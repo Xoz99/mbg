@@ -2,26 +2,15 @@
 'use client';
 
 import { useState, useEffect, useMemo, memo } from 'react';
+import { useRouter } from 'next/navigation';
 import DapurLayout from '@/components/layout/DapurLayout';
 import { 
-  ChefHat,
-  Package,
-  Truck,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  TrendingUp,
-  Users,
-  Calendar,
-  PlayCircle,
-  BoxIcon,
-  Activity,
-  Utensils,
-  QrCode,
-  MapPin,
-  ShoppingBag
+  ChefHat, Package, Truck, CheckCircle, TrendingUp, Calendar, 
+  PlayCircle, Activity, Utensils, QrCode, MapPin, ChevronLeft, 
+  ChevronRight, FileText, Eye, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import Link from 'next/link';
 
 const ProductionChart = memo(({ data }: { data: any[] }) => (
   <ResponsiveContainer width="100%" height={220}>
@@ -36,7 +25,6 @@ const ProductionChart = memo(({ data }: { data: any[] }) => (
     </LineChart>
   </ResponsiveContainer>
 ));
-
 ProductionChart.displayName = 'ProductionChart';
 
 const DeliveryChart = memo(({ data }: { data: any[] }) => (
@@ -50,14 +38,150 @@ const DeliveryChart = memo(({ data }: { data: any[] }) => (
     </BarChart>
   </ResponsiveContainer>
 ));
-
 DeliveryChart.displayName = 'DeliveryChart';
 
+const MiniCalendar = () => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const menuDates = useMemo(() => new Set([
+    '2025-01-13', '2025-01-14', '2025-01-15', '2025-01-16', '2025-01-17', '2025-01-18'
+  ]), []);
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const firstDayOfMonth = new Date(year, month, 1);
+  const lastDayOfMonth = new Date(year, month + 1, 0);
+  const daysInMonth = lastDayOfMonth.getDate();
+  const startingDayOfWeek = firstDayOfMonth.getDay();
+  const adjustedStartDay = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
+  
+  const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  const dayNames = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+
+  const calendarDays = [];
+  const prevMonthLastDay = new Date(year, month, 0).getDate();
+  
+  for (let i = adjustedStartDay - 1; i >= 0; i--) {
+    calendarDays.push({ day: prevMonthLastDay - i, isCurrentMonth: false });
+  }
+  
+  for (let day = 1; day <= daysInMonth; day++) {
+    calendarDays.push({ day, isCurrentMonth: true });
+  }
+  
+  const remainingCells = 42 - calendarDays.length;
+  for (let day = 1; day <= remainingCells; day++) {
+    calendarDays.push({ day, isCurrentMonth: false });
+  }
+
+  const isToday = (day: number) => {
+    const today = new Date();
+    return day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+  };
+
+  const hasMenu = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return menuDates.has(dateStr);
+  };
+
+  return (
+    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-[#D0B064]" />
+          Kalender Menu
+        </h4>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="p-1 hover:bg-gray-100 rounded">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-xs font-semibold text-gray-700 min-w-[100px] text-center">
+            {monthNames[month]} {year}
+          </span>
+          <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="p-1 hover:bg-gray-100 rounded">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {dayNames.map((day) => (
+          <div key={day} className="text-center text-[10px] font-semibold text-gray-500 py-1">{day}</div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {calendarDays.map((item, index) => {
+          const { day, isCurrentMonth } = item;
+          const today = isCurrentMonth && isToday(day);
+          const hasMenuDay = isCurrentMonth && hasMenu(day);
+
+          return (
+            <button
+              key={index}
+              disabled={!isCurrentMonth}
+              className={`aspect-square rounded text-[11px] font-medium transition-all relative flex items-center justify-center
+                ${!isCurrentMonth ? "text-gray-300" : ""}
+                ${today ? "ring-1 ring-[#D0B064]" : ""}
+                ${hasMenuDay && isCurrentMonth ? "bg-blue-500 text-white hover:bg-blue-600" : isCurrentMonth ? "text-gray-700 hover:bg-gray-50" : "text-gray-300"}`}
+            >
+              <span className="relative z-10">{day}</span>
+              {hasMenuDay && isCurrentMonth && (
+                <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2">
+                  <div className="w-1 h-1 rounded-full bg-white" />
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-center gap-3 text-[10px]">
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded bg-blue-500" />
+          <span className="text-gray-600">Ada Menu</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded border border-[#D0B064]" />
+          <span className="text-gray-600">Hari Ini</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DashboardDapur = () => {
+  const router = useRouter();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [userInfo, setUserInfo] = useState({
+    name: 'Loading...',
+    email: '',
+    phone: '',
+    dapurName: 'Dapur MBG'
+  });
 
-  // Update time & countdown
+  useEffect(() => {
+    const userData = localStorage.getItem('mbg_user');
+    const token = localStorage.getItem('mbg_token');
+    
+    if (!userData || !token) {
+      router.push('/auth/login');
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userData);
+      setUserInfo({
+        name: user.name || 'PIC Dapur',
+        email: user.email || '',
+        phone: user.phone || '',
+        dapurName: user.name || 'Dapur MBG'
+      });
+    } catch (error) {
+      router.push('/auth/login');
+    }
+  }, [router]);
+
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
@@ -68,34 +192,43 @@ const DashboardDapur = () => {
       if (now > prodStart) prodStart.setDate(prodStart.getDate() + 1);
 
       const diff = prodStart.getTime() - now.getTime();
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      setCountdown({ hours, minutes, seconds });
+      setCountdown({
+        hours: Math.floor(diff / (1000 * 60 * 60)),
+        minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((diff % (1000 * 60)) / 1000)
+      });
     }, 1000);
 
     return () => clearInterval(timer);
   }, []);
 
-  // Stats - Sesuai ERD
+  const schoolMenuStatus = useMemo(() => [
+    { id: '1', name: 'SDN Melati 01', menuPlanned: 6, menuNeeded: 7, status: 'INCOMPLETE', daysLeft: 1 },
+    { id: '2', name: 'SMP Harapan 02', menuPlanned: 7, menuNeeded: 7, status: 'COMPLETE', daysLeft: 0 },
+    { id: '3', name: 'SMA Nusantara 03', menuPlanned: 4, menuNeeded: 7, status: 'INCOMPLETE', daysLeft: 3 },
+    { id: '4', name: 'SMAN 5 Karawang', menuPlanned: 0, menuNeeded: 7, status: 'INCOMPLETE', daysLeft: 7 },
+    { id: '5', name: 'SMK Teknik 1', menuPlanned: 7, menuNeeded: 7, status: 'COMPLETE', daysLeft: 0 }
+  ], []);
+
+  const menuPlanningStats = useMemo(() => {
+    const total = schoolMenuStatus.length;
+    const complete = schoolMenuStatus.filter(s => s.status === 'COMPLETE').length;
+    const incomplete = total - complete;
+    const critical = schoolMenuStatus.filter(s => s.daysLeft >= 5).length;
+    return { total, complete, incomplete, critical, percentComplete: Math.round((complete / total) * 100) };
+  }, [schoolMenuStatus]);
+
   const stats = useMemo(() => ({
     targetHariIni: 5000,
     sudahPacking: 3850,
-    sedangMasak: 450,
-    siapDistribusi: 3400,
-    totalBatch: 3,
-    batchCompleted: 1,
-    batchInProgress: 2,
     totalTrays: 5500,
     traysAvailable: 4200,
-    traysInUse: 1300,
     totalBaskets: 120,
     basketsAvailable: 85,
-    totalKaryawan: 45,
-    karyawanAktif: 42,
     totalSekolah: 12,
-    sudahDikirim: 8
+    sudahDikirim: 8,
+    totalBatch: 3,
+    batchInProgress: 2
   }), []);
 
   const produksiMingguan = useMemo(() => [
@@ -108,11 +241,11 @@ const DashboardDapur = () => {
   ], []);
 
   const deliveryTrips = useMemo(() => [
-    { school: 'SMAN 5', trays: 485, status: 'ON_THE_WAY' },
-    { school: 'SMAN 2', trays: 420, status: 'LOADED' },
-    { school: 'SMP 1', trays: 380, status: 'ON_THE_WAY' },
-    { school: 'SMK 1', trays: 450, status: 'PENDING' },
-    { school: 'SMAN 3', trays: 395, status: 'ARRIVED' }
+    { school: 'SMAN 5', trays: 485 },
+    { school: 'SMAN 2', trays: 420 },
+    { school: 'SMP 1', trays: 380 },
+    { school: 'SMK 1', trays: 450 },
+    { school: 'SMAN 3', trays: 395 }
   ], []);
 
   const todayMenu = useMemo(() => ({
@@ -121,28 +254,16 @@ const DashboardDapur = () => {
     kalori: 650,
     protein: 25,
     cookingStartAt: '06:00',
-    cookingEndAt: '08:30'
+    cookingEndAt: '08:30',
+    difficulty: 'EASY',
+    totalBahan: 6,
+    allergyRisk: false
   }), []);
 
   const recentCheckpoints = useMemo(() => [
-    { 
-      type: 'DRIVER_TO_SCHOOL', 
-      school: 'SMAN 5 Karawang',
-      driver: 'Pak Budi',
-      time: '10:45'
-    },
-    { 
-      type: 'SCHOOL_RECEIVED', 
-      school: 'SMAN 2 Karawang',
-      driver: 'Pak Ahmad',
-      time: '10:30'
-    },
-    { 
-      type: 'DRIVER_DEPARTURE', 
-      school: 'SMP 1 Karawang',
-      driver: 'Pak Dedi',
-      time: '10:15'
-    }
+    { type: 'DRIVER_TO_SCHOOL', school: 'SMAN 5 Karawang', driver: 'Pak Budi', time: '10:45' },
+    { type: 'SCHOOL_RECEIVED', school: 'SMAN 2 Karawang', driver: 'Pak Ahmad', time: '10:30' },
+    { type: 'DRIVER_DEPARTURE', school: 'SMP 1 Karawang', driver: 'Pak Dedi', time: '10:15' }
   ], []);
 
   const formattedTime = useMemo(() => 
@@ -176,19 +297,96 @@ const DashboardDapur = () => {
   return (
     <DapurLayout currentPage="dashboard">
       <div className="space-y-4">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Dashboard Dapur Karawang</h1>
-            <p className="text-sm text-gray-600">Monitoring produksi, distribusi & equipment real-time</p>
+            <h1 className="text-xl font-bold text-gray-900">Dashboard {userInfo.dapurName}</h1>
+            <p className="text-sm text-gray-600">Monitoring produksi, distribusi & menu planning real-time</p>
           </div>
           <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
             <p className="text-xs text-blue-600 font-medium">PIC Dapur</p>
-            <p className="text-sm font-bold text-blue-900">Bu Siti Aminah</p>
+            <p className="text-sm font-bold text-blue-900">{userInfo.name}</p>
+            {userInfo.phone && <p className="text-xs text-blue-600 mt-0.5">{userInfo.phone}</p>}
           </div>
         </div>
 
-        {/* Stats Grid */}
+        {menuPlanningStats.incomplete > 0 && (
+          <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-lg p-4 text-white shadow-lg">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-base mb-1">
+                  ⚠️ {menuPlanningStats.incomplete} Sekolah Belum Lengkap Menu Planning!
+                </p>
+                <p className="text-sm text-white/90 mb-3">
+                  {menuPlanningStats.critical} sekolah kritis (5+ hari kosong) • {menuPlanningStats.complete}/{menuPlanningStats.total} sekolah sudah complete
+                </p>
+                <div className="w-full bg-white/20 rounded-full h-2 mb-3">
+                  <div 
+                    className="bg-white h-2 rounded-full transition-all" 
+                    style={{ width: `${menuPlanningStats.percentComplete}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 mb-3">
+              {schoolMenuStatus.filter(s => s.status === 'INCOMPLETE').map((school) => (
+                <div key={school.id} className="bg-white/10 rounded-lg p-3 backdrop-blur">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">{school.name}</p>
+                      <p className="text-xs text-white/80 mt-0.5">
+                        Menu: {school.menuPlanned}/{school.menuNeeded} hari • 
+                        <span className={`ml-1 ${school.daysLeft >= 5 ? 'text-red-200 font-bold' : ''}`}>
+                          {school.daysLeft} hari kosong
+                        </span>
+                      </p>
+                    </div>
+                    <div className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                      school.daysLeft >= 5 ? 'bg-red-500' : 'bg-orange-500'
+                    }`}>
+                      {school.daysLeft >= 5 ? 'URGENT' : 'PERLU'}
+                    </div>
+                  </div>
+                  <div className="w-full bg-white/20 rounded-full h-1.5">
+                    <div 
+                      className="bg-white h-1.5 rounded-full transition-all" 
+                      style={{ width: `${(school.menuPlanned / school.menuNeeded) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Link 
+              href="/dapur/menu"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white text-red-600 rounded-lg hover:bg-white/90 transition-colors font-semibold text-sm"
+            >
+              <FileText className="w-4 h-4" />
+              Lengkapi Menu Planning Sekarang
+            </Link>
+          </div>
+        )}
+
+        {menuPlanningStats.complete > 0 && (
+          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <h4 className="font-semibold text-gray-900 text-sm">Sekolah dengan Menu Lengkap (7 Hari ke Depan)</h4>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+              {schoolMenuStatus.filter(s => s.status === 'COMPLETE').map((school) => (
+                <div key={school.id} className="bg-green-50 border border-green-200 rounded-lg p-2">
+                  <p className="text-xs font-semibold text-green-900">{school.name}</p>
+                  <p className="text-[10px] text-green-600 mt-0.5">✓ {school.menuPlanned}/7 hari</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <StatCard 
             title="Target Hari Ini" 
@@ -222,9 +420,7 @@ const DashboardDapur = () => {
           />
         </div>
 
-        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          {/* Production Status */}
           <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
             <div className="bg-gradient-to-br from-[#1B263A] to-[#2A3749] p-4 text-white">
               <div className="flex items-center justify-between mb-3">
@@ -267,9 +463,9 @@ const DashboardDapur = () => {
                 </div>
                 <div className="w-full bg-white/20 rounded-full h-2.5">
                   <div 
-                    className="bg-gradient-to-r from-green-400 to-green-600 h-2.5 rounded-full transition-all duration-500"
+                    className="bg-gradient-to-r from-green-400 to-green-600 h-2.5 rounded-full transition-all duration-500" 
                     style={{ width: `${progressPercentage}%` }}
-                  ></div>
+                  />
                 </div>
                 <div className="flex items-center justify-between text-xs text-white/80">
                   <span>0 baki</span>
@@ -284,37 +480,62 @@ const DashboardDapur = () => {
             </div>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-3">
-            {/* Menu Hari Ini */}
             <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-4 text-white shadow-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="p-1.5 bg-white/20 rounded-lg">
-                  <ChefHat className="w-4 h-4" />
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-white/20 rounded-lg">
+                    <ChefHat className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/80">Menu Hari Ini</p>
+                    <p className="font-bold text-base">{todayMenu.menuName}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-white/80">Menu Hari Ini</p>
-                  <p className="font-bold text-base">{todayMenu.menuName}</p>
-                </div>
+                <Link 
+                  href="/dapur/menu"
+                  className="p-1.5 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
+                </Link>
               </div>
-              <p className="text-xs text-white/90 mb-2">{todayMenu.description}</p>
-              <div className="bg-white/20 rounded-lg p-2.5">
-                <div className="flex items-center justify-between text-xs mb-1">
+              <p className="text-xs text-white/90 mb-3">{todayMenu.description}</p>
+              <div className="bg-white/20 rounded-lg p-2.5 space-y-2">
+                <div className="flex items-center justify-between text-xs">
                   <span>Kalori</span>
                   <span className="font-bold">{todayMenu.kalori} kcal</span>
                 </div>
-                <div className="flex items-center justify-between text-xs mb-1">
+                <div className="flex items-center justify-between text-xs">
                   <span>Protein</span>
                   <span className="font-bold">{todayMenu.protein}g</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
+                  <span>Tingkat Kesulitan</span>
+                  <span className="px-2 py-0.5 bg-green-500/30 rounded-full font-bold">
+                    {todayMenu.difficulty}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span>Total Bahan</span>
+                  <span className="font-bold">{todayMenu.totalBahan} items</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span>Risiko Alergi</span>
+                  <span className={`px-2 py-0.5 rounded-full font-bold ${
+                    todayMenu.allergyRisk ? 'bg-red-500/30' : 'bg-emerald-500/30'
+                  }`}>
+                    {todayMenu.allergyRisk ? 'Ada' : 'Aman'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-white/20">
                   <span>Waktu Masak</span>
                   <span className="font-bold">{todayMenu.cookingStartAt} - {todayMenu.cookingEndAt}</span>
                 </div>
               </div>
             </div>
 
-            {/* Equipment Status */}
+            <MiniCalendar />
+
             <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
               <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2 text-sm">
                 <Package className="w-4 h-4 text-purple-600" />
@@ -330,13 +551,15 @@ const DashboardDapur = () => {
                   </div>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-xs text-purple-600">Available</span>
-                    <span className="font-bold text-sm text-purple-900">{stats.traysAvailable}/{stats.totalTrays}</span>
+                    <span className="font-bold text-sm text-purple-900">
+                      {stats.traysAvailable}/{stats.totalTrays}
+                    </span>
                   </div>
                   <div className="w-full bg-purple-200 rounded-full h-1.5">
                     <div 
-                      className="bg-purple-600 h-1.5 rounded-full"
+                      className="bg-purple-600 h-1.5 rounded-full" 
                       style={{ width: `${(stats.traysAvailable / stats.totalTrays) * 100}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
 
@@ -349,19 +572,20 @@ const DashboardDapur = () => {
                   </div>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-xs text-blue-600">Available</span>
-                    <span className="font-bold text-sm text-blue-900">{stats.basketsAvailable}/{stats.totalBaskets}</span>
+                    <span className="font-bold text-sm text-blue-900">
+                      {stats.basketsAvailable}/{stats.totalBaskets}
+                    </span>
                   </div>
                   <div className="w-full bg-blue-200 rounded-full h-1.5">
                     <div 
-                      className="bg-blue-600 h-1.5 rounded-full"
+                      className="bg-blue-600 h-1.5 rounded-full" 
                       style={{ width: `${(stats.basketsAvailable / stats.totalBaskets) * 100}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Quick Actions */}
             <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
               <h4 className="font-semibold text-gray-900 mb-3 text-sm">Quick Actions</h4>
               <div className="space-y-2">
@@ -373,18 +597,19 @@ const DashboardDapur = () => {
                   <QrCode className="w-4 h-4" />
                   Scan Checkpoint
                 </button>
-                <button className="w-full flex items-center gap-2 px-3 py-2 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors font-medium text-sm">
-                  <ShoppingBag className="w-4 h-4" />
-                  Update Bahan
-                </button>
+                <Link 
+                  href="/dapur/menu"
+                  className="w-full flex items-center gap-2 px-3 py-2 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors font-medium text-sm"
+                >
+                  <FileText className="w-4 h-4" />
+                  Menu Planning
+                </Link>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Bottom Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {/* Delivery Chart */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-gray-900">Distribusi Hari Ini</h3>
@@ -395,18 +620,19 @@ const DashboardDapur = () => {
             <div className="mt-3 pt-3 border-t border-gray-200">
               <div className="flex items-center justify-between text-sm mb-1.5">
                 <span className="text-gray-600">Progress Pengiriman</span>
-                <span className="font-semibold text-gray-900">{stats.sudahDikirim}/{stats.totalSekolah} sekolah</span>
+                <span className="font-semibold text-gray-900">
+                  {stats.sudahDikirim}/{stats.totalSekolah} sekolah
+                </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 
-                  className="bg-blue-500 h-2 rounded-full transition-all"
+                  className="bg-blue-500 h-2 rounded-full transition-all" 
                   style={{ width: `${(stats.sudahDikirim / stats.totalSekolah) * 100}%` }}
-                ></div>
+                />
               </div>
             </div>
           </div>
 
-          {/* Tracking */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-gray-900">Tracking Terbaru</h3>

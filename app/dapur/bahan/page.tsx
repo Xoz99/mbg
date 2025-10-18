@@ -1,7 +1,6 @@
-// app/dapur/bahan/page.tsx
 'use client';
 
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef, memo } from 'react';
 import DapurLayout from '@/components/layout/DapurLayout';
 import { 
   Package,
@@ -27,9 +26,134 @@ import {
   RefreshCw,
   Image as ImageIcon,
   MapPin,
-  Truck
+  Truck,
+  Loader2
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend } from 'recharts';
+
+const API_BASE_URL = "http://72.60.79.126:3000"
+
+// Skeleton Components
+const SkeletonStatCard = () => (
+  <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 animate-pulse">
+    <div className="h-10 w-10 bg-gray-200 rounded-lg mb-3"></div>
+    <div className="h-3 w-24 bg-gray-200 rounded mb-2"></div>
+    <div className="h-7 w-16 bg-gray-300 rounded mb-2"></div>
+    <div className="h-3 w-20 bg-gray-200 rounded"></div>
+  </div>
+);
+
+const SkeletonChartContainer = ({ title, height = "h-80" }) => (
+  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 animate-pulse">
+    <div className="h-6 w-32 bg-gray-200 rounded mb-4"></div>
+    <div className={`w-full ${height} bg-gray-100 rounded-lg`}></div>
+  </div>
+);
+
+const SkeletonTableRow = () => (
+  <tr className="hover:bg-gray-50 transition-colors">
+    <td className="px-6 py-4">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+        <div className="flex-1">
+          <div className="h-4 w-32 bg-gray-200 rounded mb-2 animate-pulse"></div>
+          <div className="h-3 w-24 bg-gray-100 rounded animate-pulse"></div>
+        </div>
+      </div>
+    </td>
+    <td className="px-6 py-4">
+      <div className="h-6 w-20 bg-gray-200 rounded-full animate-pulse"></div>
+    </td>
+    <td className="px-6 py-4">
+      <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
+    </td>
+    <td className="px-6 py-4">
+      <div className="h-6 w-16 bg-gray-200 rounded-full animate-pulse"></div>
+    </td>
+    <td className="px-6 py-4">
+      <div className="flex items-center gap-2">
+        <div className="w-9 h-9 bg-gray-200 rounded animate-pulse"></div>
+        <div className="w-9 h-9 bg-gray-200 rounded animate-pulse"></div>
+        <div className="w-9 h-9 bg-gray-200 rounded animate-pulse"></div>
+      </div>
+    </td>
+  </tr>
+);
+
+const SkeletonLoading = () => (
+  <DapurLayout currentPage="bahan">
+    {/* Header Skeleton */}
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <div className="h-8 w-48 bg-gray-200 rounded mb-2 animate-pulse"></div>
+          <div className="h-4 w-64 bg-gray-100 rounded animate-pulse"></div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-24 bg-gray-200 rounded-xl animate-pulse"></div>
+          <div className="h-10 w-32 bg-gray-200 rounded-xl animate-pulse"></div>
+        </div>
+      </div>
+    </div>
+
+    {/* Stats Grid Skeleton */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <SkeletonStatCard />
+      <SkeletonStatCard />
+      <SkeletonStatCard />
+      <SkeletonStatCard />
+    </div>
+
+    {/* Charts Skeleton */}
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+      <div className="lg:col-span-3">
+        <SkeletonChartContainer title="Level Stok Bahan" height="h-80" />
+      </div>
+      <div className="lg:col-span-2">
+        <SkeletonChartContainer title="Riwayat Penggunaan (7 Hari)" height="h-64" />
+      </div>
+    </div>
+
+    {/* Search & Filter Skeleton */}
+    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6 animate-pulse">
+      <div className="flex flex-col md:flex-row items-center gap-4">
+        <div className="flex-1 h-10 bg-gray-200 rounded-lg"></div>
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-20 bg-gray-200 rounded"></div>
+          <div className="h-8 w-16 bg-gray-200 rounded"></div>
+          <div className="h-8 w-16 bg-gray-200 rounded"></div>
+          <div className="h-8 w-16 bg-gray-200 rounded"></div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-20 bg-gray-200 rounded"></div>
+          <div className="h-8 w-32 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    </div>
+
+    {/* Table Skeleton */}
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Bahan</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Kategori</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Stok</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {[...Array(8)].map((_, i) => (
+              <SkeletonTableRow key={i} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </DapurLayout>
+);
 
 // Stock Level Chart
 const StockLevelChart = memo(({ data }: { data: any[] }) => (
@@ -77,273 +201,296 @@ const StokBahanBaku = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustItem, setAdjustItem] = useState<any>(null);
+  const [adjustAmount, setAdjustAmount] = useState(0);
 
-  // Inventory Items - Sesuai dengan ingredients di menu
-  const inventoryItems = useMemo(() => [
-    {
-      id: 'INV-001',
-      name: 'Beras',
-      category: 'STAPLE', // STAPLE, PROTEIN, VEGETABLE, SEASONING, OTHERS
-      unit: 'kg',
-      currentStock: 2150,
-      minStock: 500,
-      maxStock: 3000,
-      reorderPoint: 800,
-      status: 'GOOD', // GOOD, LOW, CRITICAL, OVERSTOCK
-      avgDailyUsage: 850,
-      estimatedDaysLeft: 2.5,
-      lastRestockDate: '2025-01-10',
-      lastRestockQty: 1500,
-      supplier: 'PT Beras Jaya',
-      pricePerUnit: 12000,
-      location: 'Gudang A - Rak 1',
-      photoUrl: '/photos/beras.jpg',
-      expiryDate: null,
-      notes: 'Beras IR64 kualitas premium'
-    },
-    {
-      id: 'INV-002',
-      name: 'Daging Sapi',
-      category: 'PROTEIN',
-      unit: 'kg',
-      currentStock: 45,
-      minStock: 80,
-      maxStock: 200,
-      reorderPoint: 100,
-      status: 'CRITICAL',
-      avgDailyUsage: 120,
-      estimatedDaysLeft: 0.4,
-      lastRestockDate: '2025-01-12',
-      lastRestockQty: 150,
-      supplier: 'CV Sumber Protein',
-      pricePerUnit: 135000,
-      location: 'Cold Storage B',
-      photoUrl: '/photos/daging.jpg',
-      expiryDate: '2025-01-20',
-      notes: 'Simpan di suhu -18°C. Bagian has dalam.'
-    },
-    {
-      id: 'INV-003',
-      name: 'Ayam',
-      category: 'PROTEIN',
-      unit: 'kg',
-      currentStock: 280,
-      minStock: 150,
-      maxStock: 400,
-      reorderPoint: 200,
-      status: 'GOOD',
-      avgDailyUsage: 180,
-      estimatedDaysLeft: 1.6,
-      lastRestockDate: '2025-01-11',
-      lastRestockQty: 200,
-      supplier: 'PT Unggas Segar',
-      pricePerUnit: 38000,
-      location: 'Cold Storage A',
-      photoUrl: '/photos/ayam.jpg',
-      expiryDate: '2025-01-18',
-      notes: 'Ayam broiler fresh, simpan dingin'
-    },
-    {
-      id: 'INV-004',
-      name: 'Sayur Asem Mix',
-      category: 'VEGETABLE',
-      unit: 'kg',
-      currentStock: 85,
-      minStock: 100,
-      maxStock: 300,
-      reorderPoint: 150,
-      status: 'LOW',
-      avgDailyUsage: 200,
-      estimatedDaysLeft: 0.4,
-      lastRestockDate: '2025-01-13',
-      lastRestockQty: 180,
-      supplier: 'Pasar Induk Sayur',
-      pricePerUnit: 8500,
-      location: 'Gudang Dingin C',
-      photoUrl: null,
-      expiryDate: '2025-01-15',
-      notes: 'Kacang panjang, labu siam, jagung. Harus segera digunakan.'
-    },
-    {
-      id: 'INV-005',
-      name: 'Minyak Goreng',
-      category: 'OTHERS',
-      unit: 'liter',
-      currentStock: 145,
-      minStock: 80,
-      maxStock: 300,
-      reorderPoint: 120,
-      status: 'GOOD',
-      avgDailyUsage: 50,
-      estimatedDaysLeft: 2.9,
-      lastRestockDate: '2025-01-09',
-      lastRestockQty: 200,
-      supplier: 'PT Minyak Sehat',
-      pricePerUnit: 16000,
-      location: 'Gudang A - Rak 3',
-      photoUrl: null,
-      expiryDate: '2025-06-30',
-      notes: 'Minyak goreng kemasan jerigen 5L'
-    },
-    {
-      id: 'INV-006',
-      name: 'Bumbu Rendang',
-      category: 'SEASONING',
-      unit: 'kg',
-      currentStock: 25,
-      minStock: 20,
-      maxStock: 80,
-      reorderPoint: 30,
-      status: 'GOOD',
-      avgDailyUsage: 35,
-      estimatedDaysLeft: 0.7,
-      lastRestockDate: '2025-01-12',
-      lastRestockQty: 40,
-      supplier: 'CV Bumbu Nusantara',
-      pricePerUnit: 45000,
-      location: 'Gudang A - Rak 5',
-      photoUrl: null,
-      expiryDate: '2025-04-30',
-      notes: 'Bumbu halus siap pakai'
-    },
-    {
-      id: 'INV-007',
-      name: 'Kerupuk',
-      category: 'OTHERS',
-      unit: 'kg',
-      currentStock: 180,
-      minStock: 50,
-      maxStock: 250,
-      reorderPoint: 80,
-      status: 'GOOD',
-      avgDailyUsage: 50,
-      estimatedDaysLeft: 3.6,
-      lastRestockDate: '2025-01-08',
-      lastRestockQty: 150,
-      supplier: 'UD Kerupuk Enak',
-      pricePerUnit: 28000,
-      location: 'Gudang A - Rak 4',
-      photoUrl: null,
-      expiryDate: '2025-05-30',
-      notes: 'Mix kerupuk udang dan putih'
-    },
-    {
-      id: 'INV-008',
-      name: 'Kunyit',
-      category: 'SEASONING',
-      unit: 'kg',
-      currentStock: 8,
-      minStock: 10,
-      maxStock: 30,
-      reorderPoint: 15,
-      status: 'CRITICAL',
-      avgDailyUsage: 15,
-      estimatedDaysLeft: 0.5,
-      lastRestockDate: '2025-01-10',
-      lastRestockQty: 20,
-      supplier: 'Pasar Tradisional',
-      pricePerUnit: 25000,
-      location: 'Gudang A - Rak 5',
-      photoUrl: null,
-      expiryDate: '2025-01-25',
-      notes: '⚠️ URGENT! Kunyit segar hampir habis, butuh restock segera!'
-    },
-    {
-      id: 'INV-009',
-      name: 'Pisang',
-      category: 'OTHERS',
-      unit: 'kg',
-      currentStock: 320,
-      minStock: 150,
-      maxStock: 500,
-      reorderPoint: 200,
-      status: 'GOOD',
-      avgDailyUsage: 150,
-      estimatedDaysLeft: 2.1,
-      lastRestockDate: '2025-01-13',
-      lastRestockQty: 250,
-      supplier: 'Pasar Buah Segar',
-      pricePerUnit: 15000,
-      location: 'Gudang Dingin D',
-      photoUrl: null,
-      expiryDate: '2025-01-17',
-      notes: 'Mix pisang ambon dan kepok'
-    },
-    {
-      id: 'INV-010',
-      name: 'Jeruk',
-      category: 'OTHERS',
-      unit: 'kg',
-      currentStock: 95,
-      minStock: 100,
-      maxStock: 300,
-      reorderPoint: 150,
-      status: 'LOW',
-      avgDailyUsage: 200,
-      estimatedDaysLeft: 0.5,
-      lastRestockDate: '2025-01-13',
-      lastRestockQty: 180,
-      supplier: 'Pasar Buah Segar',
-      pricePerUnit: 18000,
-      location: 'Gudang Dingin D',
-      photoUrl: null,
-      expiryDate: '2025-01-20',
-      notes: 'Jeruk manis untuk jus. Perlu restock besok.'
+  // API State
+  const [stokItems, setStokItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dapurId, setDapurId] = useState("");
+  const [authToken, setAuthToken] = useState("");
+
+  // Form state
+  const [formData, setFormData] = useState({
+    nama: "",
+    kategori: "STAPLE",
+    stokKg: 0,
+  });
+
+  const isFetchingRef = useRef(false);
+
+  // Fetch stok data from API
+  const fetchStok = useCallback(async () => {
+    if (!dapurId || !authToken || isFetchingRef.current) {
+      if (!dapurId || !authToken) {
+        setError("Dapur ID atau Token tidak tersedia");
+      }
+      return;
     }
-  ], []);
 
-  // Usage history for chart
-  const usageHistory = useMemo(() => [
-    { date: '08/01', in: 1500, out: 850 },
-    { date: '09/01', in: 200, out: 900 },
-    { date: '10/01', in: 1500, out: 850 },
-    { date: '11/01', in: 200, out: 880 },
-    { date: '12/01', in: 150, out: 820 },
-    { date: '13/01', in: 430, out: 850 },
-    { date: 'Today', in: 0, out: 420 }
-  ], []);
+    try {
+      isFetchingRef.current = true;
+      setLoading(true);
+      setError(null);
+
+      const url = `${API_BASE_URL}/api/dapur/${dapurId}/stok?page=1&limit=100${
+        filterCategory !== "semua" ? `&kategori=${filterCategory}` : ""
+      }`;
+
+      console.log("[FETCH STOK] URL:", url);
+      console.log("[FETCH STOK] DapurId:", dapurId);
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      console.log("[FETCH STOK] Response status:", response.status);
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("[FETCH STOK] Response data:", data);
+
+      // Extract stok list dengan berbagai kemungkinan struktur
+      let stokList = [];
+      if (Array.isArray(data.data?.data)) {
+        stokList = data.data.data;
+      } else if (Array.isArray(data.data)) {
+        stokList = data.data;
+      } else if (Array.isArray(data)) {
+        stokList = data;
+      }
+
+      console.log("[FETCH STOK] Total items:", stokList.length);
+      setStokItems(stokList);
+    } catch (err: any) {
+      setError(err.message || "Gagal mengambil data stok");
+      console.error("[FETCH STOK] Error:", err);
+    } finally {
+      setLoading(false);
+      isFetchingRef.current = false;
+    }
+  }, [dapurId, authToken, filterCategory]);
+
+  // Create stok
+  const handleCreateStok = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      setLoading(true);
+      const payload = {
+        dapurId: dapurId,  // Tambah dapurId
+        nama: formData.nama,
+        kategori: formData.kategori,
+        stokKg: parseFloat(formData.stokKg.toString()),
+      };
+
+      console.log("[CREATE STOK] Payload:", payload);
+
+      const url = `${API_BASE_URL}/api/stok`;
+      console.log("[CREATE STOK] URL:", url);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("[CREATE STOK] Response status:", response.status);
+      const responseText = await response.text();
+      console.log("[CREATE STOK] Response:", responseText);
+
+      if (!response.ok) {
+        throw new Error(`API Error ${response.status}: ${responseText}`);
+      }
+
+      const data = JSON.parse(responseText);
+      console.log("[CREATE STOK] Success:", data);
+
+      setFormData({ nama: "", kategori: "STAPLE", stokKg: 0 });
+      setShowAddModal(false);
+      await fetchStok();
+      alert("Stok berhasil ditambahkan!");
+    } catch (err: any) {
+      alert(`Gagal: ${err.message}`);
+      console.error("[CREATE STOK] Error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Adjust stok
+  const handleAdjustStok = async () => {
+    try {
+      if (!adjustItem || adjustAmount === 0) {
+        alert("Masukkan jumlah adjustment yang valid");
+        return;
+      }
+
+      // Validasi: jangan sampe stok jadi negatif
+      const newStock = adjustItem.stokKg + adjustAmount;
+      if (newStock < 0) {
+        alert(`Stok tidak cukup! Stok saat ini: ${adjustItem.stokKg} kg`);
+        return;
+      }
+
+      setLoading(true);
+      const payload = { adjustment: adjustAmount };
+
+      const url = `${API_BASE_URL}/api/stok/${adjustItem.id || adjustItem._id}/adjust`;
+      console.log("[ADJUST STOK] URL:", url);
+      console.log("[ADJUST STOK] Current stock:", adjustItem.stokKg);
+      console.log("[ADJUST STOK] Adjustment:", adjustAmount);
+      console.log("[ADJUST STOK] New stock will be:", newStock);
+
+      const response = await fetch(url, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("[ADJUST STOK] Response status:", response.status);
+      const responseText = await response.text();
+      console.log("[ADJUST STOK] Response:", responseText);
+
+      if (!response.ok) {
+        throw new Error(`API Error ${response.status}: ${responseText}`);
+      }
+
+      const data = JSON.parse(responseText);
+      console.log("[ADJUST STOK] Success:", data);
+
+      setShowAdjustModal(false);
+      setAdjustItem(null);
+      setAdjustAmount(0);
+      await fetchStok();
+      alert("Stok berhasil diperbarui!");
+    } catch (err: any) {
+      alert(`Gagal: ${err.message}`);
+      console.error("[ADJUST STOK] Error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete stok
+  const handleDeleteStok = async (stokId: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus stok ini?")) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/stok/${stokId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Gagal menghapus stok");
+      }
+
+      await fetchStok();
+      setSelectedItem(null);
+      alert("Stok berhasil dihapus!");
+    } catch (err: any) {
+      alert(err.message || "Terjadi kesalahan");
+      console.error("[DELETE STOK] Error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initialize dari localStorage
+  useEffect(() => {
+    const storedToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
+    const storedDapurId = localStorage.getItem("dapurId") || localStorage.getItem("userDapurId");
+
+    if (storedToken && storedToken !== authToken) setAuthToken(storedToken);
+    if (storedDapurId && storedDapurId !== dapurId) setDapurId(storedDapurId);
+
+    if (!storedToken || !storedDapurId) {
+      setLoading(false);
+      setError("Token atau Dapur ID tidak ditemukan. Silakan login.");
+    }
+  }, [authToken, dapurId]);
+
+  // Fetch stok ketika dapurId atau authToken berubah
+  useEffect(() => {
+    if (dapurId && authToken) {
+      fetchStok();
+    }
+  }, [dapurId, authToken, filterCategory, fetchStok]);
 
   // Filter items
   const filteredItems = useMemo(() => {
-    let filtered = inventoryItems;
+    let filtered = stokItems;
 
     if (filterStatus !== 'semua') {
       filtered = filtered.filter(item => item.status === filterStatus);
     }
 
     if (filterCategory !== 'semua') {
-      filtered = filtered.filter(item => item.category === filterCategory);
+      filtered = filtered.filter(item => item.kategori === filterCategory);
     }
 
     if (searchQuery) {
       filtered = filtered.filter(item => 
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.supplier.toLowerCase().includes(searchQuery.toLowerCase())
+        item.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.supplier?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
     return filtered;
-  }, [inventoryItems, filterStatus, filterCategory, searchQuery]);
+  }, [stokItems, filterStatus, filterCategory, searchQuery]);
 
   // Statistics
   const stats = useMemo(() => {
-    const critical = inventoryItems.filter(i => i.status === 'CRITICAL').length;
-    const low = inventoryItems.filter(i => i.status === 'LOW').length;
-    const good = inventoryItems.filter(i => i.status === 'GOOD').length;
-    const totalValue = inventoryItems.reduce((acc, i) => acc + (i.currentStock * i.pricePerUnit), 0);
-    const needRestock = inventoryItems.filter(i => i.currentStock <= i.reorderPoint).length;
+    const critical = stokItems.filter(i => i.status === 'CRITICAL').length;
+    const low = stokItems.filter(i => i.status === 'LOW').length;
+    const good = stokItems.filter(i => i.status === 'GOOD').length;
     
-    return { critical, low, good, totalValue, needRestock, totalItems: inventoryItems.length };
-  }, [inventoryItems]);
+    return { 
+      critical, 
+      low, 
+      good, 
+      totalItems: stokItems.length,
+      needRestock: critical + low
+    };
+  }, [stokItems]);
 
-  // Chart data for stock levels
+  // Chart data
   const chartData = useMemo(() => 
-    inventoryItems.slice(0, 8).map(item => ({
-      name: item.name,
-      stock: item.currentStock,
-      status: item.status
+    stokItems.slice(0, 8).map(item => ({
+      name: item.nama,
+      stock: item.stokKg || 0,
+      status: item.status || 'GOOD'
     }))
-  , [inventoryItems]);
+  , [stokItems]);
+
+  const usageHistory = useMemo(() => [
+    { date: '08/01', in: 100, out: 50 },
+    { date: '09/01', in: 120, out: 60 },
+    { date: '10/01', in: 150, out: 80 },
+    { date: '11/01', in: 100, out: 90 },
+    { date: '12/01', in: 110, out: 85 },
+    { date: '13/01', in: 140, out: 95 },
+    { date: 'Today', in: 0, out: 70 }
+  ], []);
 
   const getStatusConfig = (status: string) => {
     const configs = {
@@ -365,12 +512,6 @@ const StokBahanBaku = () => {
         text: 'Kritis',
         dotColor: 'bg-red-500 animate-pulse'
       },
-      OVERSTOCK: {
-        color: 'bg-blue-100 text-blue-700 border-blue-200',
-        icon: TrendingUp,
-        text: 'Berlebih',
-        dotColor: 'bg-blue-500'
-      }
     };
     return configs[status as keyof typeof configs] || configs.GOOD;
   };
@@ -386,26 +527,42 @@ const StokBahanBaku = () => {
     return names[category as keyof typeof names] || category;
   };
 
-  const StatCard = ({ title, value, subtitle, icon: Icon, color, trend }: any) => (
+  const StatCard = ({ title, value, subtitle, icon: Icon, color }: any) => (
     <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`p-2.5 rounded-lg ${color}`}>
-          <Icon className="w-5 h-5 text-white" />
-        </div>
-        {trend !== undefined && (
-          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
-            trend > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-          }`}>
-            {trend > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {Math.abs(trend)}%
-          </div>
-        )}
+      <div className={`p-2.5 rounded-lg ${color} mb-3 w-fit`}>
+        <Icon className="w-5 h-5 text-white" />
       </div>
       <p className="text-xs font-medium text-gray-600 mb-1">{title}</p>
       <p className="text-2xl font-bold text-gray-900 mb-0.5">{value}</p>
       <p className="text-xs text-gray-500">{subtitle}</p>
     </div>
   );
+
+  if (loading && stokItems.length === 0) {
+    return <SkeletonLoading />;
+  }
+
+  if (error && stokItems.length === 0) {
+    return (
+      <DapurLayout currentPage="bahan">
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center max-w-md">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <p className="text-red-600 mb-4">{error}</p>
+            <button
+              onClick={() => {
+                setError(null);
+                if (dapurId && authToken) fetchStok();
+              }}
+              className="px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] transition-colors"
+            >
+              Coba Lagi
+            </button>
+          </div>
+        </div>
+      </DapurLayout>
+    );
+  }
 
   return (
     <DapurLayout currentPage="bahan">
@@ -417,9 +574,13 @@ const StokBahanBaku = () => {
             <p className="text-gray-600">Kelola inventory dan monitoring stok ingredients</p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold shadow-sm">
-              <Download className="w-5 h-5" />
-              Export
+            <button 
+              onClick={fetchStok}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold shadow-sm disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+              Refresh
             </button>
             <button 
               onClick={() => setShowAddModal(true)}
@@ -439,19 +600,16 @@ const StokBahanBaku = () => {
             <AlertCircle className="w-6 h-6 text-red-500 mt-0.5 flex-shrink-0 animate-pulse" />
             <div className="flex-1">
               <p className="font-bold text-red-900 text-lg mb-1">Perhatian - Stok Kritis!</p>
-              <p className="text-sm text-red-700 mb-2">
+              <p className="text-sm text-red-700">
                 {stats.critical} bahan dalam status kritis dan {stats.low} bahan stok rendah. Segera lakukan pemesanan!
               </p>
-              <button className="text-sm font-semibold text-red-700 hover:text-red-800 underline">
-                Lihat Bahan Kritis →
-              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard 
           title="TOTAL ITEM" 
           value={stats.totalItems} 
@@ -480,40 +638,15 @@ const StokBahanBaku = () => {
           icon={ShoppingCart} 
           color="bg-orange-600"
         />
-        <StatCard 
-          title="NILAI INVENTORI" 
-          value={`Rp ${(stats.totalValue / 1000000).toFixed(1)}jt`}
-          subtitle="total aset stok" 
-          icon={TrendingUp} 
-          color="bg-purple-600"
-        />
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-        {/* Stock Level Chart */}
         <div className="lg:col-span-3 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900">Level Stok Bahan</h3>
-            <div className="flex items-center gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded"></div>
-                <span className="text-gray-600">Aman</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                <span className="text-gray-600">Rendah</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-red-500 rounded"></div>
-                <span className="text-gray-600">Kritis</span>
-              </div>
-            </div>
-          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Level Stok Bahan</h3>
           <StockLevelChart data={chartData} />
         </div>
 
-        {/* Usage History */}
         <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Riwayat Penggunaan (7 Hari)</h3>
           <UsageHistoryChart data={usageHistory} />
@@ -523,7 +656,6 @@ const StokBahanBaku = () => {
       {/* Search & Filter */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col md:flex-row items-center gap-4">
-          {/* Search */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -535,7 +667,6 @@ const StokBahanBaku = () => {
             />
           </div>
 
-          {/* Status Filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-gray-700">Status:</span>
             {['semua', 'CRITICAL', 'LOW', 'GOOD'].map((status) => (
@@ -553,7 +684,6 @@ const StokBahanBaku = () => {
             ))}
           </div>
 
-          {/* Category Filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-gray-700">Kategori:</span>
             <select
@@ -582,112 +712,254 @@ const StokBahanBaku = () => {
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Kategori</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Stok</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Est. Habis</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Lokasi</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredItems.map((item) => {
-                const statusConfig = getStatusConfig(item.status);
-                
-                return (
-                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                          {item.photoUrl ? (
-                            <ImageIcon className="w-6 h-6 text-gray-400" />
-                          ) : (
+              {filteredItems.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                    <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>Tidak ada data stok</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredItems.map((item) => {
+                  const statusConfig = getStatusConfig(item.status || 'GOOD');
+                  
+                  return (
+                    <tr key={item.id || item._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
                             <Package className="w-6 h-6 text-gray-400" />
-                          )}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900">{item.nama}</p>
+                            <p className="text-xs text-gray-500">{item.supplier || '-'}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">{item.name}</p>
-                          <p className="text-xs text-gray-500">{item.supplier}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
+                          {getCategoryName(item.kategori)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-bold text-gray-900">{item.stokKg} kg</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${statusConfig.color}`}>
+                          <div className={`w-2 h-2 rounded-full ${statusConfig.dotColor}`}></div>
+                          {statusConfig.text}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSelectedItem(item)}
+                            className="p-2 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition-colors"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setAdjustItem(item);
+                              setAdjustAmount(0);
+                              setShowAdjustModal(true);
+                            }}
+                            className="p-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+                            title="Adjust stok"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
-                        {getCategoryName(item.category)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">{item.currentStock.toLocaleString()} {item.unit}</p>
-                        <p className="text-xs text-gray-500">Min: {item.minStock} {item.unit}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${statusConfig.color}`}>
-                        <div className={`w-2 h-2 rounded-full ${statusConfig.dotColor}`}></div>
-                        {statusConfig.text}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{item.estimatedDaysLeft.toFixed(1)} hari</p>
-                        <p className="text-xs text-gray-500">{item.avgDailyUsage} {item.unit}/hari</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1 text-sm text-gray-700">
-                        <MapPin className="w-3 h-3 text-gray-400" />
-                        <span className="text-xs">{item.location}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setSelectedItem(item)}
-                          className="p-2 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition-colors"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {item.status === 'CRITICAL' || item.status === 'LOW' ? (
-                          <button className="p-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors">
-                            <ShoppingCart className="w-4 h-4" />
-                          </button>
-                        ) : (
-                          <button className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                            <Edit className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* Adjust Stok Modal */}
+      {showAdjustModal && adjustItem && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
+            <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white px-6 py-5 flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-xl font-bold">Sesuaikan Stok</h3>
+              <button
+                onClick={() => {
+                  setShowAdjustModal(false);
+                  setAdjustItem(null);
+                  setAdjustAmount(0);
+                }}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                <p className="text-xs text-blue-600 font-semibold mb-1">Item</p>
+                <p className="text-lg font-bold text-blue-900">{adjustItem.nama}</p>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <p className="text-xs text-gray-600 font-semibold mb-1">Stok Saat Ini</p>
+                <p className="text-2xl font-bold text-gray-900">{adjustItem.stokKg} kg</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Jumlah Perubahan (kg)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={adjustAmount}
+                    onChange={(e) => setAdjustAmount(parseFloat(e.target.value) || 0)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                    placeholder="Contoh: 5 (tambah) atau -3 (kurang)"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  • Angka positif = tambah stok (contoh: 5)
+                  <br />
+                  • Angka negatif = kurangi stok (contoh: -3)
+                </p>
+              </div>
+
+              {adjustAmount !== 0 && (
+                <div className={`rounded-xl p-4 ${adjustAmount > 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                  <p className={`text-xs font-semibold mb-1 ${adjustAmount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    Stok Baru
+                  </p>
+                  <p className={`text-2xl font-bold ${adjustAmount > 0 ? 'text-green-900' : 'text-red-900'}`}>
+                    {adjustItem.stokKg + adjustAmount} kg
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdjustModal(false);
+                    setAdjustItem(null);
+                    setAdjustAmount(0);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleAdjustStok}
+                  disabled={loading || adjustAmount === 0}
+                  className="flex-1 px-4 py-2.5 bg-[#D0B064] text-white rounded-xl hover:bg-[#C9A355] transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
+                  Perbarui
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
+            <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white px-6 py-5 flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-xl font-bold">Tambah Stok</h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateStok} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Bahan</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.nama}
+                  onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                  placeholder="Contoh: Beras"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Kategori</label>
+                <select
+                  value={formData.kategori}
+                  onChange={(e) => setFormData({ ...formData, kategori: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                >
+                  <option value="STAPLE">Bahan Pokok</option>
+                  <option value="PROTEIN">Protein</option>
+                  <option value="VEGETABLE">Sayuran</option>
+                  <option value="SEASONING">Bumbu</option>
+                  <option value="OTHERS">Lainnya</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Jumlah (kg)</label>
+                <input
+                  type="number"
+                  required
+                  step="0.1"
+                  min="0"
+                  value={formData.stokKg}
+                  onChange={(e) => setFormData({ ...formData, stokKg: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                  placeholder="Contoh: 50.5"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 px-4 py-2.5 bg-[#D0B064] text-white rounded-xl hover:bg-[#C9A355] transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                  Tambah
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Detail Modal */}
       {selectedItem && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            {/* Modal Header */}
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white px-6 py-5 flex items-center justify-between z-10 rounded-t-2xl">
               <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="font-mono text-sm font-bold bg-white/20 px-3 py-1 rounded-lg">{selectedItem.id}</span>
-                  {(() => {
-                    const statusConfig = getStatusConfig(selectedItem.status);
-                    return (
-                      <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/20 border border-white/30">
-                        <statusConfig.icon className="w-4 h-4" />
-                        {statusConfig.text}
-                      </span>
-                    );
-                  })()}
-                </div>
-                <h3 className="text-xl font-bold">{selectedItem.name}</h3>
-                <p className="text-sm text-white/70 mt-1">{getCategoryName(selectedItem.category)}</p>
+                <h3 className="text-xl font-bold">{selectedItem.nama}</h3>
+                <p className="text-sm text-white/70 mt-1">{getCategoryName(selectedItem.kategori)}</p>
               </div>
-              <button 
-                onClick={() => setSelectedItem(null)} 
+              <button
+                onClick={() => setSelectedItem(null)}
                 className="p-2 hover:bg-white/20 rounded-lg transition-colors"
               >
                 <X className="w-6 h-6" />
@@ -695,7 +967,6 @@ const StokBahanBaku = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Alert jika kritis */}
               {(selectedItem.status === 'CRITICAL' || selectedItem.status === 'LOW') && (
                 <div className={`${selectedItem.status === 'CRITICAL' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'} border rounded-xl p-4`}>
                   <div className="flex items-start gap-3">
@@ -705,136 +976,48 @@ const StokBahanBaku = () => {
                         {selectedItem.status === 'CRITICAL' ? 'Stok Kritis!' : 'Stok Rendah!'}
                       </p>
                       <p className={`text-sm ${selectedItem.status === 'CRITICAL' ? 'text-red-700' : 'text-yellow-700'} mt-1`}>
-                        Estimasi habis dalam {selectedItem.estimatedDaysLeft.toFixed(1)} hari. Segera lakukan pemesanan ulang!
+                        Segera lakukan pemesanan ulang!
                       </p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Stock Info Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
                   <Package className="w-5 h-5 text-blue-600 mb-2" />
                   <p className="text-xs text-blue-600 mb-1">Stok Saat Ini</p>
-                  <p className="text-2xl font-bold text-blue-900">{selectedItem.currentStock}</p>
-                  <p className="text-xs text-blue-600 mt-1">{selectedItem.unit}</p>
+                  <p className="text-2xl font-bold text-blue-900">{selectedItem.stokKg}</p>
+                  <p className="text-xs text-blue-600 mt-1">kg</p>
                 </div>
+
+                <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+                  <BarChart3 className="w-5 h-5 text-purple-600 mb-2" />
+                  <p className="text-xs text-purple-600 mb-1">Kategori</p>
+                  <p className="font-semibold text-purple-900 text-sm">{getCategoryName(selectedItem.kategori)}</p>
+                </div>
+
                 <div className="bg-green-50 rounded-xl p-4 border border-green-100">
-                  <TrendingUp className="w-5 h-5 text-green-600 mb-2" />
-                  <p className="text-xs text-green-600 mb-1">Stok Maksimal</p>
-                  <p className="text-2xl font-bold text-green-900">{selectedItem.maxStock}</p>
-                  <p className="text-xs text-green-600 mt-1">{selectedItem.unit}</p>
-                </div>
-                <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
-                  <AlertCircle className="w-5 h-5 text-orange-600 mb-2" />
-                  <p className="text-xs text-orange-600 mb-1">Reorder Point</p>
-                  <p className="text-2xl font-bold text-orange-900">{selectedItem.reorderPoint}</p>
-                  <p className="text-xs text-orange-600 mt-1">{selectedItem.unit}</p>
-                </div>
-                <div className="bg-red-50 rounded-xl p-4 border border-red-100">
-                  <TrendingDown className="w-5 h-5 text-red-600 mb-2" />
-                  <p className="text-xs text-red-600 mb-1">Stok Minimal</p>
-                  <p className="text-2xl font-bold text-red-900">{selectedItem.minStock}</p>
-                  <p className="text-xs text-red-600 mt-1">{selectedItem.unit}</p>
+                  <Calendar className="w-5 h-5 text-green-600 mb-2" />
+                  <p className="text-xs text-green-600 mb-1">Dibuat</p>
+                  <p className="font-semibold text-green-900 text-sm">
+                    {selectedItem.createdAt ? new Date(selectedItem.createdAt).toLocaleDateString('id-ID') : '-'}
+                  </p>
                 </div>
               </div>
 
-              {/* Usage & Cost Info */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <h4 className="font-bold text-gray-900 text-sm uppercase tracking-wide">Info Penggunaan</h4>
-                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                    <BarChart3 className="w-5 h-5 text-gray-600" />
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500">Rata-rata per Hari</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.avgDailyUsage} {selectedItem.unit}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                    <Clock className="w-5 h-5 text-gray-600" />
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500">Estimasi Habis</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.estimatedDaysLeft.toFixed(1)} hari</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="font-bold text-gray-900 text-sm uppercase tracking-wide">Info Biaya</h4>
-                  <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-xl border border-purple-200">
-                    <TrendingUp className="w-5 h-5 text-purple-600" />
-                    <div className="flex-1">
-                      <p className="text-xs text-purple-600">Harga per {selectedItem.unit}</p>
-                      <p className="font-bold text-purple-900">Rp {selectedItem.pricePerUnit.toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-xl border border-purple-200">
-                    <Package className="w-5 h-5 text-purple-600" />
-                    <div className="flex-1">
-                      <p className="text-xs text-purple-600">Nilai Total Stok</p>
-                      <p className="font-bold text-purple-900">Rp {(selectedItem.currentStock * selectedItem.pricePerUnit).toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Restock Info */}
-              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-5 border border-blue-100">
-                <h4 className="font-bold text-gray-900 mb-3 text-sm uppercase tracking-wide flex items-center gap-2">
-                  <RefreshCw className="w-5 h-5 text-blue-600" />
-                  Info Restock Terakhir
-                </h4>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-blue-200">
-                    <Calendar className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="text-xs text-blue-600">Tanggal</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.lastRestockDate}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-blue-200">
-                    <Package className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="text-xs text-blue-600">Jumlah</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.lastRestockQty} {selectedItem.unit}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-blue-200">
-                    <Truck className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="text-xs text-blue-600">Supplier</p>
-                      <p className="font-semibold text-gray-900 text-sm">{selectedItem.supplier}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Storage & Expiry */}
-              <div className="grid md:grid-cols-2 gap-4">
+              {selectedItem.supplier && (
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                   <div className="flex items-center gap-3">
-                    <MapPin className="w-5 h-5 text-gray-600" />
+                    <Truck className="w-5 h-5 text-gray-600" />
                     <div>
-                      <p className="text-xs text-gray-500">Lokasi Penyimpanan</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.location}</p>
+                      <p className="text-xs text-gray-500">Supplier</p>
+                      <p className="font-semibold text-gray-900">{selectedItem.supplier}</p>
                     </div>
                   </div>
                 </div>
-                {selectedItem.expiryDate && (
-                  <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
-                    <div className="flex items-center gap-3">
-                      <Clock className="w-5 h-5 text-yellow-600" />
-                      <div>
-                        <p className="text-xs text-yellow-600">Tanggal Kadaluarsa</p>
-                        <p className="font-semibold text-yellow-900">{selectedItem.expiryDate}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
 
-              {/* Notes */}
               {selectedItem.notes && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
                   <div className="flex items-start gap-3">
@@ -847,29 +1030,27 @@ const StokBahanBaku = () => {
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <button 
-                  onClick={() => setShowHistoryModal(true)}
-                  className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-[#1B263A] text-white rounded-xl hover:bg-[#2A3749] transition-all font-bold shadow-md hover:shadow-lg"
+                <button
+                  onClick={() => {
+                    setAdjustItem(selectedItem);
+                    setAdjustAmount(0);
+                    setShowAdjustModal(true);
+                    setSelectedItem(null);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-all font-bold"
                 >
-                  <History className="w-5 h-5" />
-                  Lihat Riwayat
+                  <RefreshCw className="w-5 h-5" />
+                  Sesuaikan Stok
                 </button>
-                {(selectedItem.status === 'CRITICAL' || selectedItem.status === 'LOW') && (
-                  <button className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all font-bold shadow-md hover:shadow-lg">
-                    <ShoppingCart className="w-5 h-5" />
-                    Pesan Ulang
-                  </button>
-                )}
-                <button className="px-5 py-3 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-all font-bold">
-                  <Edit className="w-5 h-5" />
-                </button>
-                <button className="px-5 py-3 bg-green-100 text-green-700 rounded-xl hover:bg-green-200 transition-all font-bold">
-                  <Plus className="w-5 h-5" />
-                </button>
-                <button className="px-5 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-bold">
-                  <Minus className="w-5 h-5" />
+                <button
+                  onClick={() => {
+                    setSelectedItem(null);
+                    handleDeleteStok(selectedItem.id || selectedItem._id);
+                  }}
+                  className="px-5 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-bold"
+                >
+                  <Trash2 className="w-5 h-5" />
                 </button>
               </div>
             </div>

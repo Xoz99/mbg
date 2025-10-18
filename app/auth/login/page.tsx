@@ -1,10 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, AlertCircle } from "lucide-react"
+import { Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
 
 const LoginPage = () => {
   const router = useRouter()
@@ -14,33 +13,177 @@ const LoginPage = () => {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleLogin = (e: React.MouseEvent) => {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://72.60.79.126:3000"
+
+  const handleLogin = async (e: React.MouseEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
-    setTimeout(() => {
-      const users = [
-        { email: "smanli@mbg.id", password: "123456", role: "sekolah", nama: "SDN 01 Jakarta" },
-        { email: "kementerian@mbg.id", password: "123456", role: "kementerian", nama: "Admin Kemendikbud" },
-        { email: "dapur@mbg.id", password: "123456", role: "dapur", nama: "Dapur MBG Jakarta Pusat" },
-      ]
+    try {
+      console.log("🔄 Attempting login to:", `${baseUrl}/api/auth/login`)
+      
+      const response = await fetch(`${baseUrl}/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email,
+          password: password,
+        }),
+      })
 
-      const user = users.find((u) => u.email === email && u.password === password)
+      let data
+      try {
+        data = await response.json()
+        console.log("📦 Raw API Response:", data)
+      } catch (parseError) {
+        console.error("❌ Parse error:", parseError)
+        setError("Server mengembalikan response yang tidak valid.")
+        setIsLoading(false)
+        return
+      }
 
-      if (user) {
-        if (typeof window !== "undefined") {
-          localStorage.setItem("mbg_user", JSON.stringify(user))
-          document.cookie = `mbg_user=${JSON.stringify(user)}; path=/; max-age=86400`
+      if (response.ok) {
+        // Debug: Cek semua kemungkinan lokasi data
+        console.log("🔍 Checking data locations:", {
+          "data": data,
+          "data.data": data.data,
+          "data.user": data.user,
+          "data.data.user": data.data?.user,
+        })
+
+        // Ekstrak user data dengan berbagai kemungkinan struktur
+        let userData = null
+        let token = null
+        let apiRole = null
+
+        // Coba berbagai struktur response
+        if (data.data?.user) {
+          userData = data.data.user
+          token = data.data.token || data.token
+          apiRole = data.data.user.role
+        } else if (data.user) {
+          userData = data.user
+          token = data.token
+          apiRole = data.user.role
+        } else if (data.data) {
+          userData = data.data
+          token = data.token || data.data.token
+          apiRole = data.data.role
+        } else {
+          userData = data
+          token = data.token
+          apiRole = data.role
         }
 
-        setIsLoading(false)
-        router.push(`/${user.role}/dashboard`)
+        console.log("📋 Extracted data:", { userData, token, apiRole })
+
+        if (!apiRole) {
+          console.error("❌ Role tidak ditemukan di response")
+          setError("Data login tidak lengkap. Silakan hubungi administrator.")
+          setIsLoading(false)
+          return
+        }
+
+        if (!token) {
+          console.error("❌ Token tidak ditemukan di response")
+          setError("Token tidak ditemukan. Silakan hubungi administrator.")
+          setIsLoading(false)
+          return
+        }
+
+        // Mapping role dari API ke route
+        const roleMapping: { [key: string]: string } = {
+          "PIC_DAPUR": "dapur",
+          "PIC_SEKOLAH": "sekolah",
+          "KEMENTERIAN": "kementerian",
+          "ADMIN": "admin",
+          "SUPERADMIN": "admin"
+        }
+
+        const userRole = roleMapping[apiRole] || apiRole.toLowerCase()
+
+        // Simpan data user ke localStorage
+        if (typeof window !== "undefined") {
+          const userDataWithMappedRole = {
+            ...userData,
+            role: apiRole,
+            routeRole: userRole
+          }
+          
+          console.log("💾 Saving to localStorage:", userDataWithMappedRole)
+          
+          // Simpan user data
+          localStorage.setItem("mbg_user", JSON.stringify(userDataWithMappedRole))
+          
+          // Simpan token
+          localStorage.setItem("authToken", token)
+          localStorage.setItem("mbg_token", token)
+          document.cookie = `mbg_token=${token}; path=/; max-age=86400; SameSite=Lax`
+          
+          console.log("✅ Token saved:", token.substring(0, 20) + "...")
+
+          // Simpan dapur ID jika role adalah PIC_DAPUR
+          if (apiRole === "PIC_DAPUR") {
+            // Coba berbagai kemungkinan field name
+            const dapurId = userData.dapurId 
+              || userData.dapur_id 
+              || userData.kitchenId
+              || userData.Dapur?.id
+              || userData.dapur?.id
+            
+            console.log("🔍 Looking for dapurId in:", {
+              dapurId: userData.dapurId,
+              dapur_id: userData.dapur_id,
+              kitchenId: userData.kitchenId,
+              "Dapur?.id": userData.Dapur?.id,
+              "dapur?.id": userData.dapur?.id,
+            })
+            
+            if (dapurId) {
+              localStorage.setItem("userDapurId", dapurId)
+              console.log("✅ Dapur ID saved:", dapurId)
+            } else {
+              console.warn("⚠️ Dapur ID tidak ditemukan di response. userData:", userData)
+              // Jangan block login, tapi warn user
+              console.warn("⚠️ Menu Planning mungkin tidak berfungsi tanpa Dapur ID")
+            }
+          }
+          
+          // Simpan sekolah ID jika role adalah PIC_SEKOLAH
+          if (apiRole === "PIC_SEKOLAH") {
+            const sekolahId = userData.sekolahId 
+              || userData.sekolah_id 
+              || userData.schoolId
+              || userData.Sekolah?.id
+              || userData.sekolah?.id
+            
+            if (sekolahId) {
+              localStorage.setItem("userSekolahId", sekolahId)
+              console.log("✅ Sekolah ID saved:", sekolahId)
+            }
+          }
+          
+          // Set cookie
+          document.cookie = `mbg_user=${JSON.stringify(userDataWithMappedRole)}; path=/; max-age=86400; SameSite=Lax`
+          
+          console.log("✅ Login berhasil, redirecting to:", `/${userRole}/dashboard`)
+        }
+
+        // Redirect berdasarkan role
+        router.push(`/${userRole}/dashboard`)
       } else {
-        setError("Email atau password salah!")
+        console.error("❌ Login failed:", data)
+        setError(data.message || data.error || "Email atau password salah!")
         setIsLoading(false)
       }
-    }, 500)
+    } catch (err) {
+      console.error("❌ Login error:", err)
+      setError("Terjadi kesalahan koneksi. Silakan coba lagi.")
+      setIsLoading(false)
+    }
   }
 
   const fillDemoCredentials = (role: string) => {
@@ -132,7 +275,7 @@ const LoginPage = () => {
             {/* Error */}
             {error && (
               <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                <AlertCircle size={18} />
+                <AlertCircle size={18} className="flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
@@ -141,14 +284,16 @@ const LoginPage = () => {
             <button
               onClick={handleLogin}
               disabled={isLoading || !email || !password}
-              className="w-full bg-[#0f2a4a] text-white py-3 rounded-lg font-semibold hover:bg-[#0d2340] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-[#0f2a4a] text-white py-3 rounded-lg font-semibold hover:bg-[#0d2340] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
+              {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
               {isLoading ? "Memproses..." : "Masuk"}
             </button>
           </form>
 
           {/* Demo */}
           <div className="mt-6 pt-6 border-t border-gray-200">
+            <p className="text-xs text-gray-500 mb-3 text-center">Demo Credentials</p>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
