@@ -2,51 +2,48 @@
 'use client';
 import { useState, useEffect } from 'react';
 import CSRLayout from '@/components/layout/CSRLayout';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import {
   School, MapPin, Users, TrendingUp, Search, List, Map as MapIcon,
   Phone, Mail, MapPin as LocationIcon, Award, Eye
 } from 'lucide-react';
 
-// Fix untuk Leaflet marker icon
-const defaultIcon = L.icon({
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Custom icons berdasarkan status
-const getMarkerIcon = (status: string) => {
-  const colors: any = {
-    EXCELLENT: '#10b981',
-    GOOD: '#3b82f6',
-    NEEDS_ATTENTION: '#f59e0b'
-  };
-
-  const svgIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${colors[status] || '#3b82f6'}">
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-    </svg>
-  `;
-
-  return L.icon({
-    iconUrl: `data:image/svg+xml;base64,${btoa(svgIcon)}`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32]
-  });
-};
+// Dynamic import untuk Leaflet (hindari window error saat build)
+let MapContainer: any;
+let TileLayer: any;
+let Marker: any;
+let Popup: any;
+let L: any;
 
 const CSRSekolahBinaan = () => {
-  const [viewMode, setViewMode] = useState('map'); // map or list
+  const [viewMode, setViewMode] = useState('map');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProvince, setSelectedProvince] = useState('all');
   const [selectedSchool, setSelectedSchool] = useState<any>(null);
+  const [isClient, setIsClient] = useState(false);
+  const [leafletReady, setLeafletReady] = useState(false);
+
+  // Load Leaflet hanya di client
+  useEffect(() => {
+    setIsClient(true);
+    
+    (async () => {
+      try {
+        const leafletModule = await import('leaflet');
+        L = leafletModule.default;
+        
+        const reactLeaflet = await import('react-leaflet');
+        MapContainer = reactLeaflet.MapContainer;
+        TileLayer = reactLeaflet.TileLayer;
+        Marker = reactLeaflet.Marker;
+        Popup = reactLeaflet.Popup;
+        
+        import('leaflet/dist/leaflet.css');
+        setLeafletReady(true);
+      } catch (error) {
+        console.error('Error loading Leaflet:', error);
+      }
+    })();
+  }, []);
 
   // Data sekolah binaan
   const schools = [
@@ -153,6 +150,29 @@ const CSRSekolahBinaan = () => {
     return colors[status] || 'bg-gray-50';
   };
 
+  const getMarkerIcon = (status: string) => {
+    if (!L) return undefined;
+    
+    const colors: any = {
+      EXCELLENT: '#10b981',
+      GOOD: '#3b82f6',
+      NEEDS_ATTENTION: '#f59e0b'
+    };
+
+    const svgIcon = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${colors[status] || '#3b82f6'}">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+      </svg>
+    `;
+
+    return L.icon({
+      iconUrl: `data:image/svg+xml;base64,${btoa(svgIcon)}`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -32]
+    });
+  };
+
   return (
     <CSRLayout currentPage="sekolah">
       <div className="p-8 h-full flex flex-col">
@@ -237,117 +257,123 @@ const CSRSekolahBinaan = () => {
 
         {/* Content */}
         {viewMode === 'map' ? (
-          <div className="flex gap-6 flex-1 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 overflow-hidden">
-            {/* Map */}
-            <div className="flex-1 rounded-lg overflow-hidden border border-gray-200">
-              <MapContainer center={[-6.35, 106.95]} zoom={10} style={{ height: '100%', width: '100%' }}>
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; OpenStreetMap contributors'
-                />
-                {filteredSchools.map(school => (
-                  <Marker
-                    key={school.id}
-                    position={[school.lat, school.lng]}
-                    icon={getMarkerIcon(school.status)}
-                    eventHandlers={{
-                      click: () => setSelectedSchool(school)
-                    }}
-                  >
-                    <Popup>
-                      <div className="w-48">
-                        <h3 className="font-bold text-sm mb-1">{school.name}</h3>
-                        <p className="text-xs text-gray-600 mb-2">{school.province}</p>
-                        <div className="space-y-1 text-xs">
-                          <p>Siswa: {school.students}</p>
-                          <p>Efisiensi: {school.efficiency}%</p>
-                          <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusColor(school.status)}`}>
-                            {school.status}
-                          </span>
+          leafletReady && isClient && MapContainer ? (
+            <div className="flex gap-6 flex-1 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 overflow-hidden">
+              {/* Map */}
+              <div className="flex-1 rounded-lg overflow-hidden border border-gray-200">
+                <MapContainer center={[-6.35, 106.95]} zoom={10} style={{ height: '100%', width: '100%' }}>
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; OpenStreetMap contributors'
+                  />
+                  {filteredSchools.map(school => (
+                    <Marker
+                      key={school.id}
+                      position={[school.lat, school.lng]}
+                      icon={getMarkerIcon(school.status)}
+                      eventHandlers={{
+                        click: () => setSelectedSchool(school)
+                      }}
+                    >
+                      <Popup>
+                        <div className="w-48">
+                          <h3 className="font-bold text-sm mb-1">{school.name}</h3>
+                          <p className="text-xs text-gray-600 mb-2">{school.province}</p>
+                          <div className="space-y-1 text-xs">
+                            <p>Siswa: {school.students}</p>
+                            <p>Efisiensi: {school.efficiency}%</p>
+                            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusColor(school.status)}`}>
+                              {school.status}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
-            </div>
-
-            {/* Detail Panel */}
-            {selectedSchool && (
-              <div className={`w-80 rounded-lg p-4 border border-gray-200 overflow-y-auto ${getStatusBgColor(selectedSchool.status)}`}>
-                <div className="mb-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-bold text-lg text-gray-900">{selectedSchool.name}</h3>
-                      <p className="text-sm text-gray-600">{selectedSchool.province}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedSchool.status)}`}>
-                      {selectedSchool.status}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-4 text-sm">
-                  {/* Contact Info */}
-                  <div className="bg-white p-3 rounded-lg border border-gray-200">
-                    <p className="font-semibold text-gray-900 mb-2">Informasi Kontak</p>
-                    <div className="space-y-2">
-                      <div className="flex items-start gap-2">
-                        <School className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-xs text-gray-600">Kepala Sekolah</p>
-                          <p className="font-medium text-gray-900">{selectedSchool.kepalaSekolah}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Phone className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-xs text-gray-600">Telepon</p>
-                          <p className="font-medium text-gray-900">{selectedSchool.contact}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Mail className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-xs text-gray-600">Email</p>
-                          <p className="font-medium text-gray-900 break-all">{selectedSchool.email}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Metrics */}
-                  <div className="bg-white p-3 rounded-lg border border-gray-200">
-                    <p className="font-semibold text-gray-900 mb-2">Metrik</p>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Jumlah Siswa</span>
-                        <span className="font-semibold text-gray-900">{selectedSchool.students}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Meals Hari Ini</span>
-                        <span className="font-semibold text-gray-900">{selectedSchool.mealsToday}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Efisiensi</span>
-                        <span className="font-semibold text-green-700">{selectedSchool.efficiency}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Kepuasan</span>
-                        <span className="font-semibold text-blue-700">{selectedSchool.satisfaction}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action Button */}
-                  <button className="w-full px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] font-semibold transition-all">
-                    <Eye className="w-4 h-4 inline mr-2" />
-                    Lihat Detail Lengkap
-                  </button>
-                </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
               </div>
-            )}
-          </div>
+
+              {/* Detail Panel */}
+              {selectedSchool && (
+                <div className={`w-80 rounded-lg p-4 border border-gray-200 overflow-y-auto ${getStatusBgColor(selectedSchool.status)}`}>
+                  <div className="mb-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="font-bold text-lg text-gray-900">{selectedSchool.name}</h3>
+                        <p className="text-sm text-gray-600">{selectedSchool.province}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedSchool.status)}`}>
+                        {selectedSchool.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 text-sm">
+                    {/* Contact Info */}
+                    <div className="bg-white p-3 rounded-lg border border-gray-200">
+                      <p className="font-semibold text-gray-900 mb-2">Informasi Kontak</p>
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-2">
+                          <School className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-600">Kepala Sekolah</p>
+                            <p className="font-medium text-gray-900">{selectedSchool.kepalaSekolah}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Phone className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-600">Telepon</p>
+                            <p className="font-medium text-gray-900">{selectedSchool.contact}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Mail className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-600">Email</p>
+                            <p className="font-medium text-gray-900 break-all">{selectedSchool.email}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Metrics */}
+                    <div className="bg-white p-3 rounded-lg border border-gray-200">
+                      <p className="font-semibold text-gray-900 mb-2">Metrik</p>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Jumlah Siswa</span>
+                          <span className="font-semibold text-gray-900">{selectedSchool.students}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Meals Hari Ini</span>
+                          <span className="font-semibold text-gray-900">{selectedSchool.mealsToday}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Efisiensi</span>
+                          <span className="font-semibold text-green-700">{selectedSchool.efficiency}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Kepuasan</span>
+                          <span className="font-semibold text-blue-700">{selectedSchool.satisfaction}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <button className="w-full px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] font-semibold transition-all">
+                      <Eye className="w-4 h-4 inline mr-2" />
+                      Lihat Detail Lengkap
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex-1 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-center">
+              <p className="text-gray-500">Loading map...</p>
+            </div>
+          )
         ) : (
           /* List View */
           <div className="flex-1 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 overflow-y-auto">

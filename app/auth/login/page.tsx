@@ -15,51 +15,85 @@ const LoginPage = () => {
 
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://72.60.79.126:3000"
 
+  // Hardcoded credentials
+  const CSR_EMAIL = "csr@mbg.id"
+  const CSR_PASSWORD = "123456"
+
+  const PEMPROV_MAP: { [key: string]: string } = {
+    "pemprovjabar@mbg.id": "Jawa Barat",
+    "pemprovjateng@mbg.id": "Jawa Tengah",
+    "pemprovjatim@mbg.id": "Jawa Timur",
+    "pemprovbanten@mbg.id": "Banten",
+    "pemprovdki@mbg.id": "DKI Jakarta",
+    "pemprovbali@mbg.id": "Bali",
+    "pemprovsumatera@mbg.id": "Sumatera Utara"
+  }
+
   const handleLogin = async (e: React.MouseEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
     try {
-      console.log("🔄 Attempting login to:", `${baseUrl}/api/auth/login`)
-      
-      const response = await fetch(`${baseUrl}/api/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      // CSR Login (Local)
+      if (email === CSR_EMAIL && password === CSR_PASSWORD) {
+        const csrUser = {
+          id: "csr-001",
           email: email,
-          password: password,
-        }),
-      })
-
-      let data
-      try {
-        data = await response.json()
-        console.log("📦 Raw API Response:", data)
-      } catch (parseError) {
-        console.error("❌ Parse error:", parseError)
-        setError("Server mengembalikan response yang tidak valid.")
-        setIsLoading(false)
+          name: "CSR Officer",
+          role: "CSR",
+          routeRole: "csr"
+        }
+        
+        if (typeof window !== "undefined") {
+          localStorage.setItem("mbg_user", JSON.stringify(csrUser))
+          localStorage.setItem("authToken", "csr-token-dummy")
+          localStorage.setItem("mbg_token", "csr-token-dummy")
+          document.cookie = `mbg_token=csr-token-dummy; path=/; max-age=86400; SameSite=Lax`
+        }
+        
+        router.push("/csr/dashboard")
         return
       }
 
-      if (response.ok) {
-        // Debug: Cek semua kemungkinan lokasi data
-        console.log("🔍 Checking data locations:", {
-          "data": data,
-          "data.data": data.data,
-          "data.user": data.user,
-          "data.data.user": data.data?.user,
-        })
+      // Pemprov Login (Local)
+      const province = PEMPROV_MAP[email.toLowerCase()]
+      if (province && password === CSR_PASSWORD) {
+        const pemprovUser = {
+          id: "pemprov-001",
+          email: email,
+          name: `Pemerintah Provinsi ${province}`,
+          role: "PEMPROV",
+          routeRole: "pemprov",
+          province: province
+        }
+        
+        if (typeof window !== "undefined") {
+          localStorage.setItem("mbg_user", JSON.stringify(pemprovUser))
+          localStorage.setItem("authToken", "pemprov-token-dummy")
+          localStorage.setItem("mbg_token", "pemprov-token-dummy")
+          localStorage.setItem("userProvince", province)
+          document.cookie = `mbg_token=pemprov-token-dummy; path=/; max-age=86400; SameSite=Lax`
+        }
+        
+        router.push("/pemprov/dashboard")
+        return
+      }
 
-        // Ekstrak user data dengan berbagai kemungkinan struktur
+      // API Login untuk role lain (Sekolah, Kementerian, Dapur)
+      const response = await fetch(`${baseUrl}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
         let userData = null
         let token = null
         let apiRole = null
 
-        // Coba berbagai struktur response
         if (data.data?.user) {
           userData = data.data.user
           token = data.data.token || data.token
@@ -78,23 +112,12 @@ const LoginPage = () => {
           apiRole = data.role
         }
 
-        console.log("📋 Extracted data:", { userData, token, apiRole })
-
-        if (!apiRole) {
-          console.error("❌ Role tidak ditemukan di response")
+        if (!apiRole || !token) {
           setError("Data login tidak lengkap. Silakan hubungi administrator.")
           setIsLoading(false)
           return
         }
 
-        if (!token) {
-          console.error("❌ Token tidak ditemukan di response")
-          setError("Token tidak ditemukan. Silakan hubungi administrator.")
-          setIsLoading(false)
-          return
-        }
-
-        // Mapping role dari API ke route
         const roleMapping: { [key: string]: string } = {
           "PIC_DAPUR": "dapur",
           "PIC_SEKOLAH": "sekolah",
@@ -105,95 +128,62 @@ const LoginPage = () => {
 
         const userRole = roleMapping[apiRole] || apiRole.toLowerCase()
 
-        // Simpan data user ke localStorage
         if (typeof window !== "undefined") {
-          const userDataWithMappedRole = {
+          const userDataWithRole = {
             ...userData,
             role: apiRole,
             routeRole: userRole
           }
           
-          console.log("💾 Saving to localStorage:", userDataWithMappedRole)
-          
-          // Simpan user data
-          localStorage.setItem("mbg_user", JSON.stringify(userDataWithMappedRole))
-          
-          // Simpan token
+          localStorage.setItem("mbg_user", JSON.stringify(userDataWithRole))
           localStorage.setItem("authToken", token)
           localStorage.setItem("mbg_token", token)
           document.cookie = `mbg_token=${token}; path=/; max-age=86400; SameSite=Lax`
-          
-          console.log("✅ Token saved:", token.substring(0, 20) + "...")
 
-          // Simpan dapur ID jika role adalah PIC_DAPUR
           if (apiRole === "PIC_DAPUR") {
-            // Coba berbagai kemungkinan field name
-            const dapurId = userData.dapurId 
-              || userData.dapur_id 
-              || userData.kitchenId
-              || userData.Dapur?.id
-              || userData.dapur?.id
-            
-            console.log("🔍 Looking for dapurId in:", {
-              dapurId: userData.dapurId,
-              dapur_id: userData.dapur_id,
-              kitchenId: userData.kitchenId,
-              "Dapur?.id": userData.Dapur?.id,
-              "dapur?.id": userData.dapur?.id,
-            })
-            
+            const dapurId = userData.dapurId || userData.dapur_id || userData.kitchenId || userData.Dapur?.id || userData.dapur?.id
             if (dapurId) {
               localStorage.setItem("userDapurId", dapurId)
-              console.log("✅ Dapur ID saved:", dapurId)
-            } else {
-              console.warn("⚠️ Dapur ID tidak ditemukan di response. userData:", userData)
-              // Jangan block login, tapi warn user
-              console.warn("⚠️ Menu Planning mungkin tidak berfungsi tanpa Dapur ID")
             }
           }
-          
-          // Simpan sekolah ID jika role adalah PIC_SEKOLAH
+
           if (apiRole === "PIC_SEKOLAH") {
-            const sekolahId = userData.sekolahId 
-              || userData.sekolah_id 
-              || userData.schoolId
-              || userData.Sekolah?.id
-              || userData.sekolah?.id
-            
+            const sekolahId = userData.sekolahId || userData.sekolah_id || userData.schoolId || userData.Sekolah?.id || userData.sekolah?.id
             if (sekolahId) {
               localStorage.setItem("userSekolahId", sekolahId)
-              console.log("✅ Sekolah ID saved:", sekolahId)
             }
           }
-          
-          // Set cookie
-          document.cookie = `mbg_user=${JSON.stringify(userDataWithMappedRole)}; path=/; max-age=86400; SameSite=Lax`
-          
-          console.log("✅ Login berhasil, redirecting to:", `/${userRole}/dashboard`)
         }
 
-        // Redirect berdasarkan role
         router.push(`/${userRole}/dashboard`)
       } else {
-        console.error("❌ Login failed:", data)
         setError(data.message || data.error || "Email atau password salah!")
         setIsLoading(false)
       }
     } catch (err) {
-      console.error("❌ Login error:", err)
       setError("Terjadi kesalahan koneksi. Silakan coba lagi.")
       setIsLoading(false)
     }
   }
 
-  const fillDemoCredentials = (role: string) => {
-    setEmail(`${role}@mbg.id`)
-    setPassword("123456")
+  const fillDemoCredentials = (type: string) => {
     setError("")
+    const credentials: { [key: string]: { email: string; password: string } } = {
+      sekolah: { email: "picsekolah1@mbg.com", password: "password123" },
+      kementerian: { email: "kementerian@mbg.id", password: "123456" },
+      dapur: { email: "pic.dapur@mbg.id", password: "password123" },
+      csr: { email: "csr@mbg.id", password: "123456" },
+      pemprovjabar: { email: "pemprovjabar@mbg.id", password: "123456" }
+    }
+    
+    if (credentials[type]) {
+      setEmail(credentials[type].email)
+      setPassword(credentials[type].password)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isLoading) {
+    if (e.key === 'Enter' && !isLoading && email && password) {
       handleLogin(e as any)
     }
   }
@@ -212,29 +202,20 @@ const LoginPage = () => {
       />
       
       <div className="relative z-10 w-full max-w-md">
-        {/* Logo & Title */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-24 h-24 rounded-2xl mb-4 bg-white shadow-xl">
             <img src="/logo/bgn_logo.png" alt="Logo BGN" className="w-16 h-16 object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-1">
-            Makan Bergizi Gratis
-          </h1>
-          <p className="text-white/70 text-sm">
-            Sistem Manajemen Program MBG
-          </p>
+          <h1 className="text-2xl font-bold text-white mb-1">Makan Bergizi Gratis</h1>
+          <p className="text-white/70 text-sm">Sistem Manajemen Program MBG</p>
         </div>
 
-        {/* Login Card */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/50">
           <h2 className="text-xl font-bold text-gray-900 mb-6">Login</h2>
 
           <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-            {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
               <input
                 type="email"
                 value={email}
@@ -246,11 +227,8 @@ const LoginPage = () => {
               />
             </div>
 
-            {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -272,7 +250,6 @@ const LoginPage = () => {
               </div>
             </div>
 
-            {/* Error */}
             {error && (
               <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                 <AlertCircle size={18} className="flex-shrink-0" />
@@ -280,7 +257,6 @@ const LoginPage = () => {
               </div>
             )}
 
-            {/* Button */}
             <button
               onClick={handleLogin}
               disabled={isLoading || !email || !password}
@@ -291,39 +267,57 @@ const LoginPage = () => {
             </button>
           </form>
 
-          {/* Demo */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-xs text-gray-500 mb-3 text-center">Demo Credentials</p>
-            <div className="grid grid-cols-3 gap-2">
+            
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => fillDemoCredentials("sekolah")}
+                  disabled={isLoading}
+                  className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-all border border-blue-200 font-medium text-xs disabled:opacity-50"
+                >
+                  Sekolah
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fillDemoCredentials("kementerian")}
+                  disabled={isLoading}
+                  className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-all border border-blue-200 font-medium text-xs disabled:opacity-50"
+                >
+                  Kementerian
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fillDemoCredentials("dapur")}
+                  disabled={isLoading}
+                  className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-all border border-blue-200 font-medium text-xs disabled:opacity-50"
+                >
+                  Dapur
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fillDemoCredentials("csr")}
+                  disabled={isLoading}
+                  className="px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-all border border-green-200 font-medium text-xs disabled:opacity-50"
+                >
+                  CSR
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => fillDemoCredentials("smanli")}
+                onClick={() => fillDemoCredentials("pemprovjabar")}
                 disabled={isLoading}
-                className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-all border border-blue-200 font-medium text-sm disabled:opacity-50"
+                className="w-full px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-all border border-purple-200 font-medium text-xs disabled:opacity-50"
               >
-                Sekolah
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemoCredentials("kementerian")}
-                disabled={isLoading}
-                className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-all border border-blue-200 font-medium text-sm disabled:opacity-50"
-              >
-                Kementerian
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemoCredentials("dapur")}
-                disabled={isLoading}
-                className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-all border border-blue-200 font-medium text-sm disabled:opacity-50"
-              >
-                Dapur
+                Pemprov Jawa Barat
               </button>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
         <p className="text-center text-sm text-white/60 mt-6">
           © 2025 Program Makan Bergizi Gratis
         </p>
