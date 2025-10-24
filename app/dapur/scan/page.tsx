@@ -1,530 +1,512 @@
-// app/dapur/scan/page.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import DapurLayout from '@/components/layout/DapurLayout';
 import { 
-  QrCode, Camera, CheckCircle, X, Clock, MapPin, Upload, 
-  Truck, Package, AlertCircle, User, Calendar, FileText,
-  Navigation, Phone, Image as ImageIcon, RefreshCw, Info,
-  Boxes, ChefHat, School
+  CheckCircle, AlertCircle, Loader, RefreshCw, ChefHat, Package, 
+  Boxes, Navigation, X, ZoomIn
 } from 'lucide-react';
 
-const QRCheckpointScanner = () => {
-  const [scanning, setScanning] = useState(false);
-  const [selectedCheckpoint, setSelectedCheckpoint] = useState<string>('');
-  const [scannedData, setScannedData] = useState<any>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string>('');
-  const [notes, setNotes] = useState('');
-  const [showSuccess, setShowSuccess] = useState(false);
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://72.60.79.126:3000';
 
-  // Checkpoint types sesuai ERD
-  const checkpointTypes = [
+enum TipeCheckpoint {
+  MULAI_MEMASAK = 'MULAI_MEMASAK',
+  SELESAI_MEMASAK = 'SELESAI_MEMASAK',
+  SELESAI_PACKING = 'SELESAI_PACKING',
+  SCHOOL_TO_DRIVER_RETURN = 'SCHOOL_TO_DRIVER_RETURN',
+  DRIVER_TO_KITCHEN = 'DRIVER_TO_KITCHEN',
+  KITCHEN_RECEIVED = 'KITCHEN_RECEIVED',
+  WASHING_COMPLETE = 'WASHING_COMPLETE'
+}
+
+interface CheckpointType {
+  id: TipeCheckpoint;
+  label: string;
+  description: string;
+  icon: any;
+  color: string;
+  requiresPhoto: boolean;
+}
+
+interface CheckpointData {
+  id: string;
+  tipe: TipeCheckpoint;
+  timestamp: string;
+  catatan?: string;
+  lokasi: string;
+  pemindaiOleh: string;
+  fotoUrl?: string;
+}
+
+const CheckpointViewPage = () => {
+  const [menuHarianId, setMenuHarianId] = useState('');
+  const [allMenus, setAllMenus] = useState<any[]>([]);
+  const [loadingMenus, setLoadingMenus] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [checkpointStatus, setCheckpointStatus] = useState<Record<TipeCheckpoint, CheckpointData | null>>({
+    [TipeCheckpoint.MULAI_MEMASAK]: null,
+    [TipeCheckpoint.SELESAI_MEMASAK]: null,
+    [TipeCheckpoint.SELESAI_PACKING]: null,
+    [TipeCheckpoint.SCHOOL_TO_DRIVER_RETURN]: null,
+    [TipeCheckpoint.DRIVER_TO_KITCHEN]: null,
+    [TipeCheckpoint.KITCHEN_RECEIVED]: null,
+    [TipeCheckpoint.WASHING_COMPLETE]: null,
+  });
+  const [hasSearched, setHasSearched] = useState(false);
+  const [photoModal, setPhotoModal] = useState<{ isOpen: boolean; photoUrl: string; title: string }>({
+    isOpen: false,
+    photoUrl: '',
+    title: ''
+  });
+
+  const checkpointTypes: CheckpointType[] = [
     { 
-      id: 'COOKING_START', 
-      label: 'Mulai Memasak', 
-      icon: ChefHat, 
-      color: 'bg-orange-500',
+      id: TipeCheckpoint.MULAI_MEMASAK, 
+      label: 'Mulai Memasak',
       description: 'Scan saat mulai proses memasak',
+      icon: ChefHat,
+      color: 'bg-orange-400',
       requiresPhoto: true
     },
     { 
-      id: 'COOKING_COMPLETE', 
-      label: 'Selesai Memasak', 
-      icon: CheckCircle, 
-      color: 'bg-green-500',
+      id: TipeCheckpoint.SELESAI_MEMASAK, 
+      label: 'Selesai Memasak',
       description: 'Scan saat makanan selesai dimasak',
+      icon: CheckCircle,
+      color: 'bg-green-400',
       requiresPhoto: true
     },
     { 
-      id: 'PACKING_START', 
-      label: 'Mulai Packing', 
-      icon: Package, 
-      color: 'bg-blue-500',
-      description: 'Scan saat mulai packaging',
-      requiresPhoto: false
-    },
-    { 
-      id: 'PACKING_COMPLETE', 
-      label: 'Selesai Packing', 
-      icon: Boxes, 
-      color: 'bg-purple-500',
+      id: TipeCheckpoint.SELESAI_PACKING, 
+      label: 'Selesai Packing',
       description: 'Scan saat packing selesai',
+      icon: Boxes,
+      color: 'bg-purple-400',
       requiresPhoto: true
     },
     { 
-      id: 'KITCHEN_TO_DRIVER', 
-      label: 'Serah Terima ke Driver', 
-      icon: Truck, 
-      color: 'bg-indigo-500',
-      description: 'Scan saat baki diserahkan ke driver',
-      requiresPhoto: true
-    },
-    { 
-      id: 'DRIVER_DEPARTURE', 
-      label: 'Driver Berangkat', 
-      icon: Navigation, 
-      color: 'bg-cyan-500',
-      description: 'Scan saat driver mulai perjalanan',
-      requiresPhoto: true
-    },
-    { 
-      id: 'DRIVER_TO_SCHOOL', 
-      label: 'Dalam Perjalanan', 
-      icon: Truck, 
-      color: 'bg-blue-600',
-      description: 'Scan checkpoint perjalanan (optional)',
-      requiresPhoto: false
-    },
-    { 
-      id: 'SCHOOL_RECEIVED', 
-      label: 'Diterima Sekolah', 
-      icon: School, 
-      color: 'bg-green-600',
-      description: 'Scan saat baki diterima sekolah',
-      requiresPhoto: true
-    },
-    { 
-      id: 'SCHOOL_TO_DRIVER_RETURN', 
-      label: 'Pickup Baki Kosong', 
-      icon: Package, 
-      color: 'bg-yellow-600',
+      id: TipeCheckpoint.SCHOOL_TO_DRIVER_RETURN, 
+      label: 'Pickup Baki Kosong',
       description: 'Scan saat driver pickup baki kosong',
+      icon: Package,
+      color: 'bg-yellow-400',
       requiresPhoto: true
     },
     { 
-      id: 'DRIVER_TO_KITCHEN', 
-      label: 'Kembali ke Dapur', 
-      icon: Navigation, 
-      color: 'bg-purple-600',
+      id: TipeCheckpoint.DRIVER_TO_KITCHEN, 
+      label: 'Kembali ke Dapur',
       description: 'Scan saat dalam perjalanan kembali',
+      icon: Navigation,
+      color: 'bg-purple-500',
       requiresPhoto: false
     },
     { 
-      id: 'KITCHEN_RECEIVED', 
-      label: 'Baki Diterima Dapur', 
-      icon: CheckCircle, 
-      color: 'bg-green-700',
+      id: TipeCheckpoint.KITCHEN_RECEIVED, 
+      label: 'Baki Diterima Dapur',
       description: 'Scan saat baki kosong kembali ke dapur',
+      icon: CheckCircle,
+      color: 'bg-green-500',
       requiresPhoto: true
     },
     { 
-      id: 'WASHING_COMPLETE', 
-      label: 'Selesai Cuci Baki', 
-      icon: RefreshCw, 
-      color: 'bg-blue-700',
+      id: TipeCheckpoint.WASHING_COMPLETE, 
+      label: 'Selesai Cuci Baki',
       description: 'Scan saat baki selesai dicuci',
+      icon: RefreshCw,
+      color: 'bg-blue-500',
       requiresPhoto: false
     }
   ];
 
-  // Sample scanned batches/trips for today
-  const recentScans = useMemo(() => [
-    {
-      id: 'SCAN-001',
-      timestamp: '2025-01-13 08:50',
-      type: 'COOKING_START',
-      batch: 'BATCH-2025-01-13-001',
-      menu: 'Nasi Putih + Rendang Sapi',
-      scannedBy: 'Bu Siti Aminah',
-      location: 'Dapur Utama',
-      photoUrl: '/photos/cooking1.jpg',
-      notes: 'Mulai memasak batch pagi'
-    },
-    {
-      id: 'SCAN-002',
-      timestamp: '2025-01-13 10:15',
-      type: 'COOKING_COMPLETE',
-      batch: 'BATCH-2025-01-13-001',
-      menu: 'Nasi Putih + Rendang Sapi',
-      scannedBy: 'Bu Siti Aminah',
-      location: 'Dapur Utama',
-      photoUrl: '/photos/cooking-done1.jpg',
-      notes: 'Masakan matang sempurna'
-    },
-    {
-      id: 'SCAN-003',
-      timestamp: '2025-01-13 10:45',
-      type: 'KITCHEN_TO_DRIVER',
-      batch: 'BATCH-2025-01-13-001',
-      trip: 'TRIP-001 - SMAN 5 Karawang',
-      scannedBy: 'Pak Budi',
-      location: 'Loading Area Dapur',
-      photoUrl: '/photos/handover1.jpg',
-      notes: '10 keranjang, 485 baki'
-    },
-    {
-      id: 'SCAN-004',
-      timestamp: '2025-01-13 11:00',
-      type: 'DRIVER_DEPARTURE',
-      batch: 'BATCH-2025-01-13-001',
-      trip: 'TRIP-001 - SMAN 5 Karawang',
-      scannedBy: 'Pak Budi',
-      location: 'Gerbang Dapur',
-      photoUrl: '/photos/depart1.jpg',
-      notes: 'Berangkat tepat waktu'
-    },
-    {
-      id: 'SCAN-005',
-      timestamp: '2025-01-13 11:35',
-      type: 'SCHOOL_RECEIVED',
-      batch: 'BATCH-2025-01-13-001',
-      trip: 'TRIP-001 - SMAN 5 Karawang',
-      scannedBy: 'Ibu Siti (PIC Sekolah)',
-      location: 'SMAN 5 Karawang',
-      photoUrl: '/photos/received1.jpg',
-      notes: 'Diterima lengkap, kondisi baik'
+  const getAuthToken = () => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('authToken') || '';
     }
-  ], []);
+    return '';
+  };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setPhotoFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
+  const fetchCheckpointsData = async (id: string) => {
+    setLoading(true);
+    setError('');
+    setHasSearched(true);
+
+    try {
+      const token = getAuthToken();
+      const response = await fetch(
+        `${API_BASE_URL}/api/menu-harian/${id}/checkpoint`,
+        {
+          method: 'GET',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Menu Harian ID tidak ditemukan');
+        }
+        if (response.status === 401) {
+          throw new Error('Unauthorized - Token tidak valid');
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+      const checkpoints = result.data || result.checkpoints || [];
+
+      const statusMap: Record<TipeCheckpoint, CheckpointData | null> = {
+        [TipeCheckpoint.MULAI_MEMASAK]: null,
+        [TipeCheckpoint.SELESAI_MEMASAK]: null,
+        [TipeCheckpoint.SELESAI_PACKING]: null,
+        [TipeCheckpoint.SCHOOL_TO_DRIVER_RETURN]: null,
+        [TipeCheckpoint.DRIVER_TO_KITCHEN]: null,
+        [TipeCheckpoint.KITCHEN_RECEIVED]: null,
+        [TipeCheckpoint.WASHING_COMPLETE]: null,
       };
-      reader.readAsDataURL(file);
-    }
-  };
 
-  const handleScanQR = () => {
-    // Simulate QR scan
-    setScanning(true);
-    setTimeout(() => {
-      setScanning(false);
-      // Mock scanned data
-      setScannedData({
-        batchId: 'BATCH-2025-01-13-002',
-        tripId: 'TRIP-004',
-        school: 'SMK 1 Karawang',
-        menu: 'Nasi Goreng Spesial',
-        expectedTrays: 450,
-        expectedBaskets: 9,
-        driver: 'Pak Ahmad Yani'
+      checkpoints.forEach((cp: CheckpointData) => {
+        statusMap[cp.tipe] = cp;
       });
-    }, 2000);
+
+      setCheckpointStatus(statusMap);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan');
+      setCheckpointStatus({
+        [TipeCheckpoint.MULAI_MEMASAK]: null,
+        [TipeCheckpoint.SELESAI_MEMASAK]: null,
+        [TipeCheckpoint.SELESAI_PACKING]: null,
+        [TipeCheckpoint.SCHOOL_TO_DRIVER_RETURN]: null,
+        [TipeCheckpoint.DRIVER_TO_KITCHEN]: null,
+        [TipeCheckpoint.KITCHEN_RECEIVED]: null,
+        [TipeCheckpoint.WASHING_COMPLETE]: null,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = () => {
-    if (!selectedCheckpoint) {
-      alert('Pilih jenis checkpoint terlebih dahulu');
-      return;
+  useEffect(() => {
+    const loadAllMenus = async () => {
+      try {
+        setLoadingMenus(true);
+        const token = getAuthToken();
+        
+        // Fetch semua menu-planning dulu
+        const planningRes = await fetch(`${API_BASE_URL}/api/menu-planning`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        const planningData = await planningRes.json();
+        const plannings = Array.isArray(planningData?.data?.data) ? planningData.data.data : 
+                         Array.isArray(planningData?.data) ? planningData.data : [];
+        
+        const allMenusData: any[] = [];
+        
+        // Untuk setiap planning, fetch menu-harian
+        for (const planning of plannings) {
+          try {
+            const menuRes = await fetch(`${API_BASE_URL}/api/menu-planning/${planning.id}/menu-harian`, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            const menuData = await menuRes.json();
+            const menus = Array.isArray(menuData?.data?.data) ? menuData.data.data :
+                         Array.isArray(menuData?.data) ? menuData.data : [];
+            
+            // Add semua menus dari planning ini
+            for (const menu of menus) {
+              allMenusData.push({
+                id: menu.id,
+                nama: menu.namaMenu,
+                tanggal: menu.tanggal,
+                sekolahId: planning.sekolahId,
+                sekolahNama: planning.sekolah?.nama || 'Unknown',
+                displayText: `${menu.namaMenu} - ${new Date(menu.tanggal).toLocaleDateString('id-ID')} (${planning.sekolah?.nama || 'Unknown'})`
+              });
+            }
+          } catch (err) {
+            console.warn(`Gagal fetch menu untuk planning ${planning.id}:`, err);
+          }
+        }
+        
+        console.log('Loaded menus:', allMenusData);
+        setAllMenus(allMenusData);
+      } catch (err) {
+        console.error('Gagal load menus:', err);
+        setAllMenus([]);
+      } finally {
+        setLoadingMenus(false);
+      }
+    };
+    
+    loadAllMenus();
+  }, []);
+
+  const handleSearch = () => {
+    if (menuHarianId.trim()) {
+      fetchCheckpointsData(menuHarianId);
+    } else {
+      setError('Masukkan Menu Harian ID terlebih dahulu');
     }
-
-    const checkpoint = checkpointTypes.find(c => c.id === selectedCheckpoint);
-    if (checkpoint?.requiresPhoto && !photoFile) {
-      alert('Checkpoint ini memerlukan foto evidence');
-      return;
-    }
-
-    // Submit checkpoint data
-    console.log({
-      type: selectedCheckpoint,
-      scannedData,
-      photo: photoFile,
-      notes,
-      timestamp: new Date().toISOString(),
-      location: 'Dapur Karawang',
-      scannedBy: 'Bu Siti Aminah'
-    });
-
-    // Show success
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      // Reset form
-      setSelectedCheckpoint('');
-      setScannedData(null);
-      setPhotoFile(null);
-      setPhotoPreview('');
-      setNotes('');
-    }, 2000);
   };
 
-  const selectedCheckpointData = checkpointTypes.find(c => c.id === selectedCheckpoint);
+  const completedCount = Object.values(checkpointStatus).filter(c => c !== null).length;
+  const totalCount = Object.keys(checkpointStatus).length;
+  const progressPercentage = (completedCount / totalCount) * 100;
+
+  const formatDate = (isoString: string) => {
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    } catch {
+      return isoString;
+    }
+  };
 
   return (
     <DapurLayout currentPage="scan">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">QR Checkpoint Scanner</h1>
-        <p className="text-gray-600">Scan QR code untuk tracking delivery dan production checkpoints</p>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-[#1B263A] mb-1">Checkpoint Status</h1>
+        <p className="text-gray-600">Lihat progress checkpoint untuk menu harian</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Scanner Section */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* QR Scanner */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <QrCode className="w-6 h-6 text-blue-600" />
-              Scan QR Code
-            </h3>
+      <div className="mb-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div>
+          <label className="block text-sm font-bold text-[#1B263A] mb-2">
+            Pilih Menu Harian <span className="text-red-500">*</span>
+          </label>
+          {loadingMenus ? (
+            <div className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+              <Loader className="w-4 h-4 inline animate-spin mr-2" />
+              Loading menu...
+            </div>
+          ) : (
+            <select
+              value={menuHarianId}
+              onChange={(e) => {
+                const selectedId = e.target.value;
+                setMenuHarianId(selectedId);
+                setHasSearched(false);
+                setCheckpointStatus({
+                  [TipeCheckpoint.MULAI_MEMASAK]: null,
+                  [TipeCheckpoint.SELESAI_MEMASAK]: null,
+                  [TipeCheckpoint.SELESAI_PACKING]: null,
+                  [TipeCheckpoint.SCHOOL_TO_DRIVER_RETURN]: null,
+                  [TipeCheckpoint.DRIVER_TO_KITCHEN]: null,
+                  [TipeCheckpoint.KITCHEN_RECEIVED]: null,
+                  [TipeCheckpoint.WASHING_COMPLETE]: null,
+                });
+                
+                // Auto-fetch checkpoint saat pilih menu
+                if (selectedId.trim()) {
+                  fetchCheckpointsData(selectedId);
+                }
+              }}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent bg-white"
+            >
+              <option value="">-- Pilih Menu --</option>
+              {allMenus.map((menu) => (
+                <option key={menu.id} value={menu.id}>
+                  {menu.displayText}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
 
-            <div className="mb-6">
-              {!scannedData ? (
-                <div className="relative">
-                  <div className="aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl flex items-center justify-center overflow-hidden">
-                    {scanning ? (
-                      <div className="text-center">
-                        <div className="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4 mx-auto"></div>
-                        <p className="text-white font-semibold">Scanning QR Code...</p>
-                        <p className="text-white/70 text-sm mt-2">Arahkan kamera ke QR code</p>
-                      </div>
-                    ) : (
-                      <div className="text-center">
-                        <QrCode className="w-24 h-24 text-white/30 mb-4 mx-auto" />
-                        <p className="text-white font-semibold mb-4">Siap untuk scan</p>
-                        <button
-                          onClick={handleScanQR}
-                          className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold flex items-center gap-2 mx-auto"
-                        >
-                          <Camera className="w-5 h-5" />
-                          Mulai Scan
-                        </button>
+      {error && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-red-900">Error</p>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {!hasSearched && (
+        <div className="text-center py-12">
+          <p className="text-gray-500">Masukkan Menu Harian ID untuk melihat status checkpoint</p>
+        </div>
+      )}
+
+      {loading && hasSearched && (
+        <>
+          {/* Skeleton for Progress Bar */}
+          <div className="mb-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-5 w-40 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-6 w-12 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden animate-pulse"></div>
+            </div>
+          </div>
+
+          {/* Skeleton for Checkpoint Cards */}
+          <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mb-6"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <div key={i} className="rounded-2xl border-2 border-gray-200 bg-white p-6">
+                <div className="flex items-start gap-4 mb-3">
+                  <div className="w-14 h-14 bg-gray-200 rounded-xl animate-pulse"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="h-4 w-full bg-gray-200 rounded animate-pulse mb-3"></div>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div className="h-3 w-full bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-3 w-4/5 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-3 w-3/4 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {hasSearched && !loading && (
+        <div className="mb-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-[#1B263A]">Progress Checkpoint</h3>
+              <span className="text-lg font-bold text-[#D0B064]">
+                {completedCount}/{totalCount}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-[#D0B064] to-[#D0B064] h-full transition-all duration-500"
+                style={{ width: `${progressPercentage}%` }}
+              ></div>
+            </div>
+          </div>
+          {completedCount === totalCount && (
+            <div className="mt-4 p-4 bg-[#1B263A] bg-opacity-5 border border-[#D0B064] rounded-lg">
+              <p className="text-[#1B263A] font-bold text-center">✓ Semua checkpoint sudah selesai!</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {hasSearched && !loading && (
+        <>
+          <h2 className="text-xl font-bold text-[#1B263A] mb-6">Status Checkpoint</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {checkpointTypes.map((checkpoint) => {
+              const data = checkpointStatus[checkpoint.id];
+              const isCompleted = data !== null;
+              const Icon = checkpoint.icon;
+
+              return (
+                <div
+                  key={checkpoint.id}
+                  className={`rounded-2xl border-2 p-6 transition-all ${
+                    isCompleted
+                      ? 'bg-white border-[#D0B064] shadow-sm'
+                      : 'bg-white border-gray-200 opacity-70'
+                  }`}
+                >
+                  <div className="flex items-start gap-4 mb-3">
+                    <div className={`w-14 h-14 ${checkpoint.color} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                      <Icon className="w-7 h-7 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-lg text-[#1B263A]">{checkpoint.label}</h3>
+                      {checkpoint.requiresPhoto && (
+                        <p className="text-sm text-[#D0B064] font-semibold">📷 Wajib foto</p>
+                      )}
+                    </div>
+                    {isCompleted && (
+                      <div className="bg-[#D0B064] text-white rounded-full p-1.5 flex-shrink-0">
+                        <CheckCircle className="w-5 h-5" />
                       </div>
                     )}
                   </div>
-                  <div className="absolute inset-0 border-2 border-blue-500 rounded-xl pointer-events-none"></div>
-                </div>
-              ) : (
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                      <CheckCircle className="w-7 h-7 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-bold text-green-900 text-lg mb-2">QR Code Berhasil di-Scan!</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-green-700">Batch ID:</span>
-                          <span className="font-bold text-green-900">{scannedData.batchId}</span>
-                        </div>
-                        {scannedData.tripId && (
-                          <div className="flex justify-between">
-                            <span className="text-green-700">Trip ID:</span>
-                            <span className="font-bold text-green-900">{scannedData.tripId}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between">
-                          <span className="text-green-700">Menu:</span>
-                          <span className="font-bold text-green-900">{scannedData.menu}</span>
-                        </div>
-                        {scannedData.school && (
-                          <div className="flex justify-between">
-                            <span className="text-green-700">Tujuan:</span>
-                            <span className="font-bold text-green-900">{scannedData.school}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between">
-                          <span className="text-green-700">Trays:</span>
-                          <span className="font-bold text-green-900">{scannedData.expectedTrays} baki</span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setScannedData(null)}
-                        className="mt-4 text-sm text-green-700 hover:text-green-800 font-semibold flex items-center gap-1"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        Scan Ulang
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
 
-            {/* Checkpoint Type Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-bold text-gray-900 mb-3">
-                Pilih Jenis Checkpoint <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {checkpointTypes.map((type) => {
-                  const Icon = type.icon;
-                  return (
-                    <button
-                      key={type.id}
-                      onClick={() => setSelectedCheckpoint(type.id)}
-                      disabled={!scannedData}
-                      className={`p-4 rounded-xl border-2 transition-all text-left ${
-                        selectedCheckpoint === type.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300 bg-white'
-                      } ${!scannedData ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className={`w-10 h-10 ${type.color} rounded-lg flex items-center justify-center`}>
-                          <Icon className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm text-gray-900">{type.label}</p>
-                          {type.requiresPhoto && (
-                            <span className="text-xs text-orange-600 font-semibold">📷 Wajib foto</span>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-600">{type.description}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+                  <p className="text-sm text-gray-600 mb-3">{checkpoint.description}</p>
 
-            {/* Photo Upload */}
-            {selectedCheckpointData && (
-              <div className="mb-6">
-                <label className="block text-sm font-bold text-gray-900 mb-3">
-                  Upload Foto Evidence {selectedCheckpointData.requiresPhoto && <span className="text-red-500">*</span>}
-                </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
-                  {photoPreview ? (
-                    <div className="relative">
-                      <img src={photoPreview} alt="Preview" className="max-h-64 mx-auto rounded-lg" />
-                      <button
-                        onClick={() => {
-                          setPhotoFile(null);
-                          setPhotoPreview('');
-                        }}
-                        className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                  {isCompleted && data ? (
+                    <div className="bg-green-50 rounded-lg p-4 space-y-2 border border-green-200">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-green-600">Waktu:</span>
+                        <span className="text-green-700 font-bold">{formatDate(data.timestamp)}</span>
+                      </div>
+                      <div className="border-t border-green-200 pt-2 flex justify-between text-xs">
+                        <span className="text-green-600">Lokasi:</span>
+                        <span className="text-green-900 font-bold">{data.lokasi}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-green-600">Pemindai:</span>
+                        <span className="text-green-900 font-bold">{data.pemindaiOleh}</span>
+                      </div>
+                      {data.catatan && (
+                        <div className="border-t border-green-200 pt-2">
+                          <p className="text-xs text-green-600 mb-1">Catatan:</p>
+                          <p className="text-xs text-green-900">{data.catatan}</p>
+                        </div>
+                      )}
+                      {data.fotoUrl && (
+                        <div className="border-t border-green-200 pt-2">
+                          <button
+                            onClick={() => setPhotoModal({
+                              isOpen: true,
+                              photoUrl: data.fotoUrl || '',
+                              title: checkpoint.label
+                            })}
+                            className="w-full flex items-center justify-center gap-2 p-2 bg-green-100 hover:bg-green-200 rounded text-xs text-green-700 font-semibold transition-all"
+                          >
+                            <ZoomIn className="w-4 h-4" />
+                            Lihat Foto
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <div>
-                      <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-600 mb-2">Click untuk upload foto</p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePhotoUpload}
-                        className="hidden"
-                        id="photo-upload"
-                      />
-                      <label
-                        htmlFor="photo-upload"
-                        className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer font-semibold"
-                      >
-                        <Upload className="w-4 h-4 inline mr-2" />
-                        Upload Foto
-                      </label>
+                    <div className="text-center text-gray-400 py-8">
+                      <p className="text-sm font-semibold">Belum ada checkpoint</p>
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              );
+            })}
+          </div>
+        </>
+      )}
 
-            {/* Notes */}
-            <div className="mb-6">
-              <label className="block text-sm font-bold text-gray-900 mb-3">
-                Catatan (Optional)
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Tambahkan catatan jika diperlukan..."
-                rows={3}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={!scannedData}
+      {photoModal.isOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+              <h2 className="font-bold text-gray-900">Bukti Foto - {photoModal.title}</h2>
+              <button
+                onClick={() => setPhotoModal({ isOpen: false, photoUrl: '', title: '' })}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6 text-gray-600" />
+              </button>
+            </div>
+            <div className="p-4">
+              <img
+                src={photoModal.photoUrl}
+                alt={photoModal.title}
+                className="w-full rounded-lg"
               />
-            </div>
-
-            {/* Submit Button */}
-            <button
-              onClick={handleSubmit}
-              disabled={!scannedData || !selectedCheckpoint}
-              className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 ${
-                !scannedData || !selectedCheckpoint
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-lg'
-              }`}
-            >
-              <CheckCircle className="w-6 h-6" />
-              Submit Checkpoint
-            </button>
-          </div>
-        </div>
-
-        {/* Recent Scans */}
-        <div className="space-y-6">
-          {/* Info Card */}
-          <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                <Info className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="font-bold text-lg">Panduan Scan</p>
-                <p className="text-sm text-white/80">Tips sukses scanning</p>
-              </div>
-            </div>
-            <ul className="space-y-2 text-sm">
-              <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>Pastikan QR code terlihat jelas</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>Pilih checkpoint type yang sesuai</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>Upload foto jika wajib</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>Tambahkan catatan jika perlu</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* Recent Scans List */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-gray-600" />
-              Scan Terbaru
-            </h3>
-            <div className="space-y-3">
-              {recentScans.slice(0, 5).map((scan) => (
-                <div key={scan.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-gray-900 mb-1">
-                        {checkpointTypes.find(t => t.id === scan.type)?.label}
-                      </p>
-                      <p className="text-xs text-gray-600 mb-1">{scan.batch}</p>
-                      {scan.trip && <p className="text-xs text-blue-600 mb-1">{scan.trip}</p>}
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Clock className="w-3 h-3" />
-                        {scan.timestamp}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Success Modal */}
-      {showSuccess && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center animate-in zoom-in duration-300">
-            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-12 h-12 text-white" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Checkpoint Berhasil!</h3>
-            <p className="text-gray-600 mb-4">Data checkpoint telah tersimpan dan terupdate di sistem</p>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600">Checkpoint Type:</p>
-              <p className="font-bold text-gray-900">{selectedCheckpointData?.label}</p>
             </div>
           </div>
         </div>
@@ -533,4 +515,4 @@ const QRCheckpointScanner = () => {
   );
 };
 
-export default QRCheckpointScanner;
+export default CheckpointViewPage;

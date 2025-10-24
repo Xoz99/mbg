@@ -28,7 +28,6 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://72.60.79.126:3000"
 
-// Skeleton Components
 const SkeletonCard = () => (
   <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 animate-pulse">
     <div className="h-10 w-10 rounded-lg bg-gray-200 mb-3"></div>
@@ -68,7 +67,11 @@ const SkeletonRow = () => (
 function extractEmployeesList(payload: any): any[] {
   if (!payload) return []
   if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload.data)) return payload.data
+  if (Array.isArray(payload.data)) {
+    // Handle nested data.data
+    if (Array.isArray(payload.data.data)) return payload.data.data
+    return payload.data
+  }
   if (Array.isArray(payload.items)) return payload.items
   if (Array.isArray(payload.results)) return payload.results
   if (Array.isArray(payload.result)) return payload.result
@@ -99,14 +102,12 @@ const DataKaryawan = () => {
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<any>(null)
 
-  // API State
   const [employees, setEmployees] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dapurId, setDapurId] = useState("")
   const [authToken, setAuthToken] = useState("")
 
-  // Form state
   const [formData, setFormData] = useState({
     nama: "",
     posisi: "",
@@ -118,13 +119,8 @@ const DataKaryawan = () => {
   const isFetchingRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Fetch karyawan - hanya dari dapur yang login
   const fetchEmployees = useCallback(async () => {
-    console.log("[FETCH] Starting with dapurId:", dapurId)
-    console.log("[FETCH] authToken exists:", !!authToken)
-
     if (!dapurId || !authToken || isFetchingRef.current) {
-      console.warn("[FETCH] Missing credentials - dapurId:", dapurId, "token:", !!authToken)
       setError("Dapur ID atau Token tidak tersedia")
       setLoading(false)
       return
@@ -143,40 +139,25 @@ const DataKaryawan = () => {
       const statusParam = filterStatus !== "semua" ? `&status=${filterStatus}` : ""
       const url = `${API_BASE_URL}/api/dapur/${dapurId}/karyawan?page=1&limit=100${statusParam}`
 
-      console.log("[FETCH] Calling URL:", url)
-
       const response = await fetch(url, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
           "Content-Type": "application/json",
         },
         signal: abortControllerRef.current.signal,
       })
 
-      console.log("[FETCH] Response status:", response.status)
-
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error("[FETCH] Error response:", errorText)
         throw new Error(`API Error: ${response.status}`)
       }
 
       const data = await response.json()
-      console.log("[FETCH] Raw response:", data)
-
       const list = extractEmployeesList(data)
-      console.log("[FETCH] Extracted employees count:", list.length)
-
-      if (list.length > 0) {
-        console.log("[DEBUG] Sample employee:", JSON.stringify(list[0], null, 2))
-      }
-
       setEmployees(list)
       setError(null)
     } catch (err: any) {
       if (err.name !== "AbortError") {
-        console.error("[FETCH] Error:", err.message)
         setError(err.message || "Gagal memuat data karyawan")
         setEmployees([])
       }
@@ -186,7 +167,6 @@ const DataKaryawan = () => {
     }
   }, [dapurId, authToken, filterStatus])
 
-  // Initialize - ambil dapurId dan token dari localStorage
   useEffect(() => {
     const storedToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
     let userObj: any = null
@@ -197,44 +177,24 @@ const DataKaryawan = () => {
       userObj = null
     }
 
-    console.log("[INIT] userObj:", userObj)
-    console.log("[INIT] token exists:", !!storedToken)
-
-    // Cari dapurId dari berbagai kemungkinan lokasi
     const candidates = [
       localStorage.getItem("userDapurId"),
       localStorage.getItem("dapurId"),
       userObj?.dapurId,
       userObj?.dapur_id,
-      userObj?.kitchenId,
-      userObj?.Kitchen?.id,
-      userObj?.kitchen?.id,
       userObj?.Dapur?.id,
       userObj?.dapur?.id,
       Array.isArray(userObj?.DapurUser) ? userObj?.DapurUser?.[0]?.dapurId : null,
-      Array.isArray(userObj?.KitchenUser) ? userObj?.KitchenUser?.[0]?.kitchenId : null,
     ].filter(Boolean) as string[]
 
     const foundDapurId = candidates[0] || ""
 
-    console.log("[INIT] Found dapurId:", foundDapurId)
-
-    // Set token
     if (storedToken && storedToken !== authToken) {
       setAuthToken(storedToken)
     }
 
-    // Set dapurId
     if (foundDapurId && foundDapurId !== dapurId) {
       setDapurId(foundDapurId)
-    }
-
-    // Check role
-    const routeRole = (userObj?.routeRole || userObj?.role || "").toString().toLowerCase()
-    if (routeRole && routeRole !== "dapur" && routeRole !== "pic_dapur") {
-      setError("Akses ditolak: halaman ini khusus untuk PIC DAPUR.")
-      setLoading(false)
-      return
     }
 
     if (!storedToken || !foundDapurId) {
@@ -243,176 +203,122 @@ const DataKaryawan = () => {
     }
   }, [])
 
-  // Fetch employees saat dapurId dan token tersedia
   useEffect(() => {
     if (dapurId && authToken) {
-      console.log("[EFFECT] Fetching employees for dapurId:", dapurId)
       fetchEmployees()
     }
   }, [dapurId, authToken, filterStatus, fetchEmployees])
 
-  // Fungsi helper untuk mencoba multiple endpoints
-  const tryFetchEndpoints = async (
-    method: string,
-    payload: any,
-    endpoints: string[]
-  ): Promise<Response> => {
-    let lastError: any = null
-
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`[API] Trying ${method} ${endpoint}`)
-
-        const response = await fetch(endpoint, {
-          method,
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            "Content-Type": "application/json",
-          },
-          body: method !== "GET" ? JSON.stringify(payload) : undefined,
-        })
-
-        console.log(`[API] Response from ${endpoint}: ${response.status}`)
-
-        if (response.ok) {
-          return response
-        }
-
-        lastError = response
-      } catch (err) {
-        console.error(`[API] Error trying ${endpoint}:`, err)
-        lastError = err
-      }
-    }
-
-    throw lastError || new Error("Semua endpoint gagal")
-  }
-
-  // Create karyawan
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault()
 
     try {
       setLoading(true)
-      
-      // Coba format JSON dulu (tanpa foto)
-      const payload = {
-        nama: formData.nama,
-        posisi: formData.posisi,
-        status: formData.status,
+
+      const formDataToSend = new FormData()
+      formDataToSend.append("nama", formData.nama)
+      formDataToSend.append("posisi", formData.posisi)
+      formDataToSend.append("status", formData.status)
+
+      if (fotoFile) {
+        formDataToSend.append("foto", fotoFile)
       }
 
-      console.log("[CREATE] Payload:", payload)
-      console.log("[CREATE] Using dapurId:", dapurId)
-      console.log("[CREATE] Foto file:", fotoFile)
-
-      const url = `${API_BASE_URL}/api/dapur/${dapurId}/karyawan`
-      console.log("[CREATE] Calling URL:", url)
+      const url = `${API_BASE_URL}/api/karyawan`
 
       const response = await fetch(url, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: formDataToSend,
       })
-
-      console.log("[CREATE] Response status:", response.status)
 
       if (!response.ok) {
         const errorData = await response.text()
-        console.error("[CREATE] Error response:", errorData)
         throw new Error(`API Error: ${response.status} - ${errorData}`)
       }
-
-      const result = await response.json()
-      console.log("[CREATE] Success:", result)
 
       setFormData({ nama: "", posisi: "", status: "AKTIF" })
       setFotoFile(null)
       setFotoPreview("")
       setShowAddModal(false)
+
       await fetchEmployees()
       alert("Karyawan berhasil ditambahkan!")
     } catch (err: any) {
-      console.error("[CREATE] Error:", err)
       alert(err.message || "Terjadi kesalahan saat menambah karyawan")
     } finally {
       setLoading(false)
     }
   }
 
-  // Update karyawan
   const handleUpdateEmployee = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingEmployee) return
 
     try {
       setLoading(true)
-      const payload = {
-        nama: formData.nama,
-        posisi: formData.posisi,
-        status: formData.status,
-      }
 
-      console.log("[UPDATE] Payload:", payload)
+      const formDataToSend = new FormData()
+      formDataToSend.append("nama", formData.nama)
+      formDataToSend.append("posisi", formData.posisi)
+      formDataToSend.append("status", formData.status)
+
+      if (fotoFile) {
+        formDataToSend.append("foto", fotoFile)
+      }
 
       const employeeId = editingEmployee.id || editingEmployee._id
+      const url = `${API_BASE_URL}/api/karyawan/${employeeId}`
 
-      // Coba berbagai endpoint
-      const endpoints = [
-        `${API_BASE_URL}/api/dapur/${dapurId}/karyawan/${employeeId}`,
-        `${API_BASE_URL}/api/karyawan/${employeeId}`,
-      ]
-
-      const response = await tryFetchEndpoints("PUT", payload, endpoints)
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: formDataToSend,
+      })
 
       if (!response.ok) {
-        const errorData = await response.text()
-        throw new Error(`API Error: ${response.status} - ${errorData}`)
+        throw new Error(`API Error: ${response.status}`)
       }
 
-      const result = await response.json()
-      console.log("[UPDATE] Success:", result)
-
       setFormData({ nama: "", posisi: "", status: "AKTIF" })
+      setFotoFile(null)
+      setFotoPreview("")
       setShowEditModal(false)
       setEditingEmployee(null)
       await fetchEmployees()
       alert("Karyawan berhasil diupdate!")
     } catch (err: any) {
-      console.error("[UPDATE] Error:", err)
       alert(err.message || "Terjadi kesalahan saat update karyawan")
     } finally {
       setLoading(false)
     }
   }
 
-  // Delete karyawan
   const handleDeleteEmployee = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus karyawan ini?")) return
 
     try {
       setLoading(true)
+      const url = `${API_BASE_URL}/api/karyawan/${id}`
 
-      // Coba berbagai endpoint
-      const endpoints = [
-        `${API_BASE_URL}/api/dapur/${dapurId}/karyawan/${id}`,
-        `${API_BASE_URL}/api/karyawan/${id}`,
-      ]
-
-      const response = await tryFetchEndpoints("DELETE", null, endpoints)
+      const response = await fetch(url, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      })
 
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`)
       }
 
-      console.log("[DELETE] Success")
       await fetchEmployees()
       alert("Karyawan berhasil dihapus!")
     } catch (err: any) {
-      console.error("[DELETE] Error:", err)
       alert(err.message || "Terjadi kesalahan saat menghapus karyawan")
     } finally {
       setLoading(false)
@@ -426,14 +332,14 @@ const DataKaryawan = () => {
       posisi: employee.posisi || employee.position || "",
       status: employee.status || "AKTIF",
     })
+    setFotoPreview("")
+    setFotoFile(null)
     setShowEditModal(true)
   }
 
-  // Filter dan search
   const filteredEmployees = useMemo(() => {
     let filtered = employees
 
-    // Search
     if (searchQuery) {
       filtered = filtered.filter(
         (emp) =>
@@ -443,7 +349,6 @@ const DataKaryawan = () => {
       )
     }
 
-    // Status filter
     if (filterStatus !== "semua") {
       filtered = filtered.filter((emp) => (emp.status || "").toUpperCase() === filterStatus)
     }
@@ -451,7 +356,6 @@ const DataKaryawan = () => {
     return filtered
   }, [employees, searchQuery, filterStatus])
 
-  // Stats
   const stats = useMemo(() => {
     const total = employees.length
     const active = employees.filter((e) => (e.status || "").toUpperCase() === "AKTIF").length
@@ -488,27 +392,18 @@ const DataKaryawan = () => {
     </div>
   )
 
-  // Loading state
   if (loading && employees.length === 0) {
     return (
       <DapurLayout currentPage="karyawan">
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">Data Karyawan</h1>
-              <p className="text-gray-600">Kelola data dan performa staff dapur</p>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Data Karyawan</h1>
+          <p className="text-gray-600">Kelola data dan performa staff dapur</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
-        </div>
-
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6 animate-pulse">
-          <div className="h-10 bg-gray-200 rounded-lg"></div>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -534,7 +429,6 @@ const DataKaryawan = () => {
     )
   }
 
-  // Error state
   if (error && employees.length === 0) {
     return (
       <DapurLayout currentPage="karyawan">
@@ -560,7 +454,6 @@ const DataKaryawan = () => {
 
   return (
     <DapurLayout currentPage="karyawan">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <div>
@@ -587,7 +480,6 @@ const DataKaryawan = () => {
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <StatCard title="TOTAL KARYAWAN" value={stats.total} subtitle="staff dapur" icon={Users} color="bg-blue-600" />
         <StatCard title="AKTIF" value={stats.active} subtitle="sedang bertugas" icon={UserCheck} color="bg-green-600" />
@@ -600,7 +492,6 @@ const DataKaryawan = () => {
         />
       </div>
 
-      {/* Search & Filter */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col md:flex-row items-center gap-4">
           <div className="flex-1 relative">
@@ -633,7 +524,6 @@ const DataKaryawan = () => {
         </div>
       </div>
 
-      {/* Employee Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -667,7 +557,11 @@ const DataKaryawan = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
-                            <User className="w-6 h-6 text-gray-400" />
+                            {emp.fotoUrl || emp.foto ? (
+                              <img src={emp.fotoUrl || emp.foto} alt={emp.nama} className="w-12 h-12 object-cover" />
+                            ) : (
+                              <User className="w-6 h-6 text-gray-400" />
+                            )}
                           </div>
                           <div>
                             <p className="font-semibold text-gray-900">{emp.nama || emp.name}</p>
@@ -717,14 +611,18 @@ const DataKaryawan = () => {
         </div>
       </div>
 
-      {/* Add Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
             <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white px-6 py-5 flex items-center justify-between rounded-t-2xl">
               <h3 className="text-xl font-bold">Tambah Karyawan</h3>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false)
+                  setFotoFile(null)
+                  setFotoPreview("")
+                  setFormData({ nama: "", posisi: "", status: "AKTIF" })
+                }}
                 className="p-2 hover:bg-white/20 rounded-lg transition-colors"
               >
                 <X className="w-6 h-6" />
@@ -815,6 +713,7 @@ const DataKaryawan = () => {
                     setShowAddModal(false)
                     setFotoFile(null)
                     setFotoPreview("")
+                    setFormData({ nama: "", posisi: "", status: "AKTIF" })
                   }}
                   className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
                 >
@@ -834,7 +733,6 @@ const DataKaryawan = () => {
         </div>
       )}
 
-      {/* Edit Modal */}
       {showEditModal && editingEmployee && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
@@ -844,6 +742,8 @@ const DataKaryawan = () => {
                 onClick={() => {
                   setShowEditModal(false)
                   setEditingEmployee(null)
+                  setFotoFile(null)
+                  setFotoPreview("")
                 }}
                 className="p-2 hover:bg-white/20 rounded-lg transition-colors"
               >
@@ -886,12 +786,62 @@ const DataKaryawan = () => {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Update Foto (Opsional)</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-[#D0B064] transition-colors cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        setFotoFile(file)
+                        const reader = new FileReader()
+                        reader.onloadend = () => {
+                          setFotoPreview(reader.result as string)
+                        }
+                        reader.readAsDataURL(file)
+                      }
+                    }}
+                    className="hidden"
+                    id="foto-input-edit"
+                  />
+                  <label htmlFor="foto-input-edit" className="cursor-pointer">
+                    {fotoPreview ? (
+                      <div className="flex items-center gap-3">
+                        <img src={fotoPreview} alt="Preview" className="w-16 h-16 object-cover rounded-lg" />
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{fotoFile?.name}</p>
+                          <p className="text-xs text-gray-500">Klik untuk ubah foto</p>
+                        </div>
+                      </div>
+                    ) : editingEmployee.foto ? (
+                      <div className="flex items-center gap-3">
+                        <img src={editingEmployee.foto} alt="Current" className="w-16 h-16 object-cover rounded-lg" />
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">Foto saat ini</p>
+                          <p className="text-xs text-gray-500">Klik untuk ubah foto</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <User className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-700 font-medium">Klik untuk upload foto</p>
+                        <p className="text-xs text-gray-500">atau drag & drop</p>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => {
                     setShowEditModal(false)
                     setEditingEmployee(null)
+                    setFotoFile(null)
+                    setFotoPreview("")
                   }}
                   className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
                 >
@@ -911,14 +861,17 @@ const DataKaryawan = () => {
         </div>
       )}
 
-      {/* Detail Modal */}
       {selectedEmployee && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white px-6 py-5 flex items-center justify-between z-10 rounded-t-2xl">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                  <User className="w-8 h-8" />
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center overflow-hidden">
+                  {selectedEmployee.fotoUrl || selectedEmployee.foto ? (
+                    <img src={selectedEmployee.fotoUrl || selectedEmployee.foto} alt={selectedEmployee.nama} className="w-16 h-16 object-cover" />
+                  ) : (
+                    <User className="w-8 h-8" />
+                  )}
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">{selectedEmployee.nama || selectedEmployee.name}</h3>

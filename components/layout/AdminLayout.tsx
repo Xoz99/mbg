@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import { 
   Home, Building2, Plus, GraduationCap, Users, BarChart3, 
   Menu, X, LogOut, Settings, MapPin, ShieldAlert, Utensils,
-  Loader2
+  Loader2,
+  TicketCheck,
+  TicketIcon
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -65,7 +67,8 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
       { id: 'sekolah', name: 'Manajemen Sekolah', icon: GraduationCap, path: '/admin/sekolah' },
       { id: 'register-pic-sekolah', name: 'Register PIC Sekolah', icon: Plus, path: '/admin/register-pic-sekolah'},
       { id: 'user', name: 'User Management', icon: Users, path: '/admin/user' },
-      { id: 'link-dapur-sekolah', name: 'Dapur Ke Sekolah', icon: Utensils, path: '/admin/link-dapur-sekolah' },
+      { id: 'LinkDapurSekolah', name: 'Dapur Ke Sekolah', icon: Utensils, path: '/admin/LinkDapurSekolah' },
+      { id: 'tickets', name: 'Laporan tiketing', icon: TicketIcon, path: '/admin/tickets' },
       { id: 'laporan', name: 'Laporan & Analytics', icon: BarChart3, path: '/admin/laporan' },
       { id: 'settings', name: 'Pengaturan Sistem', icon: Settings, path: '/admin/settings' },
     ];

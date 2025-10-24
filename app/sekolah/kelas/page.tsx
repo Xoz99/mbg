@@ -77,6 +77,7 @@ const DataKelas = () => {
 
   // API State
   const [kelasData, setKelasData] = useState<any[]>([]);
+  const [siswaData, setSiswaData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState("");
@@ -113,7 +114,7 @@ const DataKelas = () => {
     }
   }, []);
 
-  // Fetch kelas data
+  // Fetch kelas data dengan perbaikan siswa
   const fetchKelas = useCallback(async () => {
     if (!sekolahId || !authToken || isFetchingRef.current) {
       return;
@@ -124,15 +125,15 @@ const DataKelas = () => {
       setLoading(true);
       setError(null);
 
+      const headers = {
+        Authorization: `Bearer ${authToken}`,
+        "Content-Type": "application/json",
+      };
+
       const url = `${API_BASE_URL}/api/sekolah/${sekolahId}/kelas?page=1&limit=100`;
       console.log("[FETCH KELAS] URL:", url);
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(url, { headers });
 
       console.log("[FETCH KELAS] Response status:", response.status);
 
@@ -151,6 +152,57 @@ const DataKelas = () => {
       } else if (Array.isArray(data)) {
         kelasList = data;
       }
+
+      // Fetch siswa untuk mendapatkan data lengkap
+      let siswaArray: any[] = [];
+      try {
+        const siswaRes = await fetch(`${API_BASE_URL}/api/sekolah/${sekolahId}/siswa`, { headers });
+        if (siswaRes.ok) {
+          const siswaData = await siswaRes.json();
+          siswaArray = Array.isArray(siswaData.data?.data) 
+            ? siswaData.data.data 
+            : Array.isArray(siswaData.data) 
+            ? siswaData.data 
+            : [];
+        }
+      } catch (err) {
+        console.error('Siswa fetch error:', err);
+      }
+
+      setSiswaData(siswaArray);
+
+      // Calculate siswa per kelas dan alergi
+      const siswaPerKelas: { [key: string]: { laki: number; perempuan: number; alergi: number } } = {};
+      
+      siswaArray.forEach((siswa: any) => {
+        const kelasId = siswa.kelasId?.id || siswa.kelasId;
+        if (!siswaPerKelas[kelasId]) {
+          siswaPerKelas[kelasId] = { laki: 0, perempuan: 0, alergi: 0 };
+        }
+        if (siswa.jenisKelamin === 'LAKI_LAKI') {
+          siswaPerKelas[kelasId].laki++;
+        } else {
+          siswaPerKelas[kelasId].perempuan++;
+        }
+        
+        // Count alergi
+        if (siswa.alergi) {
+          if (Array.isArray(siswa.alergi) && siswa.alergi.length > 0) {
+            siswaPerKelas[kelasId].alergi++;
+          } else if (typeof siswa.alergi === 'string' && siswa.alergi.trim() !== '') {
+            siswaPerKelas[kelasId].alergi++;
+          }
+        }
+      });
+
+      // Update kelas dengan siswa count
+      kelasList = kelasList.map((kelas: any) => ({
+        ...kelas,
+        totalSiswa: (siswaPerKelas[kelas.id]?.laki || 0) + (siswaPerKelas[kelas.id]?.perempuan || 0) || kelas.totalSiswa || 0,
+        lakiLaki: siswaPerKelas[kelas.id]?.laki || kelas.lakiLaki || 0,
+        perempuan: siswaPerKelas[kelas.id]?.perempuan || kelas.perempuan || 0,
+        alergiCount: siswaPerKelas[kelas.id]?.alergi || kelas.alergiCount || 0
+      }));
 
       console.log("[FETCH KELAS] Total kelas:", kelasList.length);
       setKelasData(kelasList);
@@ -277,12 +329,14 @@ const DataKelas = () => {
     currentPage * itemsPerPage
   );
 
-  // Statistics
+  // Statistics dengan alergi
   const stats = useMemo(() => {
     const totalKelas = kelasData.length;
     const totalSiswa = kelasData.reduce((acc, k) => acc + (k.totalSiswa || 0), 0);
+    const totalAlergi = kelasData.reduce((acc, k) => acc + (k.alergiCount || 0), 0);
     const avgKehadiran = totalSiswa > 0 ? "95" : "0";
-    return { totalKelas, totalSiswa, avgKehadiran };
+    const persenAlergi = totalSiswa > 0 ? Math.round((totalAlergi / totalSiswa) * 100) : 0;
+    return { totalKelas, totalSiswa, avgKehadiran, totalAlergi, persenAlergi };
   }, [kelasData]);
 
   // Chart data
@@ -379,7 +433,7 @@ const DataKelas = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <StatCard title="Total Kelas" value={stats.totalKelas} subtitle="Kelas aktif" icon={GraduationCap} color="bg-blue-500" />
         <StatCard title="Total Siswa" value={stats.totalSiswa} subtitle="Seluruh tingkat" icon={Users} color="bg-green-500" />
-        <StatCard title="Rata-rata" value={stats.totalKelas > 0 ? Math.round(stats.totalSiswa / stats.totalKelas) : 0} subtitle="Siswa per kelas" icon={TrendingUp} color="bg-purple-500" />
+        <StatCard title="Siswa Alergi" value={stats.totalAlergi} subtitle={`${stats.persenAlergi}% dari total`} icon={AlertCircle} color="bg-red-500" />
         <StatCard title="Kehadiran" value={`${stats.avgKehadiran}%`} subtitle="rata-rata hari ini" icon={UserCheck} color="bg-orange-500" />
       </div>
 
@@ -434,22 +488,22 @@ const DataKelas = () => {
 
                 <div className="p-5">
                   <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                      <Users className="w-5 h-5 text-blue-600 mx-auto mb-1" />
-                      <p className="text-2xl font-bold text-blue-600">{kelas.totalSiswa || 0}</p>
-                      <p className="text-xs text-gray-600">Total Siswa</p>
-                    </div>
                     <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <UserCheck className="w-5 h-5 text-green-600 mx-auto mb-1" />
+                      <Users className="w-5 h-5 text-green-600 mx-auto mb-1" />
                       <p className="text-2xl font-bold text-green-600">{kelas.lakiLaki || 0}</p>
                       <p className="text-xs text-gray-600">Laki-laki</p>
+                    </div>
+                    <div className="text-center p-3 bg-pink-50 rounded-lg">
+                      <Users className="w-5 h-5 text-pink-600 mx-auto mb-1" />
+                      <p className="text-2xl font-bold text-pink-600">{kelas.perempuan || 0}</p>
+                      <p className="text-xs text-gray-600">Perempuan</p>
                     </div>
                   </div>
 
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Perempuan</span>
-                      <span className="font-semibold text-gray-900">{kelas.perempuan || 0} siswa</span>
+                      <span className="text-gray-600">Total Siswa</span>
+                      <span className="font-semibold text-gray-900">{kelas.totalSiswa || 0} siswa</span>
                     </div>
                     {kelas.alergiCount > 0 && (
                       <div className="flex items-center justify-between text-sm">
@@ -691,6 +745,77 @@ const DataKelas = () => {
                       {selectedKelas.alergiList && (
                         <p className="text-xs text-red-700 mt-2">{selectedKelas.alergiList}</p>
                       )}
+                      {/* Detail siswa dengan alergi */}
+                      <div className="mt-4 pt-4 border-t border-red-200">
+                        <p className="text-xs font-semibold text-red-900 mb-2">Detail Siswa ({siswaData.filter(s => {
+                          const kelasId = s.kelasId?.id || s.kelasId;
+                          return String(kelasId) === String(selectedKelas.id);
+                        }).length}):</p>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {siswaData
+                            .filter(siswa => {
+                              const siswaKelasId = String(siswa.kelasId?.id || siswa.kelasId || '');
+                              const selectedKelasId = String(selectedKelas.id || '');
+                              return siswaKelasId === selectedKelasId;
+                            })
+                            .filter(siswa => {
+                              // Cek apakah benar-benar ada alergi
+                              if (!siswa.alergi) return false;
+                              
+                              if (Array.isArray(siswa.alergi)) {
+                                return siswa.alergi.some((a: any) => {
+                                  if (typeof a === 'string') return a.trim() !== '';
+                                  if (typeof a === 'object' && a) {
+                                    const val = a.namaAlergi || a.nama || '';
+                                    return String(val).trim() !== '';
+                                  }
+                                  return false;
+                                });
+                              } else if (typeof siswa.alergi === 'string') {
+                                return siswa.alergi.trim() !== '';
+                              } else if (typeof siswa.alergi === 'object') {
+                                return true;
+                              }
+                              return false;
+                            })
+                            .map((siswa, idx) => {
+                              let alergiText = '';
+                              
+                              // Handle berbagai format alergi seperti di DataSiswa
+                              if (siswa.alergi) {
+                                if (Array.isArray(siswa.alergi)) {
+                                  alergiText = siswa.alergi
+                                    .map((a: any) => {
+                                      if (typeof a === 'string') return a;
+                                      if (typeof a === 'object' && a) {
+                                        return String(a.namaAlergi || a.nama || '');
+                                      }
+                                      return '';
+                                    })
+                                    .filter((a: string) => a && a.trim())
+                                    .join(', ');
+                                } else if (typeof siswa.alergi === 'object' && siswa.alergi !== null) {
+                                  if (siswa.alergi.namaAlergi) {
+                                    alergiText = String(siswa.alergi.namaAlergi);
+                                  } else if (siswa.alergi.nama) {
+                                    alergiText = String(siswa.alergi.nama);
+                                  }
+                                } else if (typeof siswa.alergi === 'string') {
+                                  alergiText = siswa.alergi.trim();
+                                }
+                              }
+                              
+                              return (
+                                <div key={idx} className="bg-white rounded p-2 text-xs border border-red-100">
+                                  <p className="font-semibold text-gray-900">{siswa.nama || 'Siswa'}</p>
+                                  <p className="text-red-700">
+                                    {alergiText || 'Alergi tidak terdaftar'}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

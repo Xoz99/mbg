@@ -7,7 +7,7 @@ import {
   Building2, Users, Truck, Package, Loader2, Activity, AlertCircle
 } from 'lucide-react';
 
-const API_BASE_URL = "http://202.155.95.183:3000";
+const API_BASE_URL = "http://72.60.79.126:3000";
 
 interface DashboardStats {
   totalDapur: number;

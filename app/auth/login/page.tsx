@@ -15,72 +15,13 @@ const LoginPage = () => {
 
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://72.60.79.126:3000"
 
-  // Hardcoded credentials
-  const CSR_EMAIL = "csr@mbg.id"
-  const CSR_PASSWORD = "123456"
-
-  const PEMPROV_MAP: { [key: string]: string } = {
-    "pemprovjabar@mbg.id": "Jawa Barat",
-    "pemprovjateng@mbg.id": "Jawa Tengah",
-    "pemprovjatim@mbg.id": "Jawa Timur",
-    "pemprovbanten@mbg.id": "Banten",
-    "pemprovdki@mbg.id": "DKI Jakarta",
-    "pemprovbali@mbg.id": "Bali",
-    "pemprovsumatera@mbg.id": "Sumatera Utara"
-  }
-
   const handleLogin = async (e: React.MouseEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
     try {
-      // CSR Login (Local)
-      if (email === CSR_EMAIL && password === CSR_PASSWORD) {
-        const csrUser = {
-          id: "csr-001",
-          email: email,
-          name: "CSR Officer",
-          role: "CSR",
-          routeRole: "csr"
-        }
-        
-        if (typeof window !== "undefined") {
-          localStorage.setItem("mbg_user", JSON.stringify(csrUser))
-          localStorage.setItem("authToken", "csr-token-dummy")
-          localStorage.setItem("mbg_token", "csr-token-dummy")
-          document.cookie = `mbg_token=csr-token-dummy; path=/; max-age=86400; SameSite=Lax`
-        }
-        
-        router.push("/csr/dashboard")
-        return
-      }
-
-      // Pemprov Login (Local)
-      const province = PEMPROV_MAP[email.toLowerCase()]
-      if (province && password === CSR_PASSWORD) {
-        const pemprovUser = {
-          id: "pemprov-001",
-          email: email,
-          name: `Pemerintah Provinsi ${province}`,
-          role: "PEMPROV",
-          routeRole: "pemprov",
-          province: province
-        }
-        
-        if (typeof window !== "undefined") {
-          localStorage.setItem("mbg_user", JSON.stringify(pemprovUser))
-          localStorage.setItem("authToken", "pemprov-token-dummy")
-          localStorage.setItem("mbg_token", "pemprov-token-dummy")
-          localStorage.setItem("userProvince", province)
-          document.cookie = `mbg_token=pemprov-token-dummy; path=/; max-age=86400; SameSite=Lax`
-        }
-        
-        router.push("/pemprov/dashboard")
-        return
-      }
-
-      // API Login untuk role lain (Sekolah, Kementerian, Dapur)
+      // API Login untuk semua role
       const response = await fetch(`${baseUrl}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -94,6 +35,7 @@ const LoginPage = () => {
         let token = null
         let apiRole = null
 
+        // Extract user data dari berbagai struktur response
         if (data.data?.user) {
           userData = data.data.user
           token = data.data.token || data.token
@@ -118,12 +60,16 @@ const LoginPage = () => {
           return
         }
 
+        // Mapping role ke route
         const roleMapping: { [key: string]: string } = {
-          "PIC_DAPUR": "dapur",
-          "PIC_SEKOLAH": "sekolah",
+          "SUPERADMIN": "admin",
+          "ADMIN": "adminbiasa",
+          "PEMPROV": "pemprov",
+          "CSR": "csr",
           "KEMENTERIAN": "kementerian",
-          "ADMIN": "admin",
-          "SUPERADMIN": "admin"
+          "DRIVER": "driver",
+          "PIC_SEKOLAH": "sekolah",
+          "PIC_DAPUR": "dapur"
         }
 
         const userRole = roleMapping[apiRole] || apiRole.toLowerCase()
@@ -140,6 +86,7 @@ const LoginPage = () => {
           localStorage.setItem("mbg_token", token)
           document.cookie = `mbg_token=${token}; path=/; max-age=86400; SameSite=Lax`
 
+          // Simpan data spesifik berdasarkan role
           if (apiRole === "PIC_DAPUR") {
             const dapurId = userData.dapurId || userData.dapur_id || userData.kitchenId || userData.Dapur?.id || userData.dapur?.id
             if (dapurId) {
@@ -153,6 +100,20 @@ const LoginPage = () => {
               localStorage.setItem("userSekolahId", sekolahId)
             }
           }
+
+          if (apiRole === "PEMPROV") {
+            const provinsi = userData.provinsi || userData.province || userData.Provinsi
+            if (provinsi) {
+              localStorage.setItem("userProvince", provinsi)
+            }
+          }
+
+          if (apiRole === "DRIVER") {
+            const driverId = userData.driverId || userData.driver_id || userData.id
+            if (driverId) {
+              localStorage.setItem("userDriverId", driverId)
+            }
+          }
         }
 
         router.push(`/${userRole}/dashboard`)
@@ -163,22 +124,6 @@ const LoginPage = () => {
     } catch (err) {
       setError("Terjadi kesalahan koneksi. Silakan coba lagi.")
       setIsLoading(false)
-    }
-  }
-
-  const fillDemoCredentials = (type: string) => {
-    setError("")
-    const credentials: { [key: string]: { email: string; password: string } } = {
-      sekolah: { email: "picsekolah1@mbg.com", password: "password123" },
-      kementerian: { email: "kementerian@mbg.id", password: "123456" },
-      dapur: { email: "pic.dapur@mbg.id", password: "password123" },
-      csr: { email: "csr@mbg.id", password: "123456" },
-      pemprovjabar: { email: "pemprovjabar@mbg.id", password: "123456" }
-    }
-    
-    if (credentials[type]) {
-      setEmail(credentials[type].email)
-      setPassword(credentials[type].password)
     }
   }
 
@@ -266,56 +211,6 @@ const LoginPage = () => {
               {isLoading ? "Memproses..." : "Masuk"}
             </button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-500 mb-3 text-center">Demo Credentials</p>
-            
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => fillDemoCredentials("sekolah")}
-                  disabled={isLoading}
-                  className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-all border border-blue-200 font-medium text-xs disabled:opacity-50"
-                >
-                  Sekolah
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillDemoCredentials("kementerian")}
-                  disabled={isLoading}
-                  className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-all border border-blue-200 font-medium text-xs disabled:opacity-50"
-                >
-                  Kementerian
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillDemoCredentials("dapur")}
-                  disabled={isLoading}
-                  className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-all border border-blue-200 font-medium text-xs disabled:opacity-50"
-                >
-                  Dapur
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillDemoCredentials("csr")}
-                  disabled={isLoading}
-                  className="px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-all border border-green-200 font-medium text-xs disabled:opacity-50"
-                >
-                  CSR
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => fillDemoCredentials("pemprovjabar")}
-                disabled={isLoading}
-                className="w-full px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-all border border-purple-200 font-medium text-xs disabled:opacity-50"
-              >
-                Pemprov Jawa Barat
-              </button>
-            </div>
-          </div>
         </div>
 
         <p className="text-center text-sm text-white/60 mt-6">

@@ -1,1076 +1,1369 @@
-// app/dapur/menu/page.tsx
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect } from "react"
 import DapurLayout from "@/components/layout/DapurLayout"
 import {
   Calendar,
   ChefHat,
   Plus,
-  Edit,
-  Copy,
-  Eye,
-  Check,
   X,
-  Clock,
-  Users,
   Flame,
   Apple,
   Drumstick,
   Wheat,
-  Salad,
-  Download,
-  Upload,
-  TrendingUp,
   AlertCircle,
-  CheckCircle2,
-  Info,
-  ImageIcon,
-  ShoppingBag,
-  Send,
-  ShieldAlert,
+  Loader,
+  Trash2,
+  Filter,
+  AlertTriangle,
 } from "lucide-react"
 
-// Profil alergi rata-rata per sekolah (mock)
-const SCHOOL_PROFILES = [
-  {
-    id: "school-1",
-    name: "SDN Melati 01",
-    restrictedAllergens: ["milk", "egg", "peanut", "fish", "seafood", "wheat", "soy"],
-    averages: { milk: 8, egg: 12, peanut: 5, seafood: 4, fish: 9, wheat: 6, soy: 4 },
-  },
-  {
-    id: "school-2",
-    name: "SMP Harapan 02",
-    restrictedAllergens: ["egg", "peanut", "seafood", "fish"],
-    averages: { milk: 5, egg: 10, peanut: 7, seafood: 6, fish: 8, wheat: 3, soy: 3 },
-  },
-  {
-    id: "school-3",
-    name: "SMA Nusantara 03",
-    restrictedAllergens: ["peanut", "seafood", "wheat"],
-    averages: { milk: 4, egg: 6, peanut: 9, seafood: 7, fish: 5, wheat: 8, soy: 2 },
-  },
-] as const
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://72.60.79.126:3000"
 
-type AllergenKey = "milk" | "egg" | "peanut" | "seafood" | "fish" | "wheat" | "soy"
-
-const ALLERGEN_LABEL: Record<AllergenKey, string> = {
-  milk: "Susu/Dairy",
-  egg: "Telur",
-  peanut: "Kacang",
-  seafood: "Seafood/Kerang",
-  fish: "Ikan",
-  wheat: "Gandum/Gluten",
-  soy: "Kedelai",
+interface MenuHarian {
+  id: string
+  tanggal: string
+  namaMenu: string
+  biayaPerTray: number
+  jamMulaiMasak: string
+  jamSelesaiMasak: string
+  kalori: number
+  protein: number
+  lemak: number
+  karbohidrat: number
 }
 
-// keyword sederhana untuk mendeteksi bahan pemicu alergi dari nama/notes
-const ALLERGEN_KEYWORDS: Record<AllergenKey, string[]> = {
-  milk: ["susu", "dairy", "milk", "keju", "butter", "mentega", "yogurt", "santan"], // santan bukan dairy, namun sering jadi pengganti — tetap tampilkan info
-  egg: ["telur", "egg"],
-  peanut: ["kacang", "peanut", "tanah"],
-  seafood: ["udang", "shrimp", "cumi", "squid", "kerang", "seafood", "kepiting", "crab"],
-  fish: ["ikan", "tuna", "salmon", "bandeng", "nila", "gurame", "tongkol", "teri", "sarden", "lele"],
-  wheat: ["gandum", "wheat", "tepung terigu", "gluten", "terigu", "roti", "mie"],
-  soy: ["kedelai", "soy", "kecap", "tauco", "tempe", "tahu"],
+interface MenuPlanning {
+  id: string
+  mingguanKe: number
+  tanggalMulai: string
+  tanggalSelesai: string
+  sekolahId: string
+  sekolah?: { id: string; nama: string }
+  _count?: { menuHarian: number }
 }
 
-function detectAllergensInText(text: string): AllergenKey[] {
-  const lower = text.toLowerCase()
-  const found = new Set<AllergenKey>()
-  ;(Object.keys(ALLERGEN_KEYWORDS) as AllergenKey[]).forEach((key) => {
-    if (ALLERGEN_KEYWORDS[key].some((kw) => lower.includes(kw))) {
-      found.add(key)
+interface Sekolah {
+  id: string
+  nama: string
+}
+
+interface AlergiItem {
+  nama: string
+  jumlahSiswa: number
+  siswaMulaiDari?: string[]
+}
+
+interface Holiday {
+  tanggal?: string
+  tanggalMulai?: string
+  tanggalSelesai?: string
+  keterangan?: string
+  deskripsi?: string
+}
+
+async function getAuthToken(): Promise<string> {
+  if (typeof window === "undefined") return ""
+  return localStorage.getItem("authToken") || ""
+}
+
+async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  try {
+    const token = await getAuthToken()
+    const url = `${API_BASE_URL}${endpoint}`
+
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...options.headers,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || `HTTP ${response.status}`)
     }
+
+    return response.json()
+  } catch (error) {
+    console.error(`[API Error] ${endpoint}:`, error)
+    throw error
+  }
+}
+
+function extractArray(data: any): any[] {
+  if (Array.isArray(data)) return data
+  if (data?.data && Array.isArray(data.data)) return data.data
+  if (typeof data === "object") {
+    const arr = Object.values(data).find((v) => Array.isArray(v))
+    if (arr) return arr as any[]
+  }
+  return []
+}
+
+// Utility function untuk parse tanggal dengan berbagai format
+function parseDate(dateString: string): Date | null {
+  if (!dateString) return null
+  
+  const date = new Date(dateString)
+  
+  // Cek apakah tanggal valid
+  if (isNaN(date.getTime())) {
+    console.warn(`Invalid date format: ${dateString}`)
+    return null
+  }
+  
+  return date
+}
+
+// Format tanggal ke format Indonesia dengan fallback
+function formatDateSafe(dateString: string): string {
+  const date = parseDate(dateString)
+  if (!date) {
+    return "Tanggal tidak valid"
+  }
+  return date.toLocaleDateString("id-ID", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   })
-  return Array.from(found)
 }
 
-function validateMenuAgainstSchool(menu: any, school: (typeof SCHOOL_PROFILES)[number]) {
-  const issues: { ingredientId: string; ingredientName: string; allergens: AllergenKey[] }[] = []
-  menu.ingredients.forEach((ing: any) => {
-    const base = `${ing.name ?? ""} ${ing.notes ?? ""}`.trim()
-    const matched = detectAllergensInText(base)
-    const restricted = matched.filter((m) => school.restrictedAllergens.includes(m))
-    if (restricted.length) {
-      issues.push({ ingredientId: ing.id, ingredientName: ing.name, allergens: restricted })
-    }
+export default function MenuPlanningPage() {
+  const [menuPlannings, setMenuPlannings] = useState<MenuPlanning[]>([])
+  const [menuHarianList, setMenuHarianList] = useState<MenuHarian[]>([])
+  const [sekolahList, setSekolahList] = useState<Sekolah[]>([])
+  const [alergiList, setAlergiList] = useState<AlergiItem[]>([])
+  const [holidays, setHolidays] = useState<Holiday[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingMenuHarian, setLoadingMenuHarian] = useState(false)
+  const [loadingAlergiAndHolidays, setLoadingAlergiAndHolidays] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const [selectedPlanningId, setSelectedPlanningId] = useState<string>("")
+  const [selectedSekolahId, setSelectedSekolahId] = useState<string>("")
+  const [selectedMenu, setSelectedMenu] = useState<MenuHarian | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showCreateMenuModal, setShowCreateMenuModal] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [formData, setFormData] = useState({
+    mingguanKe: "1",
+    tanggalMulai: "",
+    tanggalSelesai: "",
+    sekolahId: "",
   })
-  return { issues, hasRisk: issues.length > 0 }
-}
 
-const MenuPlanning = () => {
-  const [selectedWeek, setSelectedWeek] = useState("week-2")
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar")
-  const [selectedMenu, setSelectedMenu] = useState<any>(null)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [selectedSchoolId, setSelectedSchoolId] = useState("school-1")
+  const [menuFormData, setMenuFormData] = useState({
+    tanggal: "",
+    namaMenu: "",
+    biayaPerTray: "",
+    jamMulaiMasak: "",
+    jamSelesaiMasak: "",
+    kalori: "",
+    protein: "",
+    karbohidrat: "",
+    lemak: "",
+  })
 
-  const selectedSchool = useMemo(
-    () => SCHOOL_PROFILES.find((s) => s.id === selectedSchoolId) || SCHOOL_PROFILES[0],
-    [selectedSchoolId],
-  )
+  const [ingredientWarnings, setIngredientWarnings] = useState<{
+    hasWarning: boolean
+    conflicts: string[]
+    message: string
+  }>({ hasWarning: false, conflicts: [], message: "" })
 
-  const weeklyMenus = useMemo(
-    () => [
-      {
-        id: "WM-2025-W2",
-        weekNumber: 2,
-        year: 2025,
-        startDate: "2025-01-13",
-        endDate: "2025-01-18",
-        kitchenId: "kitchen-karawang-001",
-        createdBy: { id: "user-001", name: "Bu Siti Aminah" },
-        status: "APPROVED",
-        approvedBy: "Manager Pusat",
-        approvedAt: "2025-01-10",
-        notes: "Menu minggu ke-2 Januari 2025",
-        dailyMenus: [
-          {
-            id: "DM-2025-01-13",
-            date: "2025-01-13",
-            dayNumber: 1,
-            menuName: "Nasi Putih + Rendang Sapi",
-            description: "Rendang Sapi + Sayur Asem + Kerupuk + Pisang",
-            cookingStartAt: "06:00",
-            cookingEndAt: "08:30",
-            samplePhotoUrl: "/photos/sample-rendang.jpg",
-            documentedBy: { id: "user-001", name: "Bu Siti" },
-            nutritionInfo: {
-              kalori: 680,
-              protein: 28,
-              lemak: 22,
-              karbohidrat: 85,
-            },
-            estimatedCost: 12500,
-            expectedTrays: 5000,
-            difficulty: "MEDIUM",
-            ingredients: [
-              { id: "1", name: "Beras", quantity: "850 kg", photoUrl: "/photos/beras.jpg", notes: "Beras IR64" },
-              {
-                id: "2",
-                name: "Daging Sapi",
-                quantity: "120 kg",
-                photoUrl: "/photos/daging.jpg",
-                notes: "Bagian has dalam",
-              },
-              {
-                id: "3",
-                name: "Sayur Asem Mix",
-                quantity: "200 kg",
-                photoUrl: null,
-                notes: "Kacang panjang, labu siam, jagung",
-              },
-              { id: "4", name: "Bumbu Rendang", quantity: "35 kg", photoUrl: null, notes: "Bumbu halus" },
-              { id: "5", name: "Kerupuk", quantity: "50 kg", photoUrl: null, notes: "Kerupuk udang" },
-              { id: "6", name: "Pisang", quantity: "150 kg", photoUrl: null, notes: "Pisang ambon" },
-            ],
-            notes: "Daging harus empuk minimal 2 jam. Rendang jangan terlalu kering.",
-          },
-          {
-            id: "DM-2025-01-14",
-            date: "2025-01-14",
-            dayNumber: 2,
-            menuName: "Nasi Goreng Spesial",
-            description: "Nasi Goreng + Ayam Suwir + Acar + Kerupuk + Jeruk",
-            cookingStartAt: "06:00",
-            cookingEndAt: "08:00",
-            samplePhotoUrl: null,
-            documentedBy: null,
-            nutritionInfo: {
-              kalori: 650,
-              protein: 25,
-              lemak: 20,
-              karbohidrat: 82,
-            },
-            estimatedCost: 11000,
-            expectedTrays: 5000,
-            difficulty: "EASY",
-            ingredients: [
-              { id: "1", name: "Beras", quantity: "850 kg", photoUrl: null, notes: "Untuk nasi" },
-              { id: "2", name: "Ayam", quantity: "180 kg", photoUrl: null, notes: "Ayam kampung" },
-              { id: "3", name: "Bumbu Nasi Goreng", quantity: "45 kg", photoUrl: null, notes: "Bumbu lengkap" },
-              { id: "4", name: "Acar", quantity: "80 kg", photoUrl: null, notes: "Timun, wortel, cabe" },
-              { id: "5", name: "Kerupuk", quantity: "45 kg", photoUrl: null, notes: "Kerupuk putih" },
-              { id: "6", name: "Jeruk", quantity: "200 kg", photoUrl: null, notes: "Jeruk manis" },
-            ],
-            notes: "Bumbu harus merata. Nasi jangan terlalu lembek.",
-          },
-          {
-            id: "DM-2025-01-15",
-            date: "2025-01-15",
-            dayNumber: 3,
-            menuName: "Nasi Kuning + Ayam Goreng",
-            description: "Nasi Kuning + Ayam Goreng + Sambal Goreng Ati + Kerupuk + Pisang",
-            cookingStartAt: "06:00",
-            cookingEndAt: "08:30",
-            samplePhotoUrl: null,
-            documentedBy: null,
-            nutritionInfo: {
-              kalori: 720,
-              protein: 30,
-              lemak: 24,
-              karbohidrat: 88,
-            },
-            estimatedCost: 13000,
-            expectedTrays: 5000,
-            difficulty: "MEDIUM",
-            ingredients: [
-              { id: "1", name: "Beras", quantity: "850 kg", photoUrl: null, notes: "Untuk nasi kuning" },
-              { id: "2", name: "Ayam", quantity: "200 kg", photoUrl: null, notes: "Ayam broiler" },
-              { id: "3", name: "Kunyit", quantity: "15 kg", photoUrl: null, notes: "Kunyit segar" },
-              { id: "4", name: "Ati Ampela", quantity: "60 kg", photoUrl: null, notes: "Fresh" },
-              { id: "5", name: "Kerupuk", quantity: "50 kg", photoUrl: null, notes: "Kerupuk udang" },
-              { id: "6", name: "Pisang", quantity: "150 kg", photoUrl: null, notes: "Pisang raja" },
-            ],
-            notes: "Nasi kuning harus pulen dan wangi santan.",
-          },
-          {
-            id: "DM-2025-01-16",
-            date: "2025-01-16",
-            dayNumber: 4,
-            menuName: "Nasi Putih + Ikan Bakar",
-            description: "Nasi Putih + Ikan Bakar + Sambal Terasi + Lalapan + Apel",
-            cookingStartAt: "06:00",
-            cookingEndAt: "08:30",
-            samplePhotoUrl: null,
-            documentedBy: null,
-            nutritionInfo: {
-              kalori: 640,
-              protein: 26,
-              lemak: 18,
-              karbohidrat: 80,
-            },
-            estimatedCost: 11500,
-            expectedTrays: 5000,
-            difficulty: "MEDIUM",
-            ingredients: [
-              { id: "1", name: "Beras", quantity: "850 kg", photoUrl: null, notes: "Beras pulen" },
-              { id: "2", name: "Ikan Bandeng", quantity: "250 kg", photoUrl: null, notes: "Ikan segar" },
-              { id: "3", name: "Sambal Terasi", quantity: "40 kg", photoUrl: null, notes: "Sambal siap pakai" },
-              { id: "4", name: "Sayur Lalapan", quantity: "120 kg", photoUrl: null, notes: "Kol, timun, kemangi" },
-              { id: "5", name: "Apel", quantity: "180 kg", photoUrl: null, notes: "Apel fuji" },
-            ],
-            notes: "Ikan harus matang sempurna. Sambal jangan terlalu pedas.",
-          },
-          {
-            id: "DM-2025-01-17",
-            date: "2025-01-17",
-            dayNumber: 5, // Jumat
-            menuName: "Nasi + Soto Ayam",
-            description: "Nasi Putih + Soto Ayam Kuning + Emping + Sambal + Pisang",
-            cookingStartAt: "06:00",
-            cookingEndAt: "08:00",
-            samplePhotoUrl: null,
-            documentedBy: null,
-            nutritionInfo: {
-              kalori: 630,
-              protein: 24,
-              lemak: 19,
-              karbohidrat: 78,
-            },
-            estimatedCost: 10500,
-            expectedTrays: 5000,
-            difficulty: "EASY",
-            ingredients: [
-              { id: "1", name: "Beras", quantity: "850 kg", photoUrl: null, notes: "Beras putih" },
-              { id: "2", name: "Ayam", quantity: "160 kg", photoUrl: null, notes: "Ayam kampung" },
-              { id: "3", name: "Bumbu Soto", quantity: "50 kg", photoUrl: null, notes: "Bumbu lengkap" },
-              { id: "4", name: "Emping", quantity: "45 kg", photoUrl: null, notes: "Emping melinjo" },
-              { id: "5", name: "Pisang", quantity: "150 kg", photoUrl: null, notes: "Pisang kepok" },
-            ],
-            notes: "Menu ringan untuk Jumat. Kuah jangan terlalu berminyak.",
-          },
-          {
-            id: "DM-2025-01-18",
-            date: "2025-01-18",
-            dayNumber: 6, // Sabtu
-            menuName: "Nasi Putih + Ayam Geprek",
-            description: "Nasi Putih + Ayam Geprek + Tempe Orek + Sayur + Jeruk",
-            cookingStartAt: "06:00",
-            cookingEndAt: "08:00",
-            samplePhotoUrl: null,
-            documentedBy: null,
-            nutritionInfo: {
-              kalori: 660,
-              protein: 27,
-              lemak: 21,
-              karbohidrat: 80,
-            },
-            estimatedCost: 11200,
-            expectedTrays: 4500,
-            difficulty: "EASY",
-            ingredients: [
-              { id: "1", name: "Beras", quantity: "765 kg", photoUrl: null, notes: "Target lebih rendah sabtu" },
-              { id: "2", name: "Ayam", quantity: "170 kg", photoUrl: null, notes: "Ayam broiler" },
-              { id: "3", name: "Tempe", quantity: "80 kg", photoUrl: null, notes: "Tempe segar" },
-              { id: "4", name: "Sayur Sop", quantity: "150 kg", photoUrl: null, notes: "Sayur mix" },
-              { id: "5", name: "Jeruk", quantity: "180 kg", photoUrl: null, notes: "Jeruk peras" },
-            ],
-            notes: "Ayam geprek level sedang. Sambal jangan terlalu pedas untuk anak-anak.",
-          },
-        ],
-      },
-    ],
-    [],
-  )
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
 
-  const currentWeeklyMenu = weeklyMenus[0] // For now, using first week
+        const planningRes = await apiCall<any>("/api/menu-planning")
+        const plannings = extractArray(planningRes?.data || [])
+        setMenuPlannings(plannings)
 
-  const allergyRiskCount = useMemo(() => {
-    return currentWeeklyMenu.dailyMenus.reduce((acc, m) => {
-      const result = validateMenuAgainstSchool(m, selectedSchool)
-      return acc + (result.hasRisk ? 1 : 0)
-    }, 0)
-  }, [currentWeeklyMenu, selectedSchool])
+        const sekolahRes = await apiCall<any>("/api/sekolah")
+        const sekolah = extractArray(sekolahRes?.data || [])
+        setSekolahList(sekolah)
 
-  // Stats
-  const stats = useMemo(() => {
-    const dailyMenus = currentWeeklyMenu.dailyMenus
-    const totalTrays = dailyMenus.reduce((acc, m) => acc + m.expectedTrays, 0)
-    const totalCost = dailyMenus.reduce((acc, m) => acc + m.estimatedCost * m.expectedTrays, 0)
-    const avgKalori = Math.round(dailyMenus.reduce((acc, m) => acc + m.nutritionInfo.kalori, 0) / dailyMenus.length)
-    const withPhotos = dailyMenus.filter((m) => m.samplePhotoUrl).length
-    const totalIngredients = dailyMenus.reduce((acc, m) => acc + m.ingredients.length, 0)
-
-    return {
-      totalDays: dailyMenus.length,
-      totalTrays,
-      totalCost,
-      avgKalori,
-      withPhotos,
-      totalIngredients,
-      status: currentWeeklyMenu.status,
-      allergyRiskCount,
+        if (sekolah.length > 0) {
+          setSelectedSekolahId(sekolah[0].id)
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal memuat data")
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [currentWeeklyMenu])
 
-  const getStatusConfig = (status: string) => {
-    const configs = {
-      APPROVED: {
-        color: "bg-green-100 text-green-700 border-green-200",
-        icon: CheckCircle2,
-        text: "Disetujui",
-        dotColor: "bg-green-500",
-      },
-      PENDING: {
-        color: "bg-yellow-100 text-yellow-700 border-yellow-200",
-        icon: Clock,
-        text: "Menunggu",
-        dotColor: "bg-yellow-500 animate-pulse",
-      },
-      DRAFT: {
-        color: "bg-gray-100 text-gray-700 border-gray-200",
-        icon: Edit,
-        text: "Draft",
-        dotColor: "bg-gray-500",
-      },
-      REJECTED: {
-        color: "bg-red-100 text-red-700 border-red-200",
-        icon: X,
-        text: "Ditolak",
-        dotColor: "bg-red-500",
-      },
+    loadData()
+  }, [])
+
+  const filteredMenuPlannings = selectedSekolahId
+    ? menuPlannings
+        .filter((p) => p.sekolahId === selectedSekolahId)
+        .sort((a, b) => a.mingguanKe - b.mingguanKe)
+    : menuPlannings.sort((a, b) => a.mingguanKe - b.mingguanKe)
+
+  useEffect(() => {
+    if (filteredMenuPlannings.length === 0) {
+      setSelectedPlanningId("")
+      setMenuHarianList([])
+      setAlergiList([])
     }
-    return configs[status as keyof typeof configs] || configs.DRAFT
+  }, [filteredMenuPlannings])
+
+  useEffect(() => {
+    if (!selectedSekolahId) {
+      setAlergiList([])
+      setHolidays([])
+      return
+    }
+
+    const loadAlergiAndHolidays = async () => {
+      try {
+        setLoadingAlergiAndHolidays(true)
+        
+        // Load alergi
+        try {
+          const siswaRes = await apiCall<any>(`/api/sekolah/${selectedSekolahId}/siswa`)
+          const siswas = extractArray(siswaRes?.data || [])
+
+          const alergiMap = new Map<string, { count: number; siswas: string[] }>()
+
+          for (const siswa of siswas) {
+            try {
+              const alergiRes = await apiCall<any>(`/api/siswa/${siswa.id}/alergi`)
+              const alergi = extractArray(alergiRes?.data || [])
+
+              for (const a of alergi) {
+                if (!alergiMap.has(a.namaAlergi)) {
+                  alergiMap.set(a.namaAlergi, { count: 0, siswas: [] })
+                }
+                alergiMap.get(a.namaAlergi)!.count++
+                alergiMap.get(a.namaAlergi)!.siswas.push(siswa.id)
+              }
+            } catch (err) {
+              console.warn(`Gagal load alergi siswa ${siswa.id}:`, err)
+            }
+          }
+
+          const alergiArray = Array.from(alergiMap.entries()).map(([nama, data]) => ({
+            nama,
+            jumlahSiswa: data.count,
+            siswaMulaiDari: data.siswas,
+          }))
+
+          setAlergiList(alergiArray)
+        } catch (err) {
+          console.error("Gagal load alergi:", err)
+          setAlergiList([])
+        }
+
+        // Load kalender akademik sekolah
+        try {
+          const holidayRes = await apiCall<any>(`/api/kalender-akademik?sekolahId=${selectedSekolahId}`)
+          const rawHolidays = extractArray(holidayRes?.data || [])
+          
+          // DEBUG: Log raw data
+          console.log("=== DEBUG HOLIDAYS ===")
+          console.log("Raw API response:", holidayRes)
+          console.log("Extracted array:", rawHolidays)
+          console.log("First item:", rawHolidays[0])
+          
+          // Filter dan validate holidays
+          const validatedHolidays = rawHolidays
+            .filter((h: any) => {
+              // Cek apakah ada field tanggal (bisa tanggal, tanggalMulai, atau tanggalSelesai)
+              const dateField = h.tanggal || h.tanggalMulai || h.tanggalSelesai
+              
+              if (!dateField) {
+                console.warn("Holiday without date field:", h)
+                return false
+              }
+              
+              // Cek apakah tanggal bisa di-parse
+              const date = parseDate(dateField)
+              if (!date) {
+                console.warn(`Invalid date in holiday: ${dateField}`, h)
+                return false
+              }
+              
+              return true
+            })
+            .map((h: any) => {
+              // Map ke format yang konsisten
+              const dateField = h.tanggal || h.tanggalMulai || h.tanggalSelesai
+              const descriptionField = h.keterangan || h.deskripsi || "Hari Libur"
+              
+              return {
+                tanggal: dateField,
+                keterangan: descriptionField,
+              }
+            })
+          
+          console.log("Validated holidays:", validatedHolidays)
+          console.log("=== END DEBUG ===")
+          
+          setHolidays(validatedHolidays)
+        } catch (err) {
+          console.warn("Gagal load kalender akademik:", err)
+          setHolidays([])
+        }
+      } finally {
+        setLoadingAlergiAndHolidays(false)
+      }
+    }
+
+    loadAlergiAndHolidays()
+  }, [selectedSekolahId])
+
+  useEffect(() => {
+    if (!selectedPlanningId) {
+      setMenuHarianList([])
+      setLoadingMenuHarian(false)
+      return
+    }
+
+    const loadMenuHarian = async () => {
+      setLoadingMenuHarian(true)
+      setMenuHarianList([])
+
+      try {
+        const res = await apiCall<any>(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
+        const menus = extractArray(res?.data || [])
+
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        setMenuHarianList(menus)
+      } catch (err) {
+        console.error("Gagal load menu harian:", err)
+        setMenuHarianList([])
+      } finally {
+        setLoadingMenuHarian(false)
+      }
+    }
+
+    loadMenuHarian()
+  }, [selectedPlanningId])
+
+  const validateIngredient = async (namaMenu: string) => {
+    if (!selectedSekolahId || alergiList.length === 0) {
+      setIngredientWarnings({ hasWarning: false, conflicts: [], message: "" })
+      return
+    }
+
+    try {
+      const menuLower = namaMenu.toLowerCase()
+      const conflicts = alergiList
+        .filter(a => menuLower.includes(a.nama.toLowerCase()))
+        .map(a => a.nama)
+
+      if (conflicts.length > 0) {
+        setIngredientWarnings({
+          hasWarning: true,
+          conflicts,
+          message: `Peringatan: Menu ini mengandung alergen (${conflicts.join(", ")}) yang dikonsumsi ${conflicts.map(c => alergiList.find(a => a.nama === c)?.jumlahSiswa).join(", ")} siswa`,
+        })
+      } else {
+        setIngredientWarnings({ hasWarning: false, conflicts: [], message: "" })
+      }
+    } catch (err) {
+      console.error("Gagal validasi ingredient:", err)
+      setIngredientWarnings({ hasWarning: false, conflicts: [], message: "" })
+    }
   }
 
-  const getDifficultyConfig = (difficulty: string) => {
-    const configs = {
-      EASY: { color: "bg-green-100 text-green-700", text: "Mudah", icon: "✓" },
-      MEDIUM: { color: "bg-yellow-100 text-yellow-700", text: "Sedang", icon: "◐" },
-      HARD: { color: "bg-red-100 text-red-700", text: "Sulit", icon: "⚠" },
+  const currentPlanning = menuPlannings.find((p) => p.id === selectedPlanningId)
+  const currentSekolah = sekolahList.find((s) => s.id === selectedSekolahId)
+
+  const handleCreatePlanning = async () => {
+    if (!formData.tanggalMulai || !formData.tanggalSelesai || !formData.sekolahId) {
+      alert("Isi semua field")
+      return
     }
-    return configs[difficulty as keyof typeof configs] || configs.MEDIUM
+
+    try {
+      setIsSubmitting(true)
+      await apiCall("/api/menu-planning", {
+        method: "POST",
+        body: JSON.stringify({
+          mingguanKe: parseInt(formData.mingguanKe),
+          tanggalMulai: formData.tanggalMulai,
+          tanggalSelesai: formData.tanggalSelesai,
+          sekolahId: formData.sekolahId,
+        }),
+      })
+      alert("Menu planning berhasil dibuat")
+      setShowCreateModal(false)
+      setFormData({ mingguanKe: "1", tanggalMulai: "", tanggalSelesai: "", sekolahId: "" })
+      window.location.reload()
+    } catch (err) {
+      alert("Gagal membuat menu planning")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const getDayName = (dayNumber: number) => {
-    const days = ["", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
-    return days[dayNumber] || ""
+  const handleDeletePlanning = async (planningId: string) => {
+    if (!confirm("Yakin ingin menghapus menu planning ini?")) {
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+      await apiCall(`/api/menu-planning/${planningId}`, {
+        method: "DELETE",
+      })
+      alert("Menu planning berhasil dihapus")
+      window.location.reload()
+    } catch (err) {
+      alert("Gagal menghapus: " + (err instanceof Error ? err.message : "Unknown error"))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const StatCard = ({ title, value, subtitle, icon: Icon, color, trend }: any) => (
-    <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`p-2.5 rounded-lg ${color}`}>
-          <Icon className="w-5 h-5 text-white" />
+  const handleCreateMenuHarian = async () => {
+    if (
+      !menuFormData.tanggal ||
+      !menuFormData.namaMenu ||
+      !menuFormData.biayaPerTray ||
+      !menuFormData.jamMulaiMasak ||
+      !menuFormData.jamSelesaiMasak ||
+      !menuFormData.kalori ||
+      !menuFormData.protein ||
+      !menuFormData.karbohidrat ||
+      !menuFormData.lemak
+    ) {
+      alert("Isi semua field")
+      return
+    }
+
+    if (ingredientWarnings.hasWarning) {
+      const confirmed = confirm(
+        `Peringatan: Menu ini mengandung alergen yang dihindari ${ingredientWarnings.conflicts.join(", ")}. Lanjutkan?`
+      )
+      if (!confirmed) return
+    }
+
+    try {
+      setIsSubmitting(true)
+      await apiCall(`/api/menu-planning/${selectedPlanningId}/menu-harian`, {
+        method: "POST",
+        body: JSON.stringify({
+          tanggal: menuFormData.tanggal,
+          namaMenu: menuFormData.namaMenu,
+          biayaPerTray: parseFloat(menuFormData.biayaPerTray),
+          jamMulaiMasak: menuFormData.jamMulaiMasak,
+          jamSelesaiMasak: menuFormData.jamSelesaiMasak,
+          kalori: parseFloat(menuFormData.kalori),
+          protein: parseFloat(menuFormData.protein),
+          karbohidrat: parseFloat(menuFormData.karbohidrat),
+          lemak: parseFloat(menuFormData.lemak),
+        }),
+      })
+      alert("Menu harian berhasil dibuat")
+      setShowCreateMenuModal(false)
+      setMenuFormData({
+        tanggal: "",
+        namaMenu: "",
+        biayaPerTray: "",
+        jamMulaiMasak: "",
+        jamSelesaiMasak: "",
+        kalori: "",
+        protein: "",
+        karbohidrat: "",
+        lemak: "",
+      })
+      setIngredientWarnings({ hasWarning: false, conflicts: [], message: "" })
+      const res = await apiCall<any>(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
+      const menus = extractArray(res?.data || [])
+      setMenuHarianList(menus)
+    } catch (err) {
+      alert("Gagal membuat menu harian: " + (err instanceof Error ? err.message : "Unknown error"))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const getDayName = (date: string) => {
+    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
+    const parsedDate = parseDate(date)
+    return parsedDate ? days[parsedDate.getDay()] : "Hari?"
+  }
+
+  const avgKalori =
+    menuHarianList.length > 0
+      ? Math.round(menuHarianList.reduce((sum, m) => sum + m.kalori, 0) / menuHarianList.length)
+      : 0
+
+  const totalBiaya = menuHarianList.reduce((sum, m) => sum + m.biayaPerTray, 0)
+  const avgProtein =
+    menuHarianList.length > 0
+      ? Math.round(menuHarianList.reduce((sum, m) => sum + m.protein, 0) / menuHarianList.length)
+      : 0
+
+  if (loading) {
+    return (
+      <DapurLayout currentPage="menu">
+        <div className="flex items-center justify-center h-96">
+          <Loader className="w-12 h-12 animate-spin text-[#D0B064]" />
         </div>
-        {trend && (
-          <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-            <TrendingUp className="w-3 h-3" />
-            {trend}
-          </div>
-        )}
-      </div>
-      <p className="text-xs font-medium text-gray-600 mb-1">{title}</p>
-      <p className="text-2xl font-bold text-gray-900 mb-0.5">{value}</p>
-      <p className="text-xs text-gray-500">{subtitle}</p>
-    </div>
-  )
+      </DapurLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DapurLayout currentPage="menu">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <AlertCircle className="w-6 h-6 text-red-600 inline mr-2" />
+          <span className="text-red-700">{error}</span>
+        </div>
+      </DapurLayout>
+    )
+  }
 
   return (
     <DapurLayout currentPage="menu">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Menu Planning</h1>
-            <p className="text-gray-600">Kelola menu mingguan dan daily menu dengan ingredients</p>
+            <h1 className="text-3xl font-bold text-[#1B263A]">Menu Planning</h1>
+            <p className="text-gray-600 mt-1">Kelola menu mingguan dan daily menu</p>
           </div>
-          <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold shadow-sm">
-              <Upload className="w-5 h-5" />
-              Import Menu
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-[#D0B064] text-white rounded-xl hover:bg-[#C9A355] transition-colors font-semibold shadow-sm">
-              <Plus className="w-5 h-5" />
-              Menu Baru
-            </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-5 py-3 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] font-medium transition shadow-lg hover:shadow-xl"
+          >
+            <Plus className="w-5 h-5" />
+            Menu Planning Baru
+          </button>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <Filter className="w-5 h-5 text-gray-600" />
+            <label className="text-sm font-semibold text-gray-700">Filter per Sekolah:</label>
           </div>
+          <select
+            value={selectedSekolahId}
+            onChange={(e) => {
+              setSelectedSekolahId(e.target.value)
+              setSelectedPlanningId("")
+            }}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent font-medium"
+          >
+            <option value="">Semua Sekolah</option>
+            {sekolahList.map((s: Sekolah) => (
+              <option key={s.id} value={s.id}>
+                {s.nama}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Weekly Menu Header */}
-      <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] rounded-2xl p-6 text-white mb-6 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Calendar className="w-6 h-6" />
-              <h2 className="text-2xl font-bold">{currentWeeklyMenu.id}</h2>
-              {(() => {
-                const statusConfig = getStatusConfig(currentWeeklyMenu.status)
-                return (
-                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/20 border border-white/30">
-                    <statusConfig.icon className="w-4 h-4" />
-                    {statusConfig.text}
-                  </span>
-                )
-              })()}
+      {selectedSekolahId && (alergiList.length > 0 || holidays.length > 0 || loadingAlergiAndHolidays) && (
+        <div className="space-y-4 mb-6">
+          {loadingAlergiAndHolidays ? (
+            <>
+              <SkeletonAlergiCard />
+              <SkeletonHolidayCard />
+            </>
+          ) : (
+            <>
+              {alergiList.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
+                    <div>
+                      <h3 className="font-bold text-blue-900 mb-2">Alergi Siswa di Sekolah Ini</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {alergiList.map((a, i) => (
+                          <div key={i} className="bg-white rounded p-2 text-sm">
+                            <span className="font-medium text-blue-900">{a.nama}</span>
+                            <span className="text-blue-600 ml-2">({a.jumlahSiswa} siswa)</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {holidays.length > 0 && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Calendar className="w-5 h-5 text-purple-600 mt-1 flex-shrink-0" />
+                    <div>
+                      <h3 className="font-bold text-purple-900 mb-2">Hari Libur Sekolah</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {holidays.map((h, i) => (
+                          <div key={i} className="bg-white rounded p-2 text-sm">
+                            <span className="font-medium text-purple-900">
+                              {formatDateSafe(h.tanggal)}
+                            </span>
+                            <p className="text-xs text-purple-600 mt-1">{h.keterangan}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {filteredMenuPlannings.length === 0 ? (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
+          <AlertCircle className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-yellow-900 mb-2">Belum Ada Menu Planning</h3>
+          <p className="text-yellow-700 mb-6">
+            {selectedSekolahId ? "Sekolah ini belum memiliki menu planning" : "Buat menu planning baru untuk memulai"}
+          </p>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-6 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] font-medium transition"
+          >
+            Buat Menu Planning
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] rounded-lg p-6 text-white mb-6 shadow-lg">
+            <div className="mb-6">
+              <p className="text-white/70 text-sm mb-1 font-medium">Sekolah</p>
+              <h2 className="text-2xl font-bold">{currentSekolah?.nama || "Pilih Sekolah"}</h2>
             </div>
-            <p className="text-white/80 text-sm mb-1">
-              Minggu {currentWeeklyMenu.weekNumber} • {currentWeeklyMenu.year}
-            </p>
-            <p className="text-white/70 text-sm">
-              {currentWeeklyMenu.startDate} s/d {currentWeeklyMenu.endDate}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-white/70 mb-1">Dibuat oleh</p>
-            <p className="font-semibold">{currentWeeklyMenu.createdBy.name}</p>
-            {currentWeeklyMenu.status === "APPROVED" && (
-              <>
-                <p className="text-xs text-white/70 mt-2">Disetujui oleh</p>
-                <p className="font-semibold text-green-300">{currentWeeklyMenu.approvedBy}</p>
-              </>
+
+            {currentPlanning && (
+              <div className="grid grid-cols-3 gap-4 mb-6 pb-6 border-b border-white/20">
+                <div>
+                  <p className="text-white/70 text-xs font-medium">Minggu Ke</p>
+                  <p className="text-3xl font-bold mt-1">W{currentPlanning.mingguanKe}</p>
+                </div>
+                <div>
+                  <p className="text-white/70 text-xs font-medium">Periode</p>
+                  <p className="text-sm font-semibold mt-1">
+                    {formatDateSafe(currentPlanning.tanggalMulai)} - {formatDateSafe(currentPlanning.tanggalSelesai)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-white/70 text-xs font-medium">Total Menu</p>
+                  <p className="text-3xl font-bold mt-1">{menuHarianList.length}</p>
+                </div>
+              </div>
             )}
-          </div>
-        </div>
-      </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
-        <StatCard
-          title="TOTAL HARI"
-          value={stats.totalDays}
-          subtitle="menu (Sen-Sab)"
-          icon={Calendar}
-          color="bg-blue-600"
-        />
-        <StatCard
-          title="TOTAL TARGET"
-          value={stats.totalTrays.toLocaleString()}
-          subtitle="trays minggu ini"
-          icon={ChefHat}
-          color="bg-green-600"
-        />
-        <StatCard
-          title="EST. BIAYA"
-          value={`Rp ${(stats.totalCost / 1000000).toFixed(1)}jt`}
-          subtitle="total mingguan"
-          icon={TrendingUp}
-          color="bg-purple-600"
-        />
-        <StatCard
-          title="RATA-RATA KALORI"
-          value={`${stats.avgKalori}`}
-          subtitle="kcal per porsi"
-          icon={Flame}
-          color="bg-orange-600"
-        />
-        <StatCard
-          title="TOTAL BAHAN"
-          value={stats.totalIngredients}
-          subtitle="jenis ingredients"
-          icon={ShoppingBag}
-          color="bg-indigo-600"
-        />
-        <StatCard
-          title="RISIKO ALERGI"
-          value={allergyRiskCount}
-          subtitle="hari berisiko (minggu ini)"
-          icon={AlertCircle}
-          color="bg-red-600"
-        />
-      </div>
-
-      {/* Filter & View Toggle */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-gray-700">Periode:</span>
-              <div className="flex gap-2">
-                {[
-                  { id: "week-1", label: "Minggu 1" },
-                  { id: "week-2", label: "Minggu 2" },
-                  { id: "week-3", label: "Minggu 3" },
-                  { id: "week-4", label: "Minggu 4" },
-                ].map((period) => (
+            <div className="flex flex-wrap gap-2">
+              {filteredMenuPlannings.map((planning) => (
+                <div key={planning.id} className="relative group">
                   <button
-                    key={period.id}
-                    onClick={() => setSelectedWeek(period.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      selectedWeek === period.id
-                        ? "bg-[#D0B064] text-white shadow-md"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    onClick={() => setSelectedPlanningId(planning.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      planning.id === selectedPlanningId
+                        ? "bg-[#D0B064] text-white shadow-lg"
+                        : "bg-white/20 text-white hover:bg-white/30"
                     }`}
                   >
-                    {period.label}
+                    Minggu {planning.mingguanKe}
                   </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Sekolah */}
-            <div className="h-6 w-px bg-gray-200 hidden md:block" />
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-700">Sekolah:</span>
-              <select
-                value={selectedSchoolId}
-                onChange={(e) => setSelectedSchoolId(e.target.value)}
-                className="px-3 py-2 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-              >
-                {SCHOOL_PROFILES.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Ringkasan alergi sekolah */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {(selectedSchool.restrictedAllergens as AllergenKey[]).map((al) => (
-                <span
-                  key={al}
-                  className="px-2 py-1 rounded-md bg-red-50 text-red-700 text-xs font-semibold border border-red-200"
-                >
-                  {ALLERGEN_LABEL[al]} • {selectedSchool.averages[al]}%
-                </span>
+                  {planning.id === selectedPlanningId && (
+                    <button
+                      onClick={() => handleDeletePlanning(planning.id)}
+                      disabled={isSubmitting}
+                      title="Hapus menu planning"
+                      className="absolute -top-10 right-0 px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center gap-1 whitespace-nowrap shadow-lg transition"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Hapus
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
 
-          <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode("calendar")}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                viewMode === "calendar" ? "bg-white shadow-sm text-gray-900" : "text-gray-600"
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                viewMode === "list" ? "bg-white shadow-sm text-gray-900" : "text-gray-600"
-              }`}
-            >
-              List
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            {loadingMenuHarian ? (
+              <>
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </>
+            ) : (
+              <>
+                <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm hover:shadow-md transition">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Total Hari</p>
+                  <p className="text-3xl font-bold text-[#1B263A] mt-2">{menuHarianList.length}</p>
+                  <p className="text-xs text-gray-500 mt-1">hari</p>
+                </div>
+                <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm hover:shadow-md transition">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Rata-rata Kalori</p>
+                  <p className="text-3xl font-bold text-orange-600 mt-2">{avgKalori}</p>
+                  <p className="text-xs text-gray-500 mt-1">kcal/hari</p>
+                </div>
+                <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm hover:shadow-md transition">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Total Biaya</p>
+                  <p className="text-3xl font-bold text-green-600 mt-2">Rp {(totalBiaya / 1000).toFixed(0)}k</p>
+                  <p className="text-xs text-gray-500 mt-1">per tray</p>
+                </div>
+                <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm hover:shadow-md transition">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Rata-rata Protein</p>
+                  <p className="text-3xl font-bold text-blue-600 mt-2">{avgProtein}</p>
+                  <p className="text-xs text-gray-500 mt-1">g/hari</p>
+                </div>
+              </>
+            )}
           </div>
-        </div>
-      </div>
 
-      {/* Menu Calendar/Grid View */}
-      {viewMode === "calendar" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {currentWeeklyMenu.dailyMenus.map((menu) => {
-            const difficultyConfig = getDifficultyConfig(menu.difficulty)
-            const validation = validateMenuAgainstSchool(menu, selectedSchool)
-            const hasRisk = validation.hasRisk
-
-            return (
-              <div
-                key={menu.id}
-                className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-all group
-                  ${hasRisk ? "border-red-200 hover:border-red-300 hover:shadow-md" : "border-gray-100 hover:shadow-lg hover:border-[#D0B064]"}
-                `}
-              >
-                {/* Header */}
-                <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] p-4 text-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-5 h-5" />
-                      <div>
-                        <p className="font-bold text-lg">{getDayName(menu.dayNumber)}</p>
-                        <p className="text-xs text-white/80">{menu.date}</p>
-                      </div>
-                    </div>
-                    {menu.samplePhotoUrl && (
-                      <span className="px-2 py-1 bg-white/20 rounded-full text-xs font-bold flex items-center gap-1">
-                        <ImageIcon className="w-3 h-3" />
-                        Photo
-                      </span>
-                    )}
-                    {hasRisk && (
-                      <span className="px-2 py-1 bg-red-100/20 rounded-full text-xs font-bold flex items-center gap-1">
-                        <ShieldAlert className="w-4 h-4 text-red-700" />
-                        Risiko Alergi
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-5">
-                  {/* Menu Name */}
-                  <h3 className="font-bold text-gray-900 text-base mb-2 leading-tight min-h-[48px]">{menu.menuName}</h3>
-                  <p className="text-xs text-gray-600 mb-3">{menu.description}</p>
-
-                  {/* Tags */}
-                  <div className="flex items-center gap-2 mb-4 flex-wrap">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${difficultyConfig.color}`}>
-                      {difficultyConfig.icon} {difficultyConfig.text}
-                    </span>
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-                      {menu.ingredients.length} bahan
-                    </span>
-
-                    {hasRisk ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        Risiko Alergi
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-                        <Check className="w-3.5 h-3.5" />
-                        Aman
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Nutrition Info */}
-                  <div className="grid grid-cols-3 gap-2 mb-4">
-                    <div className="bg-orange-50 rounded-lg p-2 border border-orange-100 text-center">
-                      <Flame className="w-4 h-4 text-orange-600 mx-auto mb-1" />
-                      <p className="text-xs text-orange-600 font-medium">{menu.nutritionInfo.kalori} kcal</p>
-                    </div>
-                    <div className="bg-blue-50 rounded-lg p-2 border border-blue-100 text-center">
-                      <Drumstick className="w-4 h-4 text-blue-600 mx-auto mb-1" />
-                      <p className="text-xs text-blue-600 font-medium">{menu.nutritionInfo.protein}g</p>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-2 border border-green-100 text-center">
-                      <Wheat className="w-4 h-4 text-green-600 mx-auto mb-1" />
-                      <p className="text-xs text-green-600 font-medium">{menu.nutritionInfo.karbohidrat}g</p>
-                    </div>
-                  </div>
-
-                  {/* Info Detail */}
-                  <div className="space-y-2 mb-4 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Target:</span>
-                      <span className="font-semibold text-gray-900">{menu.expectedTrays.toLocaleString()} trays</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Biaya/tray:</span>
-                      <span className="font-semibold text-gray-900">Rp {menu.estimatedCost.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Waktu masak:</span>
-                      <span className="font-semibold text-gray-900">
-                        {menu.cookingStartAt} - {menu.cookingEndAt}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setSelectedMenu(menu)}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition-colors text-sm font-semibold"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Detail
-                    </button>
-                    <button className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* List View */}
-      {viewMode === "list" && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Hari/Tanggal
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Menu</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Tingkat
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Target
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Bahan
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Biaya/Tray
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {currentWeeklyMenu.dailyMenus.map((menu) => {
-                  const difficultyConfig = getDifficultyConfig(menu.difficulty)
-                  const validation = validateMenuAgainstSchool(menu, selectedSchool)
-                  const hasRisk = validation.hasRisk
-
-                  return (
-                    <tr key={menu.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="font-bold text-gray-900">{getDayName(menu.dayNumber)}</p>
-                          <p className="text-xs text-gray-500">{menu.date}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="max-w-xs">
-                          <p className="text-sm font-semibold text-gray-900">{menu.menuName}</p>
-                          <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <span className="text-xs text-gray-500">🔥 {menu.nutritionInfo.kalori} kcal</span>
-                            <span className="text-xs text-gray-500">🍗 {menu.nutritionInfo.protein}g</span>
-                            {hasRisk ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100 text-red-700 border border-red-200 text-xs font-semibold">
-                                <AlertCircle className="w-3.5 h-3.5" />
-                                Risiko Alergi
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold">
-                                <Check className="w-3.5 h-3.5" />
-                                Aman
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${difficultyConfig.color}`}>
-                          {difficultyConfig.icon} {difficultyConfig.text}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-semibold text-gray-900">{menu.expectedTrays.toLocaleString()}</p>
-                        <p className="text-xs text-gray-500">trays</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold">
-                          <ShoppingBag className="w-3 h-3" />
-                          {menu.ingredients.length}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-semibold text-gray-900">Rp {menu.estimatedCost.toLocaleString()}</p>
-                        <p className="text-xs text-gray-500">
-                          Total: Rp {((menu.estimatedCost * menu.expectedTrays) / 1000000).toFixed(1)}jt
-                        </p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setSelectedMenu(menu)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition-colors text-sm font-medium"
-                          >
-                            <Eye className="w-4 h-4" />
-                            Detail
-                          </button>
-                          <button className="p-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                            <Edit className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Detail Modal */}
-      {selectedMenu && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white px-6 py-5 flex items-center justify-between z-10 rounded-t-2xl">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <Calendar className="w-6 h-6" />
-                  <div>
-                    <p className="text-sm text-white/80">{selectedMenu.date}</p>
-                    <h3 className="text-xl font-bold">{getDayName(selectedMenu.dayNumber)}</h3>
-                  </div>
-                  {selectedMenu.samplePhotoUrl && (
-                    <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-bold flex items-center gap-1.5">
-                      <ImageIcon className="w-4 h-4" />
-                      Sample Photo
-                    </span>
-                  )}
-                </div>
-                <h4 className="text-lg font-semibold">{selectedMenu.menuName}</h4>
-                <p className="text-sm text-white/70 mt-1">{selectedMenu.description}</p>
-              </div>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-[#1B263A]">Menu Harian</h3>
               <button
-                onClick={() => setSelectedMenu(null)}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors ml-4"
+                onClick={() => setShowCreateMenuModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] font-medium transition shadow-md hover:shadow-lg"
               >
-                <X className="w-6 h-6" />
+                <Plus className="w-5 h-5" />
+                Tambah Menu
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* Nutrition Grid */}
-              <div>
-                <h4 className="font-bold text-gray-900 mb-3 text-sm uppercase tracking-wide">
-                  Informasi Gizi per Porsi
-                </h4>
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="bg-orange-50 rounded-xl p-4 border border-orange-100 text-center">
-                    <Flame className="w-6 h-6 text-orange-600 mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-orange-900">{selectedMenu.nutritionInfo.kalori}</p>
-                    <p className="text-xs text-orange-600 mt-1">Kalori (kcal)</p>
-                  </div>
-                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 text-center">
-                    <Drumstick className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-blue-900">{selectedMenu.nutritionInfo.protein}g</p>
-                    <p className="text-xs text-blue-600 mt-1">Protein</p>
-                  </div>
-                  <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-100 text-center">
-                    <Apple className="w-6 h-6 text-yellow-600 mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-yellow-900">{selectedMenu.nutritionInfo.lemak}g</p>
-                    <p className="text-xs text-yellow-600 mt-1">Lemak</p>
-                  </div>
-                  <div className="bg-green-50 rounded-xl p-4 border border-green-100 text-center">
-                    <Wheat className="w-6 h-6 text-green-600 mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-green-900">{selectedMenu.nutritionInfo.karbohidrat}g</p>
-                    <p className="text-xs text-green-600 mt-1">Karbohidrat</p>
-                  </div>
-                </div>
+            {loadingMenuHarian ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <SkeletonMenuCard />
+                <SkeletonMenuCard />
+                <SkeletonMenuCard />
+                <SkeletonMenuCard />
               </div>
-
-              {/* Production Info */}
-              <div className="grid md:grid-cols-3 gap-4">
-                <div className="space-y-3">
-                  <h4 className="font-bold text-gray-900 text-sm uppercase tracking-wide">Info Produksi</h4>
-                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                    <ChefHat className="w-5 h-5 text-gray-600" />
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500">Target Trays</p>
-                      <p className="font-semibold text-gray-900 text-lg">
-                        {selectedMenu.expectedTrays.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                    <Clock className="w-5 h-5 text-gray-600" />
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500">Waktu Memasak</p>
-                      <p className="font-semibold text-gray-900">
-                        {selectedMenu.cookingStartAt} - {selectedMenu.cookingEndAt}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="font-bold text-gray-900 text-sm uppercase tracking-wide">Info Biaya</h4>
-                  <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-xl border border-purple-200">
-                    <TrendingUp className="w-5 h-5 text-purple-600" />
-                    <div className="flex-1">
-                      <p className="text-xs text-purple-600">Biaya per Tray</p>
-                      <p className="font-bold text-purple-900 text-lg">
-                        Rp {selectedMenu.estimatedCost.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-xl border border-purple-200">
-                    <TrendingUp className="w-5 h-5 text-purple-600" />
-                    <div className="flex-1">
-                      <p className="text-xs text-purple-600">Total Biaya</p>
-                      <p className="font-bold text-purple-900 text-lg">
-                        Rp {(selectedMenu.estimatedCost * selectedMenu.expectedTrays).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3"></div>
+            ) : menuHarianList.length === 0 ? (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
+                <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-600 font-medium text-lg">Belum ada menu harian</p>
+                <p className="text-gray-500 text-sm mt-1">Tambahkan menu untuk minggu ini</p>
               </div>
-
-              {/* Validasi Alergi */}
-              {(() => {
-                const validation = validateMenuAgainstSchool(selectedMenu, selectedSchool)
-                return (
-                  <div
-                    className={`${validation.hasRisk ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200"} border rounded-xl p-4`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {validation.hasRisk ? (
-                        <AlertCircle className="w-5 h-5 text-red-700 mt-0.5 flex-shrink-0" />
-                      ) : (
-                        <Check className="w-5 h-5 text-emerald-700 mt-0.5 flex-shrink-0" />
-                      )}
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {menuHarianList.map((menu) => (
+                  <div key={menu.id} className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-lg transition">
+                    <div className="flex justify-between items-start mb-4">
                       <div className="flex-1">
-                        <p
-                          className={`text-xs font-semibold mb-1 uppercase tracking-wide ${validation.hasRisk ? "text-red-700" : "text-emerald-700"}`}
-                        >
-                          {validation.hasRisk ? "Validasi Alergi: Risiko Ditemukan" : "Validasi Alergi: Aman"}
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          {getDayName(menu.tanggal)} • {formatDateSafe(menu.tanggal)}
                         </p>
-                        {validation.hasRisk ? (
-                          <ul className="list-disc pl-5 text-sm text-red-900 space-y-1">
-                            {validation.issues.map((i) => (
-                              <li key={i.ingredientId}>
-                                {i.ingredientName}: {i.allergens.map((a) => ALLERGEN_LABEL[a]).join(", ")}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-sm text-emerald-900">
-                            Tidak ada bahan yang terindikasi alergen untuk profil sekolah terpilih.
-                          </p>
-                        )}
+                        <h3 className="text-lg font-bold text-[#1B263A] mt-1">{menu.namaMenu}</h3>
                       </div>
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {/* Bahan-Bahan / MenuIngredient */}
-              <div>
-                <h4 className="font-bold text-gray-900 mb-3 text-sm uppercase tracking-wide flex items-center gap-2">
-                  <ShoppingBag className="w-5 h-5 text-gray-600" />
-                  Kebutuhan Bahan Baku ({selectedMenu.ingredients.length} items)
-                </h4>
-                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-5 border border-blue-100">
-                  <div className="grid md:grid-cols-2 gap-3">
-                    {selectedMenu.ingredients.map((ingredient: any) => (
-                      <div
-                        key={ingredient.id}
-                        className="flex items-center justify-between p-4 bg-white rounded-lg border border-blue-200 hover:border-blue-300 transition-colors"
+                      <button
+                        onClick={() => setSelectedMenu(menu)}
+                        className="px-3 py-1 text-xs bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition font-medium whitespace-nowrap ml-2"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                            {ingredient.photoUrl ? (
-                              <ImageIcon className="w-6 h-6 text-blue-600" />
-                            ) : (
-                              <Salad className="w-6 h-6 text-blue-600" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-semibold text-gray-900">{ingredient.name}</p>
-                            {ingredient.notes && <p className="text-xs text-gray-500 mt-0.5">{ingredient.notes}</p>}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-blue-900">{ingredient.quantity}</p>
-                          {ingredient.photoUrl && (
-                            <span className="text-xs text-blue-600 flex items-center gap-1 mt-1">
-                              <ImageIcon className="w-3 h-3" />
-                              Photo
-                            </span>
-                          )}
-                        </div>
+                        Detail
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2 mb-4 pb-4 border-b border-gray-100">
+                      <div className="bg-orange-50 rounded-lg p-3 text-center hover:bg-orange-100 transition">
+                        <Flame className="w-5 h-5 text-orange-600 mx-auto mb-1" />
+                        <p className="text-xs font-bold text-orange-600">{Math.round(menu.kalori)}</p>
+                        <p className="text-xs text-orange-600 font-medium">kcal</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+                      <div className="bg-blue-50 rounded-lg p-3 text-center hover:bg-blue-100 transition">
+                        <Drumstick className="w-5 h-5 text-blue-600 mx-auto mb-1" />
+                        <p className="text-xs font-bold text-blue-600">{menu.protein}g</p>
+                        <p className="text-xs text-blue-600 font-medium">Protein</p>
+                      </div>
+                      <div className="bg-yellow-50 rounded-lg p-3 text-center hover:bg-yellow-100 transition">
+                        <Apple className="w-5 h-5 text-yellow-600 mx-auto mb-1" />
+                        <p className="text-xs font-bold text-yellow-600">{menu.lemak}g</p>
+                        <p className="text-xs text-yellow-600 font-medium">Lemak</p>
+                      </div>
+                      <div className="bg-green-50 rounded-lg p-3 text-center hover:bg-green-100 transition">
+                        <Wheat className="w-5 h-5 text-green-600 mx-auto mb-1" />
+                        <p className="text-xs font-bold text-green-600">{menu.karbohidrat}g</p>
+                        <p className="text-xs text-green-600 font-medium">Karbo</p>
+                      </div>
+                    </div>
 
-              {/* Catatan */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <Info className="w-5 h-5 text-yellow-700 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-yellow-700 font-semibold mb-1 uppercase tracking-wide">Catatan Chef</p>
-                    <p className="text-sm text-yellow-900">{selectedMenu.notes}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dokumentasi */}
-              {selectedMenu.documentedBy && (
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                  <div className="flex items-center gap-3">
-                    <Users className="w-5 h-5 text-gray-600" />
-                    <div>
-                      <p className="text-xs text-gray-500">Didokumentasikan oleh</p>
-                      <p className="font-semibold text-gray-900">{selectedMenu.documentedBy.name}</p>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="font-semibold text-green-600">Rp {menu.biayaPerTray.toLocaleString()}</span>
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                        {menu.jamMulaiMasak} - {menu.jamSelesaiMasak}
+                      </span>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* Alergi Info */}
-              {selectedSchool && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                  <div className="flex items-start gap-3">
-                    <ShieldAlert className="w-5 h-5 text-red-700 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-red-700 font-semibold mb-1 uppercase tracking-wide">Risiko Alergi</p>
-                      <p className="text-sm text-red-900">Perhatikan alergi sekolah {selectedSchool.name}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <button className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-[#D0B064] text-white rounded-xl hover:bg-[#C9A355] transition-all font-bold shadow-md hover:shadow-lg">
-                  <Send className="w-5 h-5" />
-                  Submit untuk Approval
-                </button>
-                <button className="px-5 py-3 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-all font-bold">
-                  <Edit className="w-5 h-5" />
-                </button>
-                <button className="px-5 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-bold">
-                  <Copy className="w-5 h-5" />
-                </button>
-                <button className="px-5 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-bold">
-                  <Download className="w-5 h-5" />
-                </button>
+                ))}
               </div>
-            </div>
+            )}
           </div>
-        </div>
+        </>
+      )}
+
+      {showCreateModal && (
+        <ModalCreatePlanning
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          formData={formData}
+          setFormData={setFormData}
+          sekolahList={sekolahList}
+          onSubmit={handleCreatePlanning}
+          isSubmitting={isSubmitting}
+        />
+      )}
+
+      {showCreateMenuModal && (
+        <ModalCreateMenuHarian
+          isOpen={showCreateMenuModal}
+          onClose={() => setShowCreateMenuModal(false)}
+          formData={menuFormData}
+          setFormData={setMenuFormData}
+          onSubmit={handleCreateMenuHarian}
+          isSubmitting={isSubmitting}
+          currentPlanning={currentPlanning}
+          alergiList={alergiList}
+          holidays={holidays}
+          ingredientWarnings={ingredientWarnings}
+          validateIngredient={validateIngredient}
+        />
+      )}
+
+      {selectedMenu && (
+        <ModalMenuDetail menu={selectedMenu} onClose={() => setSelectedMenu(null)} />
       )}
     </DapurLayout>
   )
 }
 
-export default MenuPlanning
+function ModalCreatePlanning({
+  isOpen,
+  onClose,
+  formData,
+  setFormData,
+  sekolahList,
+  onSubmit,
+  isSubmitting,
+}: any) {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full shadow-2xl">
+        <div className="bg-[#1B263A] text-white px-6 py-4 flex justify-between items-center rounded-t-lg">
+          <h3 className="font-bold text-lg">Buat Menu Planning Baru</h3>
+          <button onClick={onClose} className="hover:opacity-80 transition">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-gray-700">Minggu Ke</label>
+            <input
+              type="number"
+              min="1"
+              value={formData.mingguanKe}
+              onChange={(e) => setFormData({ ...formData, mingguanKe: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-gray-700">Tanggal Mulai</label>
+            <input
+              type="date"
+              value={formData.tanggalMulai}
+              onChange={(e) => setFormData({ ...formData, tanggalMulai: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-gray-700">Tanggal Selesai</label>
+            <input
+              type="date"
+              value={formData.tanggalSelesai}
+              onChange={(e) => setFormData({ ...formData, tanggalSelesai: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-gray-700">Sekolah</label>
+            <select
+              value={formData.sekolahId}
+              onChange={(e) => setFormData({ ...formData, sekolahId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+            >
+              <option value="">Pilih Sekolah</option>
+              {sekolahList.map((s: Sekolah) => (
+                <option key={s.id} value={s.id}>
+                  {s.nama}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition"
+            >
+              Batal
+            </button>
+            <button
+              onClick={onSubmit}
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] disabled:opacity-50 font-medium transition"
+            >
+              {isSubmitting ? "Memproses..." : "Buat"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm animate-pulse">
+      <div className="h-3 bg-gray-200 rounded w-24 mb-3"></div>
+      <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+      <div className="h-3 bg-gray-200 rounded w-12"></div>
+    </div>
+  )
+}
+
+function SkeletonMenuCard() {
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-5 animate-pulse">
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex-1">
+          <div className="h-3 bg-gray-200 rounded w-32 mb-2"></div>
+          <div className="h-5 bg-gray-200 rounded w-48"></div>
+        </div>
+        <div className="h-8 bg-gray-200 rounded w-16 ml-2"></div>
+      </div>
+      <div className="grid grid-cols-4 gap-2 mb-4">
+        <div className="bg-gray-100 rounded-lg p-3 h-16"></div>
+        <div className="bg-gray-100 rounded-lg p-3 h-16"></div>
+        <div className="bg-gray-100 rounded-lg p-3 h-16"></div>
+        <div className="bg-gray-100 rounded-lg p-3 h-16"></div>
+      </div>
+      <div className="h-3 bg-gray-200 rounded w-full"></div>
+    </div>
+  )
+}
+
+function SkeletonAlergiCard() {
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 animate-pulse">
+      <div className="flex items-start gap-3">
+        <div className="w-5 h-5 bg-blue-300 rounded-full mt-1 flex-shrink-0"></div>
+        <div className="flex-1">
+          <div className="h-4 bg-blue-200 rounded w-40 mb-3"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded p-2 h-8"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SkeletonHolidayCard() {
+  return (
+    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 animate-pulse">
+      <div className="flex items-start gap-3">
+        <div className="w-5 h-5 bg-purple-300 rounded-full mt-1 flex-shrink-0"></div>
+        <div className="flex-1">
+          <div className="h-4 bg-purple-200 rounded w-40 mb-3"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded p-3 h-12"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ModalMenuDetail({ menu, onClose }: any) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full shadow-2xl">
+        <div className="bg-[#1B263A] text-white px-6 py-4 flex justify-between items-center rounded-t-lg">
+          <h3 className="font-bold text-lg">{menu.namaMenu}</h3>
+          <button onClick={onClose} className="hover:opacity-80 transition">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-orange-50 rounded-lg p-4 text-center border border-orange-100">
+              <Flame className="w-6 h-6 text-orange-600 mx-auto mb-2" />
+              <p className="font-bold text-orange-600 text-lg">{Math.round(menu.kalori)}</p>
+              <p className="text-xs text-orange-600 font-medium mt-1">Kalori</p>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-4 text-center border border-blue-100">
+              <Drumstick className="w-6 h-6 text-blue-600 mx-auto mb-2" />
+              <p className="font-bold text-blue-600 text-lg">{menu.protein}g</p>
+              <p className="text-xs text-blue-600 font-medium mt-1">Protein</p>
+            </div>
+            <div className="bg-yellow-50 rounded-lg p-4 text-center border border-yellow-100">
+              <Apple className="w-6 h-6 text-yellow-600 mx-auto mb-2" />
+              <p className="font-bold text-yellow-600 text-lg">{menu.lemak}g</p>
+              <p className="text-xs text-yellow-600 font-medium mt-1">Lemak</p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4 text-center border border-green-100">
+              <Wheat className="w-6 h-6 text-green-600 mx-auto mb-2" />
+              <p className="font-bold text-green-600 text-lg">{menu.karbohidrat}g</p>
+              <p className="text-xs text-green-600 font-medium mt-1">Karbohidrat</p>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600 font-medium">Biaya per Tray:</span>
+              <span className="font-bold text-[#D0B064]">Rp {menu.biayaPerTray.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600 font-medium">Waktu Masak:</span>
+              <span className="font-semibold text-gray-700">{menu.jamMulaiMasak} - {menu.jamSelesaiMasak}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600 font-medium">Total Waktu:</span>
+              <span className="font-semibold text-gray-700">
+                {(() => {
+                  const start = menu.jamMulaiMasak.split(":")
+                  const end = menu.jamSelesaiMasak.split(":")
+                  const duration = (parseInt(end[0]) - parseInt(start[0])) * 60 + (parseInt(end[1]) - parseInt(start[1]))
+                  return `${Math.floor(duration / 60)}h ${duration % 60}m`
+                })()}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition"
+          >
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ModalCreateMenuHarian({
+  isOpen,
+  onClose,
+  formData,
+  setFormData,
+  onSubmit,
+  isSubmitting,
+  currentPlanning,
+  alergiList,
+  holidays,
+  ingredientWarnings,
+  validateIngredient,
+}: any) {
+  if (!isOpen) return null
+
+  const minDate = currentPlanning?.tanggalMulai || ""
+  const maxDate = currentPlanning?.tanggalSelesai || ""
+
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+  }
+
+  const getFirstDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay()
+  }
+
+  const isDateInRange = (dateStr: string) => {
+    if (!minDate || !maxDate) return false
+    const date = new Date(dateStr)
+    const min = new Date(minDate)
+    const max = new Date(maxDate)
+    return date >= min && date <= max
+  }
+
+  const isHoliday = (dateStr: string) => {
+    return holidays && holidays.some((h: Holiday) => {
+      const holidayDate = new Date(h.tanggal).toISOString().split('T')[0]
+      return holidayDate === dateStr
+    })
+  }
+
+  const getHolidayInfo = (dateStr: string) => {
+    return holidays && holidays.find((h: Holiday) => {
+      const holidayDate = new Date(h.tanggal).toISOString().split('T')[0]
+      return holidayDate === dateStr
+    })
+  }
+
+  const currentMonth = formData.tanggal ? new Date(formData.tanggal) : new Date(minDate)
+  const daysInMonth = getDaysInMonth(currentMonth)
+  const firstDay = getFirstDayOfMonth(currentMonth)
+  const days = []
+
+  // Empty cells for days before month starts
+  for (let i = 0; i < firstDay; i++) {
+    days.push(null)
+  }
+
+  // Days of the month
+  for (let i = 1; i <= daysInMonth; i++) {
+    days.push(i)
+  }
+
+  const monthYear = currentMonth.toLocaleDateString("id-ID", { month: "long", year: "numeric" })
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="bg-[#1B263A] text-white px-6 py-4 flex justify-between items-center sticky top-0 z-10">
+          <h3 className="font-bold text-lg">Tambah Menu Harian</h3>
+          <button onClick={onClose} className="hover:opacity-80 transition">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-700 border border-blue-200">
+            <p className="font-bold text-blue-900">📍 Untuk: {currentPlanning?.sekolah?.nama}</p>
+            <p className="text-xs mt-2 text-blue-600">
+              {currentPlanning && formatDateSafe(currentPlanning.tanggalMulai)} s/d {currentPlanning && formatDateSafe(currentPlanning.tanggalSelesai)}
+            </p>
+          </div>
+
+          {alergiList.length > 0 && (
+            <div className="bg-amber-50 p-4 rounded-lg text-sm border border-amber-200">
+              <p className="font-bold text-amber-900 mb-2">⚠️ Alergi di Sekolah Ini:</p>
+              <div className="flex flex-wrap gap-2">
+                {alergiList.map((a: AlergiItem, i: number) => (
+                  <span key={i} className="bg-white px-2 py-1 rounded text-xs text-amber-800 border border-amber-300">
+                    {a.nama}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-semibold mb-3 text-gray-700">Pilih Tanggal *</label>
+            
+            {/* Mini Calendar */}
+            <div className="bg-white border border-gray-300 rounded-lg p-4 mb-4">
+              <p className="text-center font-bold text-gray-700 mb-4 text-sm">{monthYear}</p>
+              
+              {/* Weekday headers */}
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((day) => (
+                  <div key={day} className="text-center text-xs font-semibold text-gray-600 py-1">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar days */}
+              <div className="grid grid-cols-7 gap-1">
+                {days.map((day, idx) => {
+                  if (day === null) {
+                    return <div key={`empty-${idx}`} className="aspect-square"></div>
+                  }
+
+                  const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+                  const inRange = isDateInRange(dateStr)
+                  const holiday = isHoliday(dateStr)
+                  const isSelected = formData.tanggal === dateStr
+                  const holidayInfo = getHolidayInfo(dateStr)
+
+                  return (
+                    <button
+                      key={`day-${day}`}
+                      onClick={() => {
+                        if (inRange && !holiday) {
+                          setFormData({ ...formData, tanggal: dateStr })
+                        }
+                      }}
+                      disabled={!inRange || holiday}
+                      title={holiday ? `Libur: ${holidayInfo?.keterangan}` : ""}
+                      className={`aspect-square rounded-lg text-xs font-medium transition flex items-center justify-center ${
+                        !inRange
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : holiday
+                          ? "bg-red-100 text-red-700 cursor-not-allowed border border-red-300"
+                          : isSelected
+                          ? "bg-[#D0B064] text-white border-2 border-[#D0B064]"
+                          : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 cursor-pointer"
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="mt-4 pt-3 border-t border-gray-200 space-y-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-[#D0B064] rounded"></div>
+                  <span className="text-gray-600">Dipilih</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+                  <span className="text-gray-600">Hari Libur</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-gray-100 rounded"></div>
+                  <span className="text-gray-600">Di luar range</span>
+                </div>
+              </div>
+            </div>
+
+            {formData.tanggal && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-700">
+                <p className="font-semibold">✓ Tanggal dipilih: {formatDateSafe(formData.tanggal)}</p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-gray-700">Nama Menu *</label>
+            <input
+              type="text"
+              value={formData.namaMenu}
+              onChange={(e) => {
+                setFormData({ ...formData, namaMenu: e.target.value })
+                validateIngredient(e.target.value)
+              }}
+              onBlur={() => validateIngredient(formData.namaMenu)}
+              placeholder="Contoh: Nasi Goreng Ikan"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+            />
+            {ingredientWarnings.hasWarning && (
+              <div className="mt-2 bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>{ingredientWarnings.message}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700">Jam Mulai *</label>
+              <input
+                type="time"
+                value={formData.jamMulaiMasak}
+                onChange={(e) => setFormData({ ...formData, jamMulaiMasak: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700">Jam Selesai *</label>
+              <input
+                type="time"
+                value={formData.jamSelesaiMasak}
+                onChange={(e) => setFormData({ ...formData, jamSelesaiMasak: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-gray-700">Biaya per Tray (Rp) *</label>
+            <input
+              type="number"
+              value={formData.biayaPerTray}
+              onChange={(e) => setFormData({ ...formData, biayaPerTray: e.target.value })}
+              placeholder="50000"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+            />
+          </div>
+
+          <div className="border-t pt-4">
+            <p className="text-xs font-bold text-gray-700 mb-3 uppercase tracking-wider">📊 Informasi Gizi</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold mb-2 text-gray-600">Kalori (kcal) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.kalori}
+                  onChange={(e) => setFormData({ ...formData, kalori: e.target.value })}
+                  placeholder="300"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-2 text-gray-600">Protein (g) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.protein}
+                  onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
+                  placeholder="15"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-2 text-gray-600">Lemak (g) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.lemak}
+                  onChange={(e) => setFormData({ ...formData, lemak: e.target.value })}
+                  placeholder="8"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-2 text-gray-600">Karbohidrat (g) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.karbohidrat}
+                  onChange={(e) => setFormData({ ...formData, karbohidrat: e.target.value })}
+                  placeholder="45"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <button
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 font-medium transition"
+            >
+              Batal
+            </button>
+            <button
+              onClick={onSubmit}
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] disabled:opacity-50 font-medium transition"
+            >
+              {isSubmitting ? "Memproses..." : "Tambah"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
