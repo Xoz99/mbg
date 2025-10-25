@@ -277,37 +277,37 @@ const MinistryLayout = ({ children, currentPage = 'dashboard' }: MinistryLayoutP
       id: 'dashboard',
       name: 'Dashboard Nasional',
       icon: Home,
-      path: '/kementerian/dashboard'
+      path: '/kementrian/dashboard'
     },
     {
       id: 'peta-dapur',
       name: 'Peta Dapur',
       icon: ChefHat,
-      path: '/kementerian/peta-dapur'
+      path: '/kementrian/peta-dapur'
     },
     {
       id: 'peta-sekolah',
       name: 'Peta Sekolah',
       icon: School,
-      path: '/kementerian/peta-sekolah'
+      path: '/kementrian/peta-sekolah'
     },
     {
       id: 'monitoring',
       name: 'Monitoring Distribusi',
       icon: Truck,
-      path: '/kementerian/monitoring'
+      path: '/kementrian/monitoring'
     },
     {
       id: 'laporan',
       name: 'Laporan Konsumsi',
       icon: FileText,
-      path: '/kementerian/laporan'
+      path: '/kementrian/laporan'
     },
     {
       id: 'anggaran',
       name: 'Pengelolaan Anggaran',
       icon: DollarSign,
-      path: '/kementerian/anggaran'
+      path: '/kementrian/anggaran'
     },
   ];
 
@@ -454,7 +454,7 @@ const MinistryLayout = ({ children, currentPage = 'dashboard' }: MinistryLayoutP
 
               {/* Settings */}
               <button
-                onClick={() => router.push('/kementerian/settings')}
+                onClick={() => router.push('/kementrian/settings')}
                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <Settings className="w-5 h-5" />

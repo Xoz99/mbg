@@ -18,6 +18,7 @@ interface Dapur {
   alamat: string;
   latitude?: number;
   longitude?: number;
+  status?: string;
   pic?: { id: string; name: string; phone?: string; email?: string };
   picDapur?: any[];
   drivers?: any[];
@@ -65,6 +66,7 @@ const DapurMapDashboard = () => {
   const [formData, setFormData] = useState({ nama: "", alamat: "", latitude: "", longitude: "" });
   const [submitting, setSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text });
@@ -177,6 +179,44 @@ const DapurMapDashboard = () => {
     }
 
     setShowAssignPICModal(true);
+  };
+
+  // Update Status Dapur
+  const handleUpdateStatus = async (dapurId: string, newStatus: string) => {
+    if (!dapurId) {
+      showToast('error', 'ID Dapur tidak valid');
+      return;
+    }
+
+    try {
+      setUpdatingStatus(true);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/dapur/${dapurId}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || `API Error: ${response.status}`
+        );
+      }
+
+      showToast('success', `Status dapur berhasil diubah menjadi ${newStatus}!`);
+      fetchDapur();
+    } catch (err: any) {
+      showToast('error', 'Gagal update status: ' + err.message);
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
   // Initialize Map
@@ -835,6 +875,54 @@ const DapurMapDashboard = () => {
                     <p className="text-sm text-yellow-800">Belum ada PIC yang di-assign. Klik "Assign PIC" untuk menambahkan.</p>
                   </div>
                 )}
+              </div>
+
+              {/* Status Dapur */}
+              <div>
+                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-cyan-600" />
+                  Status Dapur
+                </h3>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Status saat ini:</p>
+                      <p className="text-lg font-bold text-gray-900">
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                          selectedDapur.status === 'AKTIF' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {selectedDapur.status || 'TIDAK DIKETAHUI'}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => handleUpdateStatus(selectedDapur.id, 'AKTIF')}
+                      disabled={updatingStatus || selectedDapur.status === 'AKTIF'}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        selectedDapur.status === 'AKTIF'
+                          ? 'bg-green-100 text-green-700 cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      } disabled:opacity-50`}
+                    >
+                      {updatingStatus ? 'Memproses...' : 'Aktifkan'}
+                    </button>
+                    <button
+                      onClick={() => handleUpdateStatus(selectedDapur.id, 'NONAKTIF')}
+                      disabled={updatingStatus || selectedDapur.status === 'NONAKTIF'}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        selectedDapur.status === 'NONAKTIF'
+                          ? 'bg-red-100 text-red-700 cursor-not-allowed'
+                          : 'bg-red-600 text-white hover:bg-red-700'
+                      } disabled:opacity-50`}
+                    >
+                      {updatingStatus ? 'Memproses...' : 'Nonaktifkan'}
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Resources */}

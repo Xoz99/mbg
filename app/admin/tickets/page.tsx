@@ -222,6 +222,7 @@ const AdminTickets = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState('');
+  const [userRole, setUserRole] = useState('');
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState<string>('');
@@ -241,7 +242,11 @@ const AdminTickets = () => {
     const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
     const userData = localStorage.getItem('mbg_user');
 
+    console.log('=== Tickets Page Auth ===');
+    console.log('Token exists:', !!token);
+
     if (!token || !userData) {
+      console.log('No token or user data, redirecting to login');
       router.push('/auth/login');
       return;
     }
@@ -250,13 +255,20 @@ const AdminTickets = () => {
       const user = JSON.parse(userData);
       const role = user.role || user.routeRole;
 
-      if (role !== 'SUPERADMIN') {
+      console.log('User role:', role);
+
+      // Allow both SUPERADMIN and ADMIN
+      if (role !== 'SUPERADMIN' && role !== 'ADMIN') {
+        console.log('Role not allowed, redirecting to /admin/dashboard');
         router.push('/admin/dashboard');
         return;
       }
 
+      console.log('Auth check passed for tickets page');
+      setUserRole(role);
       setAuthToken(token);
     } catch (err) {
+      console.error('Error parsing user data:', err);
       router.push('/auth/login');
     }
   }, [router]);
@@ -271,18 +283,27 @@ const AdminTickets = () => {
         setLoading(true);
         setError(null);
 
+        console.log('Fetching tickets, page:', page);
+
         const response = await fetch(`${API_BASE_URL}/api/tickets?page=${page}&limit=10`, {
+          method: 'GET',
           headers: {
-            Authorization: `Bearer ${authToken}`,
+            'Authorization': `Bearer ${authToken}`,
             'Content-Type': 'application/json'
           }
         });
 
+        console.log('Tickets response status:', response.status);
+
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Tickets error:', errorText);
           throw new Error(`Failed to fetch tickets (${response.status})`);
         }
 
         const data: TicketsResponse = await response.json();
+
+        console.log('Tickets data received:', data);
 
         if (data.success && data.data.tickets) {
           setTickets(data.data.tickets);
@@ -391,6 +412,7 @@ const AdminTickets = () => {
                 <option value="">Semua Role</option>
                 <option value="PIC_SEKOLAH">PIC Sekolah</option>
                 <option value="SUPERADMIN">Super Admin</option>
+                <option value="ADMIN">Admin</option>
               </select>
             </div>
 
