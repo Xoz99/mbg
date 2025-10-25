@@ -22,6 +22,13 @@ import {
 
 const API_BASE_URL = "http://72.60.79.126:3000"
 
+// ============================================================
+// ⚠️ MODE BYPASS API - Set ke true untuk disable API calls
+// Set ke false untuk menggunakan API normal
+// ============================================================
+const USE_API_BYPASS = true
+// ============================================================
+
 interface CSRLayoutProps {
   children: ReactNode;
   currentPage?: string;
@@ -57,22 +64,28 @@ const BubbleReport = ({
       setStatus('loading');
       setErrorMessage('');
 
-      const token = authToken || localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
+      // Simulasi submit report
+      if (USE_API_BYPASS) {
+        await new Promise(resolve => setTimeout(resolve, 800));
+        console.log("🔄 [BYPASS MODE] Report submitted:", { judul, deskripsi });
+      } else {
+        const token = authToken || localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
 
-      const response = await fetch(`${apiBaseUrl}/api/tickets`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        body: JSON.stringify({
-          judul: judul.trim(),
-          deskripsi: deskripsi.trim()
-        })
-      });
+        const response = await fetch(`${apiBaseUrl}/api/tickets`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` })
+          },
+          body: JSON.stringify({
+            judul: judul.trim(),
+            deskripsi: deskripsi.trim()
+          })
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
       }
 
       setStatus('success');
@@ -240,7 +253,7 @@ const CSRLayout = ({ children, currentPage = 'dashboard' }: CSRLayoutProps) => {
     type: 'Corporate'
   });
 
-  // Fetch data CSR dari API saat component mount
+  // Fetch data CSR dari localStorage atau mock data
   useEffect(() => {
     const userData = localStorage.getItem('mbg_user');
     const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
@@ -249,13 +262,26 @@ const CSRLayout = ({ children, currentPage = 'dashboard' }: CSRLayoutProps) => {
       setAuthToken(token);
       try {
         const user = JSON.parse(userData);
-        if (user.csr) {
+        
+        // Jika menggunakan bypass mode, gunakan mock data yang lebih baik
+        if (USE_API_BYPASS) {
           setCSRInfo({
-            nama: user.csr.nama || 'PT Maju Bersama',
-            pic: user.nama || 'Bapak Joko Santoso',
-            kode: user.csr.kode || 'CSR-001',
-            type: user.csr.type || 'Corporate'
+            nama: user.companyName || user.company_name || 'PT Maju Bersama',
+            pic: user.name || user.nama || 'Bapak Joko Santoso',
+            kode: user.csrId || user.csr_id || 'CSR-001',
+            type: user.type || 'Corporate'
           });
+          console.log("🔄 [BYPASS MODE] CSRLayout loaded with data:", user);
+        } else {
+          // Mode API normal
+          if (user.csr) {
+            setCSRInfo({
+              nama: user.csr.nama || 'PT Maju Bersama',
+              pic: user.nama || 'Bapak Joko Santoso',
+              kode: user.csr.kode || 'CSR-001',
+              type: user.csr.type || 'Corporate'
+            });
+          }
         }
       } catch (error) {
         console.error('Error parsing user data:', error);
@@ -338,6 +364,15 @@ const CSRLayout = ({ children, currentPage = 'dashboard' }: CSRLayoutProps) => {
               <p className="text-xs text-gray-400">Kode Partner</p>
               <p className="text-sm font-bold text-[#D0B064]">{csrInfo.kode}</p>
             </div>
+
+            {/* Bypass Mode Indicator */}
+            {USE_API_BYPASS && (
+              <div className="mt-3 pt-3 border-t border-[#D0B064]/20">
+                <p className="text-xs text-yellow-600 font-medium bg-yellow-500/10 px-2 py-1 rounded text-center">
+                  🔄 Mode Offline
+                </p>
+              </div>
+            )}
           </div>
         )}
 
