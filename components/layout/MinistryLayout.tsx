@@ -277,7 +277,7 @@ const MinistryLayout = ({ children, currentPage = 'dashboard' }: MinistryLayoutP
       id: 'dashboard',
       name: 'Dashboard Nasional',
       icon: Home,
-      path: '/kementrian/dashboard'
+      path: '/kementerian/dashboard'
     },
     {
       id: 'peta-dapur',

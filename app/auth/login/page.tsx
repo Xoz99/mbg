@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, AlertCircle, Loader2, Users } from "lucide-react"
+import { Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
 
 const LoginPage = () => {
   const router = useRouter()
@@ -12,47 +12,8 @@ const LoginPage = () => {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [showDummyAccounts, setShowDummyAccounts] = useState(false)
 
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://72.60.79.126:3000"
-
-  // Dummy Accounts untuk Testing
-  const dummyAccounts = [
-    {
-      role: "CSR",
-      email: "csr@test.com",
-      password: "csr123",
-      name: "PT. Peduli Sosial Indonesia",
-      company: "PT. Peduli Sosial Indonesia"
-    },
-    {
-      role: "CSR",
-      email: "csr.manager@company.com",
-      password: "password123",
-      name: "PT. Karya Baik Bersama",
-      company: "PT. Karya Baik Bersama"
-    },
-    {
-      role: "KEMENTRIAN",
-      email: "kementrian@test.com",
-      password: "kementrian123",
-      name: "Kementerian Sosial",
-      department: "Kementerian Sosial RI"
-    },
-    {
-      role: "KEMENTRIAN",
-      email: "kemsos@gov.id",
-      password: "password123",
-      name: "Kementerian Pendidikan",
-      department: "Kemendikbud RI"
-    }
-  ]
-
-  const handleDummyLogin = (account: typeof dummyAccounts[0]) => {
-    setEmail(account.email)
-    setPassword(account.password)
-    setShowDummyAccounts(false)
-  }
 
   const handleLogin = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -159,28 +120,6 @@ const LoginPage = () => {
               localStorage.setItem("userDriverId", driverId)
             }
           }
-
-          if (apiRole === "CSR") {
-            const csrId = userData.csrId || userData.csr_id || userData.id
-            const companyName = userData.companyName || userData.company_name || userData.company
-            if (csrId) {
-              localStorage.setItem("userCsrId", csrId)
-            }
-            if (companyName) {
-              localStorage.setItem("userCompany", companyName)
-            }
-          }
-
-          if (apiRole === "KEMENTRIAN") {
-            const kementrianId = userData.kementrianId || userData.kementrian_id || userData.id
-            const department = userData.department || userData.departemen || userData.kementrian
-            if (kementrianId) {
-              localStorage.setItem("userKementrianId", kementrianId)
-            }
-            if (department) {
-              localStorage.setItem("userDepartment", department)
-            }
-          }
         }
 
         router.push(routePath)
@@ -223,41 +162,7 @@ const LoginPage = () => {
         </div>
 
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/50">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">Login</h2>
-            <button
-              onClick={() => setShowDummyAccounts(!showDummyAccounts)}
-              className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1"
-            >
-              <Users size={16} />
-              Dummy
-            </button>
-          </div>
-
-          {showDummyAccounts && (
-            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs font-semibold text-blue-900 mb-3">Akun Testing:</p>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {dummyAccounts.map((account, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleDummyLogin(account)}
-                    className="w-full text-left p-3 bg-white rounded-lg border border-blue-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{account.name}</p>
-                        <p className="text-xs text-gray-600">{account.email}</p>
-                      </div>
-                      <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
-                        {account.role}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <h2 className="text-xl font-bold text-gray-900 mb-6">Login</h2>
 
           <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
             <div>
