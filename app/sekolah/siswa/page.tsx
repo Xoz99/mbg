@@ -8,11 +8,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const API_BASE_URL = "http://72.60.79.126:3000";
-
-// ============================================
-// SKELETON LOADERS
-// ============================================
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
 
 const SkeletonCard = () => (
   <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 animate-pulse">

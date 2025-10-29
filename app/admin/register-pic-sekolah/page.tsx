@@ -76,7 +76,7 @@ const RegisterPICSekolahPage = () => {
 
   const fetchSekolah = async (token: string) => {
     try {
-      const response = await fetch('http://72.60.79.126:3000/api/sekolah?page=1&limit=100', {
+      const response = await fetch('https://demombgv1.xyz/api/sekolah?page=1&limit=100', {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ const RegisterPICSekolahPage = () => {
   const fetchSekolahList = async (token: string) => {
     try {
       setLoadingSekolah(true);
-      const response = await fetch('http://72.60.79.126:3000/api/sekolah?page=1&limit=100', {
+      const response = await fetch('https://demombgv1.xyz/api/sekolah?page=1&limit=100', {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -207,7 +207,7 @@ const RegisterPICSekolahPage = () => {
         sekolahId: selectedSekolahId
       };
 
-      const response = await fetch('http://72.60.79.126:3000/api/auth/register', {
+      const response = await fetch('https://demombgv1.xyz/api/auth/register', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${authToken}`,

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-const API_BASE_URL = "http://72.60.79.126:3000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
 
 // Skeleton Components
 const SkeletonStatCard = () => (

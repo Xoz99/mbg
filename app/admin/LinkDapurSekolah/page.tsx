@@ -7,7 +7,6 @@ import {
   Loader2, Search, Trash2, Plus, X, MapPin, Building2, ChevronLeft, ChevronRight, AlertCircle
 } from 'lucide-react';
 
-// ===== SKELETON LOADING COMPONENTS =====
 const SkeletonDapurCard = () => (
   <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 animate-pulse">
     <div className="flex items-start justify-between mb-3">
@@ -204,7 +203,7 @@ const LinkDapurSekolahPage = () => {
   const fetchDapurList = async (token: string) => {
     try { 
       setLoading(true);
-      const response = await fetch('http://72.60.79.126:3000/api/dapur?page=1&limit=100', {
+      const response = await fetch('https://demombgv1.xyz/api/dapur?page=1&limit=100', {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -239,7 +238,7 @@ const LinkDapurSekolahPage = () => {
 
   const fetchSekolahList = async (token: string) => {
     try {
-      const response = await fetch('http://72.60.79.126:3000/api/sekolah?page=1&limit=100', {
+      const response = await fetch('https://demombgv1.xyz/api/sekolah?page=1&limit=100', {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -275,7 +274,7 @@ const LinkDapurSekolahPage = () => {
 
   const fetchLinkedSekolah = async (dapurId: string): Promise<Sekolah[]> => {
     try {
-      const linkUrl = `http://72.60.79.126:3000/api/dapur/${dapurId}/link-sekolah`;
+      const linkUrl = `https://demombgv1.xyz/api/dapur/${dapurId}/link-sekolah`;
 
       const linkResponse = await fetch(linkUrl, {
         headers: {
@@ -352,7 +351,7 @@ const LinkDapurSekolahPage = () => {
       }
 
       const response = await fetch(
-        `http://72.60.79.126:3000/api/dapur/${selectedDapur.id}/link-sekolah`,
+        `https://demombgv1.xyz/api/dapur/${selectedDapur.id}/link-sekolah`,
         {
           method: 'POST',
           headers: {
@@ -399,7 +398,7 @@ const LinkDapurSekolahPage = () => {
       }
 
       const dapurId = selectedDapurForAutoLink.id;
-      const endpoint = `http://72.60.79.126:3000/api/dapur/${dapurId}/link-sekolah`;
+      const endpoint = `https://demombgv1.xyz/api/dapur/${dapurId}/link-sekolah`;
       const results: any = { strategies: [] };
 
       console.log('🚀 LINKING SEKOLAH - CORRECT FORMAT');
@@ -503,7 +502,7 @@ const LinkDapurSekolahPage = () => {
     if (!confirm('Yakin ingin menghapus?')) return;
 
     try {
-      const response = await fetch(`http://72.60.79.126:3000/api/dapur/${dapurId}`, {
+      const response = await fetch(`https://demombgv1.xyz/api/dapur/${dapurId}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${authToken}`,

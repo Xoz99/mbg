@@ -18,7 +18,7 @@ import {
   AlertTriangle,
 } from "lucide-react"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
 
 interface MenuHarian {
   id: string

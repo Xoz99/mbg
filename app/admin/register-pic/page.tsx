@@ -92,7 +92,7 @@ const RegisterPICPage = () => {
 
   const fetchDapur = async (token: string) => {
     try {
-      const response = await fetch('http://72.60.79.126:3000/api/dapur?page=1&limit=100', {
+      const response = await fetch('https://demombgv1.xyz/api/dapur?page=1&limit=100', {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -125,7 +125,7 @@ const RegisterPICPage = () => {
   const fetchPICList = async (token: string) => {
     try {
       setLoadingPic(true);
-      const response = await fetch('http://72.60.79.126:3000/api/dapur?page=1&limit=100', {
+      const response = await fetch('https://demombgv1.xyz/api/dapur?page=1&limit=100', {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -230,7 +230,7 @@ const RegisterPICPage = () => {
         dapurId: selectedDapurId
       };
 
-      const response = await fetch('http://72.60.79.126:3000/api/auth/register', {
+      const response = await fetch('https://demombgv1.xyz/api/auth/register', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${authToken}`,
