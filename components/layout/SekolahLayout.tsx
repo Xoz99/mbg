@@ -255,7 +255,6 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
     { id: 'tracking', name: 'Tracking MBG', icon: MapPin, path: '/sekolah/tracking' },
     { id: 'kelas', name: 'Data Kelas', icon: GraduationCap, path: '/sekolah/kelas' },
     { id: 'absensi', name: 'Absensi Penerima', icon: ClipboardCheck, path: '/sekolah/absensi' },
-    { id: 'feedback', name: 'Feedback Menu', icon: MessageSquare, path: '/sekolah/feedback' },
     { id: 'kalender-akademik', name: 'Kalender Akademik', icon: Calendar, path: '/sekolah/kalender-akademik' }
   ];
 
@@ -265,7 +264,6 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
     { id: 'daerah', name: 'Daerah' }
   ];
 
-  // Initialize auth dan ambil sekolah data
   useEffect(() => {
     const userData = localStorage.getItem('mbg_user');
     const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');

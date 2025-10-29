@@ -210,8 +210,25 @@ const DapurMapDashboard = () => {
         );
       }
 
+      const responseData = await response.json();
+
+      // Update state dapur secara real-time
+      setDapur(prevDapur =>
+        prevDapur.map(d =>
+          d.id === dapurId
+            ? { ...d, status: newStatus, ...responseData.data }
+            : d
+        )
+      );
+
+      // Update selectedDapur jika sedang dilihat di modal
+      if (selectedDapur?.id === dapurId) {
+        setSelectedDapur(prev =>
+          prev ? { ...prev, status: newStatus, ...responseData.data } : null
+        );
+      }
+
       showToast('success', `Status dapur berhasil diubah menjadi ${newStatus}!`);
-      fetchDapur();
     } catch (err: any) {
       showToast('error', 'Gagal update status: ' + err.message);
     } finally {
@@ -287,8 +304,12 @@ const DapurMapDashboard = () => {
         filteredDapurList.forEach((d: Dapur) => {
           if (d.latitude && d.longitude) {
             try {
-              const hasPIC = d.pic && d.pic.name;
-              const iconColor = hasPIC ? '#22c55e' : '#6b7280';
+              let iconColor = '#6b7280'; // default abu-abu
+              if (d.status === 'AKTIF') {
+                iconColor = '#22c55e'; // hijau untuk AKTIF
+              } else if (d.status === 'TIDAK_AKTIF') {
+                iconColor = '#ef4444'; // merah untuk TIDAK_AKTIF
+              }
               const iconHTML = `
                 <div style="
                   background: ${iconColor};
@@ -911,10 +932,10 @@ const DapurMapDashboard = () => {
                       {updatingStatus ? 'Memproses...' : 'Aktifkan'}
                     </button>
                     <button
-                      onClick={() => handleUpdateStatus(selectedDapur.id, 'NONAKTIF')}
-                      disabled={updatingStatus || selectedDapur.status === 'NONAKTIF'}
+                      onClick={() => handleUpdateStatus(selectedDapur.id, 'TIDAK_AKTIF')}
+                      disabled={updatingStatus || selectedDapur.status === 'TIDAK_AKTIF'}
                       className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                        selectedDapur.status === 'NONAKTIF'
+                        selectedDapur.status === 'TIDAK_AKTIF'
                           ? 'bg-red-100 text-red-700 cursor-not-allowed'
                           : 'bg-red-600 text-white hover:bg-red-700'
                       } disabled:opacity-50`}

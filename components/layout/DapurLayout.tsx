@@ -19,9 +19,10 @@ import {
   Send,
   CheckCircle,
   Loader2,
+  CarIcon,
 } from 'lucide-react';
 
-const API_BASE_URL = "http://72.60.79.126:3000"
+const API_BASE_URL = "https://demombgv1.xyz"
 
 interface DapurLayoutProps {
   children: ReactNode;
@@ -37,7 +38,7 @@ interface BubbleReportProps {
 }
 
 const BubbleReport = ({ 
-  apiBaseUrl = "http://72.60.79.126:3000",
+  apiBaseUrl = "https://demombgv1.xyz",
   authToken = ""
 }: BubbleReportProps) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -429,6 +430,8 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
     { id: 'produksi', name: 'Produksi Harian', icon: ChefHat, path: '/dapur/produksi' },
     { id: 'menu', name: 'Menu Planning', icon: ClipboardList, path: '/dapur/menu' },
     { id: 'bahan', name: 'Stok Bahan Baku', icon: Package, path: '/dapur/bahan' },
+    { id: 'sekolah', name: 'Sekolah Terdekat', icon: MapPin, path: '/dapur/sekolah-terdekat' },
+    { id: 'daftardriver', name: 'Daftar Driver', icon: CarIcon, path: '/dapur/assign-driver' },
     { id: 'scan', name: 'Check Point', icon: QrCode, path: '/dapur/scan' },
     { id: 'karyawan', name: 'Data Karyawan', icon: Users, path: '/dapur/karyawan' },
     { id: 'laporan', name: 'Laporan Produksi', icon: BarChart3, path: '/dapur/laporan' },

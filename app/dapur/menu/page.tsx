@@ -31,6 +31,7 @@ interface MenuHarian {
   protein: number
   lemak: number
   karbohidrat: number
+  isBooked?: boolean
 }
 
 interface MenuPlanning {
@@ -132,6 +133,606 @@ function formatDateSafe(dateString: string): string {
   })
 }
 
+function SkeletonMenuCard() {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm h-48 animate-pulse">
+      <div className="space-y-3">
+        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+        <div className="h-3 bg-gray-200 rounded w-full mt-6"></div>
+        <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+      </div>
+    </div>
+  )
+}
+
+function SkeletonAlergiCard() {
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 h-32 animate-pulse">
+      <div className="h-5 bg-blue-200 rounded w-32 mb-4"></div>
+      <div className="space-y-2">
+        <div className="h-3 bg-blue-200 rounded w-full"></div>
+        <div className="h-3 bg-blue-200 rounded w-5/6"></div>
+      </div>
+    </div>
+  )
+}
+
+function SkeletonHolidayCard() {
+  return (
+    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 h-32 animate-pulse">
+      <div className="h-5 bg-purple-200 rounded w-40 mb-4"></div>
+      <div className="space-y-2">
+        <div className="h-3 bg-purple-200 rounded w-full"></div>
+        <div className="h-3 bg-purple-200 rounded w-4/5"></div>
+      </div>
+    </div>
+  )
+}
+
+function ModalCreatePlanning({
+  isOpen,
+  onClose,
+  formData,
+  setFormData,
+  onSubmit,
+  isSubmitting,
+  sekolahList,
+}: any) {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-lg w-full shadow-2xl">
+        <div className="bg-[#1B263A] text-white px-6 py-4 flex justify-between items-center">
+          <h3 className="font-bold text-lg">Buat Menu Planning</h3>
+          <button onClick={onClose} className="hover:opacity-80 transition">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-gray-700">Minggu Ke *</label>
+            <input
+              type="number"
+              min="1"
+              value={formData.mingguanKe}
+              onChange={(e) => setFormData({ ...formData, mingguanKe: e.target.value })}
+              placeholder="1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-gray-700">Sekolah *</label>
+            <select
+              value={formData.sekolahId}
+              onChange={(e) => setFormData({ ...formData, sekolahId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+            >
+              <option value="">-- Pilih Sekolah --</option>
+              {sekolahList.map((s: Sekolah) => (
+                <option key={s.id} value={s.id}>
+                  {s.nama}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700">Tanggal Mulai *</label>
+              <input
+                type="date"
+                value={formData.tanggalMulai}
+                onChange={(e) => setFormData({ ...formData, tanggalMulai: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700">Tanggal Selesai *</label>
+              <input
+                type="date"
+                value={formData.tanggalSelesai}
+                onChange={(e) => setFormData({ ...formData, tanggalSelesai: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <button
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 font-medium transition"
+            >
+              Batal
+            </button>
+            <button
+              onClick={onSubmit}
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] disabled:opacity-50 font-medium transition"
+            >
+              {isSubmitting ? "Memproses..." : "Buat"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ModalCreateMenuHarian({
+  isOpen,
+  onClose,
+  formData,
+  setFormData,
+  onSubmit,
+  isSubmitting,
+  currentPlanning,
+  alergiList,
+  holidays,
+  ingredientWarnings,
+  validateIngredient,
+  displayMonth,
+  setDisplayMonth,
+  menuHarianList,
+}: any) {
+  if (!isOpen) return null
+
+  const minDate = currentPlanning?.tanggalMulai || ""
+  const maxDate = currentPlanning?.tanggalSelesai || ""
+
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+  }
+
+  const getFirstDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay()
+  }
+
+  const isDateInRange = (dateStr: string) => {
+    if (!minDate || !maxDate) return false
+    const date = new Date(dateStr)
+    const min = new Date(minDate)
+    const max = new Date(maxDate)
+    return date >= min && date <= max
+  }
+
+  const isHoliday = (dateStr: string) => {
+    if (!holidays || holidays.length === 0) return false
+    
+    return holidays.some((h: Holiday) => {
+      try {
+        if (!h.tanggal) return false
+        
+        // Parse tanggal dengan safe
+        const date = new Date(h.tanggal)
+        if (isNaN(date.getTime())) return false
+        
+        const holidayDate = date.toISOString().split('T')[0]
+        return holidayDate === dateStr
+      } catch (err) {
+        console.warn("Error parsing holiday date:", h.tanggal, err)
+        return false
+      }
+    })
+  }
+
+  const getHolidayInfo = (dateStr: string) => {
+    if (!holidays || holidays.length === 0) return null
+    
+    return holidays.find((h: Holiday) => {
+      try {
+        if (!h.tanggal) return false
+        
+        // Parse tanggal dengan safe
+        const date = new Date(h.tanggal)
+        if (isNaN(date.getTime())) return false
+        
+        const holidayDate = date.toISOString().split('T')[0]
+        return holidayDate === dateStr
+      } catch (err) {
+        console.warn("Error parsing holiday date:", h.tanggal, err)
+        return false
+      }
+    })
+  }
+
+  const currentMonth = displayMonth
+  const daysInMonth = getDaysInMonth(currentMonth)
+  const firstDay = getFirstDayOfMonth(currentMonth)
+  const days: (number | null)[] = []
+
+  // Empty cells for days before month starts
+  for (let i = 0; i < firstDay; i++) {
+    days.push(null)
+  }
+
+  // Days of the month
+  for (let i = 1; i <= daysInMonth; i++) {
+    days.push(i)
+  }
+
+  const monthYear = currentMonth.toLocaleDateString("id-ID", { month: "long", year: "numeric" })
+
+  // Navigation functions
+  const goToPreviousMonth = () => {
+    const prev = new Date(displayMonth)
+    prev.setMonth(prev.getMonth() - 1)
+
+    const minDateObj = new Date(minDate)
+    
+    // Compare year-month only
+    const prevYearMonth = prev.getFullYear() * 12 + prev.getMonth()
+    const minYearMonth = minDateObj.getFullYear() * 12 + minDateObj.getMonth()
+    
+    if (prevYearMonth >= minYearMonth) {
+      setDisplayMonth(prev)
+      console.log("setDisplayMonth to:", prev.toISOString())
+    } else {
+      console.log("Cannot go prev - outside range")
+    }
+  }
+
+  const goToNextMonth = () => {
+    const next = new Date(displayMonth)
+    next.setMonth(next.getMonth() + 1)
+
+    const maxDateObj = new Date(maxDate)
+    
+    // Compare year-month only
+    const nextYearMonth = next.getFullYear() * 12 + next.getMonth()
+    const maxYearMonth = maxDateObj.getFullYear() * 12 + maxDateObj.getMonth()
+    
+    if (nextYearMonth <= maxYearMonth) {
+      setDisplayMonth(next)
+      console.log("setDisplayMonth to:", next.toISOString())
+    } else {
+      console.log("Cannot go next - outside range")
+    }
+  }
+
+  const canGoPrevious = () => {
+    try {
+      const prev = new Date(displayMonth)
+      prev.setMonth(prev.getMonth() - 1)
+      
+      const minDateObj = new Date(minDate)
+      
+      // Compare year-month only
+      const prevYearMonth = prev.getFullYear() * 12 + prev.getMonth()
+      const minYearMonth = minDateObj.getFullYear() * 12 + minDateObj.getMonth()
+      
+      const canGo = prevYearMonth >= minYearMonth
+      console.log("canGoPrevious:", { 
+        prev: `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`,
+        min: `${minDateObj.getFullYear()}-${String(minDateObj.getMonth() + 1).padStart(2, '0')}`,
+        prevYearMonth,
+        minYearMonth,
+        canGo 
+      })
+      return canGo
+    } catch (e) {
+      console.error("canGoPrevious error:", e)
+      return false
+    }
+  }
+
+  const canGoNext = () => {
+    try {
+      const next = new Date(displayMonth)
+      next.setMonth(next.getMonth() + 1)
+      
+      const maxDateObj = new Date(maxDate)
+      
+      // Compare year-month only
+      const nextYearMonth = next.getFullYear() * 12 + next.getMonth()
+      const maxYearMonth = maxDateObj.getFullYear() * 12 + maxDateObj.getMonth()
+      
+      const canGo = nextYearMonth <= maxYearMonth
+      console.log("canGoNext:", { 
+        next: `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`,
+        max: `${maxDateObj.getFullYear()}-${String(maxDateObj.getMonth() + 1).padStart(2, '0')}`,
+        nextYearMonth,
+        maxYearMonth,
+        canGo 
+      })
+      return canGo
+    } catch (e) {
+      console.error("canGoNext error:", e)
+      return false
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="bg-[#1B263A] text-white px-6 py-4 flex justify-between items-center sticky top-0 z-10">
+          <h3 className="font-bold text-lg">Tambah Menu Harian</h3>
+          <button onClick={onClose} className="hover:opacity-80 transition">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-700 border border-blue-200">
+            <p className="font-bold text-blue-900">Untuk: {currentPlanning?.sekolah?.nama}</p>
+            <p className="text-xs mt-2 text-blue-600">
+              {currentPlanning && formatDateSafe(currentPlanning.tanggalMulai)} s/d {currentPlanning && formatDateSafe(currentPlanning.tanggalSelesai)}
+            </p>
+          </div>
+
+          {alergiList.length > 0 && (
+            <div className="bg-amber-50 p-4 rounded-lg text-sm border border-amber-200">
+              <p className="font-bold text-amber-900 mb-2">Alergi di Sekolah Ini:</p>
+              <div className="flex flex-wrap gap-2">
+                {alergiList.map((a: AlergiItem, i: number) => (
+                  <span key={i} className="bg-white px-2 py-1 rounded text-xs text-amber-800 border border-amber-300">
+                    {a.nama}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-semibold mb-3 text-gray-700">Pilih Tanggal *</label>
+            
+            {/* Mini Calendar */}
+            <div className="bg-white border border-gray-300 rounded-lg p-4 mb-4">
+              {/* Navigation Controls - FIXED VERSION */}
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => {
+                    console.log("Prev clicked, canGoPrevious:", canGoPrevious())
+                    goToPreviousMonth()
+                  }}
+                  disabled={canGoPrevious() === false}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition ${
+                    canGoPrevious() !== false
+                      ? 'bg-gray-100 hover:bg-gray-200 cursor-pointer'
+                      : 'bg-gray-50 text-gray-400 cursor-not-allowed opacity-50'
+                  }`}
+                  title="Bulan Sebelumnya"
+                >
+                  ← Prev
+                </button>
+                
+                <p className="text-center font-bold text-gray-700 text-sm flex-1 px-4">
+                  {monthYear}
+                </p>
+                
+                <button
+                  onClick={() => {
+                    console.log("Next clicked, canGoNext:", canGoNext())
+                    goToNextMonth()
+                  }}
+                  disabled={canGoNext() === false}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition ${
+                    canGoNext() !== false
+                      ? 'bg-gray-100 hover:bg-gray-200 cursor-pointer'
+                      : 'bg-gray-50 text-gray-400 cursor-not-allowed opacity-50'
+                  }`}
+                  title="Bulan Berikutnya"
+                >
+                  Next →
+                </button>
+              </div>
+
+              {/* Weekday headers */}
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((day) => (
+                  <div key={day} className="text-center text-xs font-semibold text-gray-600 py-1">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar days */}
+              <div className="grid grid-cols-7 gap-1">
+                {days.map((day, idx) => {
+                  if (day === null) {
+                    return <div key={`empty-${idx}`} className="aspect-square"></div>
+                  }
+
+                  const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+                  const inRange = isDateInRange(dateStr)
+                  const holiday = isHoliday(dateStr)
+                  const isSelected = formData.tanggal === dateStr
+                  const holidayInfo = getHolidayInfo(dateStr)
+                  const isBooked = menuHarianList.some((menu: MenuHarian) => {
+                    // Normalisasi kedua tanggal untuk perbandingan yang akurat
+                    const menuDate = menu.tanggal ? new Date(menu.tanggal).toISOString().split('T')[0] : null
+                    return menuDate === dateStr
+                  })
+
+                  return (
+                    <button
+                      key={`day-${day}`}
+                      onClick={() => {
+                        if (inRange && !holiday) {
+                          setFormData({ ...formData, tanggal: dateStr })
+                        }
+                      }}
+                      disabled={!inRange || holiday}
+                      title={holiday ? `Libur: ${holidayInfo?.keterangan}` : isBooked ? "Menu sudah di-booking" : ""}
+                      className={`aspect-square rounded-lg text-xs font-medium transition flex items-center justify-center relative ${
+                        !inRange
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : holiday
+                          ? "bg-red-100 text-red-700 cursor-not-allowed border border-red-300"
+                          : isSelected
+                          ? "bg-[#D0B064] text-white border-2 border-[#D0B064]"
+                          : isBooked
+                          ? "bg-green-100 text-green-700 border-2 border-green-400 cursor-pointer hover:bg-green-200"
+                          : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 cursor-pointer"
+                      }`}
+                    >
+                      {day}
+                      {isBooked && !isSelected && (
+                        <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="mt-4 pt-3 border-t border-gray-200 space-y-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-[#D0B064] rounded"></div>
+                  <span className="text-gray-600">Dipilih</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-100 border border-green-400 rounded"></div>
+                  <span className="text-gray-600">Booked</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+                  <span className="text-gray-600">Hari Libur</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-gray-100 rounded"></div>
+                  <span className="text-gray-600">Di luar range</span>
+                </div>
+              </div>
+            </div>
+
+            {formData.tanggal && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-700">
+                <p className="font-semibold">✓ Tanggal dipilih: {formatDateSafe(formData.tanggal)}</p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-gray-700">Nama Menu *</label>
+            <input
+              type="text"
+              value={formData.namaMenu}
+              onChange={(e) => {
+                setFormData({ ...formData, namaMenu: e.target.value })
+                validateIngredient(e.target.value)
+              }}
+              onBlur={() => validateIngredient(formData.namaMenu)}
+              placeholder="Contoh: Nasi Goreng Ikan"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+            />
+            {ingredientWarnings.hasWarning && (
+              <div className="mt-2 bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>{ingredientWarnings.message}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700">Jam Mulai *</label>
+              <input
+                type="time"
+                value={formData.jamMulaiMasak}
+                onChange={(e) => setFormData({ ...formData, jamMulaiMasak: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700">Jam Selesai *</label>
+              <input
+                type="time"
+                value={formData.jamSelesaiMasak}
+                onChange={(e) => setFormData({ ...formData, jamSelesaiMasak: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-gray-700">Biaya per Tray (Rp) *</label>
+            <input
+              type="number"
+              value={formData.biayaPerTray}
+              onChange={(e) => setFormData({ ...formData, biayaPerTray: e.target.value })}
+              placeholder="50000"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+            />
+          </div>
+
+          <div className="border-t pt-4">
+            <p className="text-xs font-bold text-gray-700 mb-3 uppercase tracking-wider">Informasi Gizi</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold mb-2 text-gray-600">Kalori (kcal) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.kalori}
+                  onChange={(e) => setFormData({ ...formData, kalori: e.target.value })}
+                  placeholder="300"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-2 text-gray-600">Protein (g) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.protein}
+                  onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
+                  placeholder="15"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-2 text-gray-600">Lemak (g) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.lemak}
+                  onChange={(e) => setFormData({ ...formData, lemak: e.target.value })}
+                  placeholder="8"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-2 text-gray-600">Karbohidrat (g) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.karbohidrat}
+                  onChange={(e) => setFormData({ ...formData, karbohidrat: e.target.value })}
+                  placeholder="45"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <button
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 font-medium transition"
+            >
+              Batal
+            </button>
+            <button
+              onClick={onSubmit}
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] disabled:opacity-50 font-medium transition"
+            >
+              {isSubmitting ? "Memproses..." : "Tambah"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function MenuPlanningPage() {
   const [menuPlannings, setMenuPlannings] = useState<MenuPlanning[]>([])
   const [menuHarianList, setMenuHarianList] = useState<MenuHarian[]>([])
@@ -149,6 +750,9 @@ export default function MenuPlanningPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showCreateMenuModal, setShowCreateMenuModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // TAMBAH: State untuk calendar display
+  const [displayMonth, setDisplayMonth] = useState<Date>(new Date())
 
   const [formData, setFormData] = useState({
     mingguanKe: "1",
@@ -214,7 +818,7 @@ export default function MenuPlanningPage() {
       setMenuHarianList([])
       setAlergiList([])
     }
-  }, [filteredMenuPlannings])
+  }, [selectedSekolahId])
 
   useEffect(() => {
     if (!selectedSekolahId) {
@@ -273,11 +877,11 @@ export default function MenuPlanningPage() {
           console.log("Raw API response:", holidayRes)
           console.log("Extracted array:", rawHolidays)
           console.log("First item:", rawHolidays[0])
+          console.log("=== END DEBUG ===")
           
           // Filter dan validate holidays
           const validatedHolidays = rawHolidays
             .filter((h: any) => {
-              // Cek apakah ada field tanggal (bisa tanggal, tanggalMulai, atau tanggalSelesai)
               const dateField = h.tanggal || h.tanggalMulai || h.tanggalSelesai
               
               if (!dateField) {
@@ -285,7 +889,6 @@ export default function MenuPlanningPage() {
                 return false
               }
               
-              // Cek apakah tanggal bisa di-parse
               const date = parseDate(dateField)
               if (!date) {
                 console.warn(`Invalid date in holiday: ${dateField}`, h)
@@ -295,7 +898,6 @@ export default function MenuPlanningPage() {
               return true
             })
             .map((h: any) => {
-              // Map ke format yang konsisten
               const dateField = h.tanggal || h.tanggalMulai || h.tanggalSelesai
               const descriptionField = h.keterangan || h.deskripsi || "Hari Libur"
               
@@ -304,9 +906,6 @@ export default function MenuPlanningPage() {
                 keterangan: descriptionField,
               }
             })
-          
-          console.log("Validated holidays:", validatedHolidays)
-          console.log("=== END DEBUG ===")
           
           setHolidays(validatedHolidays)
         } catch (err) {
@@ -399,55 +998,25 @@ export default function MenuPlanningPage() {
       })
       alert("Menu planning berhasil dibuat")
       setShowCreateModal(false)
-      setFormData({ mingguanKe: "1", tanggalMulai: "", tanggalSelesai: "", sekolahId: "" })
-      window.location.reload()
-    } catch (err) {
-      alert("Gagal membuat menu planning")
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleDeletePlanning = async (planningId: string) => {
-    if (!confirm("Yakin ingin menghapus menu planning ini?")) {
-      return
-    }
-
-    try {
-      setIsSubmitting(true)
-      await apiCall(`/api/menu-planning/${planningId}`, {
-        method: "DELETE",
+      setFormData({
+        mingguanKe: "1",
+        tanggalMulai: "",
+        tanggalSelesai: "",
+        sekolahId: "",
       })
-      alert("Menu planning berhasil dihapus")
+      // Reload data
       window.location.reload()
     } catch (err) {
-      alert("Gagal menghapus: " + (err instanceof Error ? err.message : "Unknown error"))
+      alert(err instanceof Error ? err.message : "Gagal membuat menu planning")
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleCreateMenuHarian = async () => {
-    if (
-      !menuFormData.tanggal ||
-      !menuFormData.namaMenu ||
-      !menuFormData.biayaPerTray ||
-      !menuFormData.jamMulaiMasak ||
-      !menuFormData.jamSelesaiMasak ||
-      !menuFormData.kalori ||
-      !menuFormData.protein ||
-      !menuFormData.karbohidrat ||
-      !menuFormData.lemak
-    ) {
-      alert("Isi semua field")
+    if (!menuFormData.tanggal || !menuFormData.namaMenu || !menuFormData.jamMulaiMasak || !menuFormData.jamSelesaiMasak) {
+      alert("Isi semua field yang wajib")
       return
-    }
-
-    if (ingredientWarnings.hasWarning) {
-      const confirmed = confirm(
-        `Peringatan: Menu ini mengandung alergen yang dihindari ${ingredientWarnings.conflicts.join(", ")}. Lanjutkan?`
-      )
-      if (!confirmed) return
     }
 
     try {
@@ -457,16 +1026,16 @@ export default function MenuPlanningPage() {
         body: JSON.stringify({
           tanggal: menuFormData.tanggal,
           namaMenu: menuFormData.namaMenu,
-          biayaPerTray: parseFloat(menuFormData.biayaPerTray),
+          biayaPerTray: parseFloat(menuFormData.biayaPerTray) || 0,
           jamMulaiMasak: menuFormData.jamMulaiMasak,
           jamSelesaiMasak: menuFormData.jamSelesaiMasak,
-          kalori: parseFloat(menuFormData.kalori),
-          protein: parseFloat(menuFormData.protein),
-          karbohidrat: parseFloat(menuFormData.karbohidrat),
-          lemak: parseFloat(menuFormData.lemak),
+          kalori: parseFloat(menuFormData.kalori) || 0,
+          protein: parseFloat(menuFormData.protein) || 0,
+          lemak: parseFloat(menuFormData.lemak) || 0,
+          karbohidrat: parseFloat(menuFormData.karbohidrat) || 0,
         }),
       })
-      alert("Menu harian berhasil dibuat")
+      alert("Menu harian berhasil ditambahkan")
       setShowCreateMenuModal(false)
       setMenuFormData({
         tanggal: "",
@@ -479,39 +1048,46 @@ export default function MenuPlanningPage() {
         karbohidrat: "",
         lemak: "",
       })
-      setIngredientWarnings({ hasWarning: false, conflicts: [], message: "" })
-      const res = await apiCall<any>(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
-      const menus = extractArray(res?.data || [])
-      setMenuHarianList(menus)
+      // Reload menu harian
+      if (selectedPlanningId) {
+        const res = await apiCall<any>(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
+        const menus = extractArray(res?.data || [])
+        setMenuHarianList(menus)
+      }
     } catch (err) {
-      alert("Gagal membuat menu harian: " + (err instanceof Error ? err.message : "Unknown error"))
+      alert(err instanceof Error ? err.message : "Gagal menambahkan menu harian")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const getDayName = (date: string) => {
-    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
-    const parsedDate = parseDate(date)
-    return parsedDate ? days[parsedDate.getDay()] : "Hari?"
+  const handleDeleteMenuHarian = async (menuId: string) => {
+    if (!confirm("Apakah kamu yakin ingin menghapus menu ini?")) return
+
+    try {
+      await apiCall(`/api/menu-harian/${menuId}`, {
+        method: "DELETE",
+      })
+      alert("Menu berhasil dihapus")
+      setMenuHarianList(menuHarianList.filter(m => m.id !== menuId))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Gagal menghapus menu")
+    }
   }
-
-  const avgKalori =
-    menuHarianList.length > 0
-      ? Math.round(menuHarianList.reduce((sum, m) => sum + m.kalori, 0) / menuHarianList.length)
-      : 0
-
-  const totalBiaya = menuHarianList.reduce((sum, m) => sum + m.biayaPerTray, 0)
-  const avgProtein =
-    menuHarianList.length > 0
-      ? Math.round(menuHarianList.reduce((sum, m) => sum + m.protein, 0) / menuHarianList.length)
-      : 0
 
   if (loading) {
     return (
       <DapurLayout currentPage="menu">
-        <div className="flex items-center justify-center h-96">
-          <Loader className="w-12 h-12 animate-spin text-[#D0B064]" />
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg p-6 h-48 animate-pulse"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm h-32 animate-pulse">
+                <div className="h-3 bg-gray-200 rounded w-24 mb-3"></div>
+                <div className="h-8 bg-gray-200 rounded w-20"></div>
+              </div>
+            ))}
+          </div>
         </div>
       </DapurLayout>
     )
@@ -550,21 +1126,25 @@ export default function MenuPlanningPage() {
             <Filter className="w-5 h-5 text-gray-600" />
             <label className="text-sm font-semibold text-gray-700">Filter per Sekolah:</label>
           </div>
-          <select
-            value={selectedSekolahId}
-            onChange={(e) => {
-              setSelectedSekolahId(e.target.value)
-              setSelectedPlanningId("")
-            }}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent font-medium"
-          >
-            <option value="">Semua Sekolah</option>
-            {sekolahList.map((s: Sekolah) => (
-              <option key={s.id} value={s.id}>
-                {s.nama}
-              </option>
-            ))}
-          </select>
+          {loading ? (
+            <div className="h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+          ) : (
+            <select
+              value={selectedSekolahId}
+              onChange={(e) => {
+                setSelectedSekolahId(e.target.value)
+                setSelectedPlanningId("")
+              }}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent font-medium"
+            >
+              <option value="">Semua Sekolah</option>
+              {sekolahList.map((s: Sekolah) => (
+                <option key={s.id} value={s.id}>
+                  {s.nama}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -603,14 +1183,24 @@ export default function MenuPlanningPage() {
                     <div>
                       <h3 className="font-bold text-purple-900 mb-2">Hari Libur Sekolah</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {holidays.map((h, i) => (
-                          <div key={i} className="bg-white rounded p-2 text-sm">
-                            <span className="font-medium text-purple-900">
-                              {formatDateSafe(h.tanggal)}
-                            </span>
-                            <p className="text-xs text-purple-600 mt-1">{h.keterangan}</p>
-                          </div>
-                        ))}
+                        {holidays.map((h, i) => {
+                          // Safety check untuk h.tanggal
+                          if (!h.tanggal) {
+                            console.warn("Holiday missing tanggal:", h)
+                            return null
+                          }
+                          
+                          return (
+                            <div key={i} className="bg-white rounded p-2 text-sm">
+                              <span className="font-medium text-purple-900">
+                                {formatDateSafe(h.tanggal)}
+                              </span>
+                              <p className="text-xs text-purple-600 mt-1">
+                                {h.keterangan || "Hari Libur"}
+                              </p>
+                            </div>
+                          )
+                        }).filter(Boolean)} {/* Filter out null entries */}
                       </div>
                     </div>
                   </div>
@@ -622,19 +1212,30 @@ export default function MenuPlanningPage() {
       )}
 
       {filteredMenuPlannings.length === 0 ? (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
-          <AlertCircle className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-yellow-900 mb-2">Belum Ada Menu Planning</h3>
-          <p className="text-yellow-700 mb-6">
-            {selectedSekolahId ? "Sekolah ini belum memiliki menu planning" : "Buat menu planning baru untuk memulai"}
-          </p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-6 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] font-medium transition"
-          >
-            Buat Menu Planning
-          </button>
-        </div>
+        loading ? (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg p-6 h-48 animate-pulse"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <SkeletonMenuCard key={i} />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
+            <AlertCircle className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-yellow-900 mb-2">Belum Ada Menu Planning</h3>
+            <p className="text-yellow-700 mb-6">
+              {selectedSekolahId ? "Sekolah ini belum memiliki menu planning" : "Buat menu planning baru untuk memulai"}
+            </p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-6 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] font-medium transition"
+            >
+              Buat Menu Planning
+            </button>
+          </div>
+        )
       ) : (
         <>
           <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] rounded-lg p-6 text-white mb-6 shadow-lg">
@@ -663,10 +1264,21 @@ export default function MenuPlanningPage() {
             )}
 
             <div className="flex flex-wrap gap-2">
-              {filteredMenuPlannings.map((planning) => (
-                <div key={planning.id} className="relative group">
+              {loading ? (
+                <>
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-10 bg-white/20 rounded-lg w-32 animate-pulse"></div>
+                  ))}
+                </>
+              ) : (
+                filteredMenuPlannings.map((planning) => (
                   <button
-                    onClick={() => setSelectedPlanningId(planning.id)}
+                    key={planning.id}
+                    onClick={() => {
+                      setSelectedPlanningId(planning.id)
+                      // Reset displayMonth ketika memilih planning baru
+                      setDisplayMonth(new Date(planning.tanggalMulai))
+                    }}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                       planning.id === selectedPlanningId
                         ? "bg-[#D0B064] text-white shadow-lg"
@@ -675,695 +1287,139 @@ export default function MenuPlanningPage() {
                   >
                     Minggu {planning.mingguanKe}
                   </button>
-                  {planning.id === selectedPlanningId && (
-                    <button
-                      onClick={() => handleDeletePlanning(planning.id)}
-                      disabled={isSubmitting}
-                      title="Hapus menu planning"
-                      className="absolute -top-10 right-0 px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center gap-1 whitespace-nowrap shadow-lg transition"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      Hapus
-                    </button>
-                  )}
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            {loadingMenuHarian ? (
-              <>
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
-              </>
-            ) : (
-              <>
-                <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm hover:shadow-md transition">
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Total Hari</p>
-                  <p className="text-3xl font-bold text-[#1B263A] mt-2">{menuHarianList.length}</p>
-                  <p className="text-xs text-gray-500 mt-1">hari</p>
-                </div>
-                <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm hover:shadow-md transition">
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Rata-rata Kalori</p>
-                  <p className="text-3xl font-bold text-orange-600 mt-2">{avgKalori}</p>
-                  <p className="text-xs text-gray-500 mt-1">kcal/hari</p>
-                </div>
-                <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm hover:shadow-md transition">
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Total Biaya</p>
-                  <p className="text-3xl font-bold text-green-600 mt-2">Rp {(totalBiaya / 1000).toFixed(0)}k</p>
-                  <p className="text-xs text-gray-500 mt-1">per tray</p>
-                </div>
-                <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm hover:shadow-md transition">
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Rata-rata Protein</p>
-                  <p className="text-3xl font-bold text-blue-600 mt-2">{avgProtein}</p>
-                  <p className="text-xs text-gray-500 mt-1">g/hari</p>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-[#1B263A]">Menu Harian</h3>
+          {selectedPlanningId && (
+            <div className="mb-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-[#1B263A]">Menu Harian</h2>
               <button
-                onClick={() => setShowCreateMenuModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] font-medium transition shadow-md hover:shadow-lg"
+                onClick={() => {
+                  // Set displayMonth ke tanggal mulai planning
+                  setDisplayMonth(new Date(currentPlanning?.tanggalMulai || new Date()))
+                  setShowCreateMenuModal(true)
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] font-medium transition"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4" />
                 Tambah Menu
               </button>
             </div>
+          )}
 
-            {loadingMenuHarian ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <SkeletonMenuCard />
-                <SkeletonMenuCard />
-                <SkeletonMenuCard />
-                <SkeletonMenuCard />
-              </div>
-            ) : menuHarianList.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
-                <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600 font-medium text-lg">Belum ada menu harian</p>
-                <p className="text-gray-500 text-sm mt-1">Tambahkan menu untuk minggu ini</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {menuHarianList.map((menu) => (
-                  <div key={menu.id} className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-lg transition">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                          {getDayName(menu.tanggal)} • {formatDateSafe(menu.tanggal)}
-                        </p>
-                        <h3 className="text-lg font-bold text-[#1B263A] mt-1">{menu.namaMenu}</h3>
+          {selectedPlanningId && loadingMenuHarian ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <SkeletonMenuCard key={i} />
+              ))}
+            </div>
+          ) : selectedPlanningId && menuHarianList.length === 0 ? (
+            <div className="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-8 text-center">
+              <ChefHat className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Belum Ada Menu Harian</h3>
+              <p className="text-gray-600 mb-6">Tambahkan menu harian untuk minggu ini</p>
+              <button
+                onClick={() => {
+                  setDisplayMonth(new Date(currentPlanning?.tanggalMulai || new Date()))
+                  setShowCreateMenuModal(true)
+                }}
+                className="px-6 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] font-medium transition"
+              >
+                Tambah Menu Harian
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {menuHarianList.map((menu) => (
+                <div key={menu.id} className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm hover:shadow-md transition">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-lg text-[#1B263A]">{menu.namaMenu}</h3>
+                        {menu.isBooked && (
+                          <span className="px-2 py-1 bg-green-500 text-white text-xs font-bold rounded-md">
+                            BOOKED
+                          </span>
+                        )}
                       </div>
-                      <button
-                        onClick={() => setSelectedMenu(menu)}
-                        className="px-3 py-1 text-xs bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition font-medium whitespace-nowrap ml-2"
-                      >
-                        Detail
-                      </button>
+                      <p className="text-sm text-gray-600">{formatDateSafe(menu.tanggal)}</p>
                     </div>
+                    <button
+                      onClick={() => handleDeleteMenuHarian(menu.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
 
-                    <div className="grid grid-cols-4 gap-2 mb-4 pb-4 border-b border-gray-100">
-                      <div className="bg-orange-50 rounded-lg p-3 text-center hover:bg-orange-100 transition">
-                        <Flame className="w-5 h-5 text-orange-600 mx-auto mb-1" />
-                        <p className="text-xs font-bold text-orange-600">{Math.round(menu.kalori)}</p>
-                        <p className="text-xs text-orange-600 font-medium">kcal</p>
-                      </div>
-                      <div className="bg-blue-50 rounded-lg p-3 text-center hover:bg-blue-100 transition">
-                        <Drumstick className="w-5 h-5 text-blue-600 mx-auto mb-1" />
-                        <p className="text-xs font-bold text-blue-600">{menu.protein}g</p>
-                        <p className="text-xs text-blue-600 font-medium">Protein</p>
-                      </div>
-                      <div className="bg-yellow-50 rounded-lg p-3 text-center hover:bg-yellow-100 transition">
-                        <Apple className="w-5 h-5 text-yellow-600 mx-auto mb-1" />
-                        <p className="text-xs font-bold text-yellow-600">{menu.lemak}g</p>
-                        <p className="text-xs text-yellow-600 font-medium">Lemak</p>
-                      </div>
-                      <div className="bg-green-50 rounded-lg p-3 text-center hover:bg-green-100 transition">
-                        <Wheat className="w-5 h-5 text-green-600 mx-auto mb-1" />
-                        <p className="text-xs font-bold text-green-600">{menu.karbohidrat}g</p>
-                        <p className="text-xs text-green-600 font-medium">Karbo</p>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="font-semibold text-green-600">Rp {menu.biayaPerTray.toLocaleString()}</span>
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                    <div className="bg-blue-50 p-2 rounded">
+                      <p className="text-gray-600 text-xs">Jam Masak</p>
+                      <p className="font-semibold text-blue-900">
                         {menu.jamMulaiMasak} - {menu.jamSelesaiMasak}
-                      </span>
+                      </p>
+                    </div>
+                    <div className="bg-green-50 p-2 rounded">
+                      <p className="text-gray-600 text-xs">Biaya/Tray</p>
+                      <p className="font-semibold text-green-900">
+                        Rp {menu.biayaPerTray.toLocaleString()}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Kalori:</span>
+                      <span className="font-semibold">{menu.kalori} kcal</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Protein:</span>
+                      <span className="font-semibold">{menu.protein}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Lemak:</span>
+                      <span className="font-semibold">{menu.lemak}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Karbohidrat:</span>
+                      <span className="font-semibold">{menu.karbohidrat}g</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
 
-      {showCreateModal && (
-        <ModalCreatePlanning
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          formData={formData}
-          setFormData={setFormData}
-          sekolahList={sekolahList}
-          onSubmit={handleCreatePlanning}
-          isSubmitting={isSubmitting}
-        />
-      )}
+      <ModalCreatePlanning
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        formData={formData}
+        setFormData={setFormData}
+        onSubmit={handleCreatePlanning}
+        isSubmitting={isSubmitting}
+        sekolahList={sekolahList}
+      />
 
-      {showCreateMenuModal && (
-        <ModalCreateMenuHarian
-          isOpen={showCreateMenuModal}
-          onClose={() => setShowCreateMenuModal(false)}
-          formData={menuFormData}
-          setFormData={setMenuFormData}
-          onSubmit={handleCreateMenuHarian}
-          isSubmitting={isSubmitting}
-          currentPlanning={currentPlanning}
-          alergiList={alergiList}
-          holidays={holidays}
-          ingredientWarnings={ingredientWarnings}
-          validateIngredient={validateIngredient}
-        />
-      )}
-
-      {selectedMenu && (
-        <ModalMenuDetail menu={selectedMenu} onClose={() => setSelectedMenu(null)} />
-      )}
+      <ModalCreateMenuHarian
+        isOpen={showCreateMenuModal}
+        onClose={() => setShowCreateMenuModal(false)}
+        formData={menuFormData}
+        setFormData={setMenuFormData}
+        onSubmit={handleCreateMenuHarian}
+        isSubmitting={isSubmitting}
+        currentPlanning={currentPlanning}
+        alergiList={alergiList}
+        holidays={holidays}
+        ingredientWarnings={ingredientWarnings}
+        validateIngredient={validateIngredient}
+        displayMonth={displayMonth}
+        setDisplayMonth={setDisplayMonth}
+        menuHarianList={menuHarianList}
+      />
     </DapurLayout>
-  )
-}
-
-function ModalCreatePlanning({
-  isOpen,
-  onClose,
-  formData,
-  setFormData,
-  sekolahList,
-  onSubmit,
-  isSubmitting,
-}: any) {
-  if (!isOpen) return null
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-md w-full shadow-2xl">
-        <div className="bg-[#1B263A] text-white px-6 py-4 flex justify-between items-center rounded-t-lg">
-          <h3 className="font-bold text-lg">Buat Menu Planning Baru</h3>
-          <button onClick={onClose} className="hover:opacity-80 transition">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-700">Minggu Ke</label>
-            <input
-              type="number"
-              min="1"
-              value={formData.mingguanKe}
-              onChange={(e) => setFormData({ ...formData, mingguanKe: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-700">Tanggal Mulai</label>
-            <input
-              type="date"
-              value={formData.tanggalMulai}
-              onChange={(e) => setFormData({ ...formData, tanggalMulai: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-700">Tanggal Selesai</label>
-            <input
-              type="date"
-              value={formData.tanggalSelesai}
-              onChange={(e) => setFormData({ ...formData, tanggalSelesai: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-700">Sekolah</label>
-            <select
-              value={formData.sekolahId}
-              onChange={(e) => setFormData({ ...formData, sekolahId: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-            >
-              <option value="">Pilih Sekolah</option>
-              {sekolahList.map((s: Sekolah) => (
-                <option key={s.id} value={s.id}>
-                  {s.nama}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition"
-            >
-              Batal
-            </button>
-            <button
-              onClick={onSubmit}
-              disabled={isSubmitting}
-              className="flex-1 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] disabled:opacity-50 font-medium transition"
-            >
-              {isSubmitting ? "Memproses..." : "Buat"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SkeletonCard() {
-  return (
-    <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm animate-pulse">
-      <div className="h-3 bg-gray-200 rounded w-24 mb-3"></div>
-      <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-      <div className="h-3 bg-gray-200 rounded w-12"></div>
-    </div>
-  )
-}
-
-function SkeletonMenuCard() {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5 animate-pulse">
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex-1">
-          <div className="h-3 bg-gray-200 rounded w-32 mb-2"></div>
-          <div className="h-5 bg-gray-200 rounded w-48"></div>
-        </div>
-        <div className="h-8 bg-gray-200 rounded w-16 ml-2"></div>
-      </div>
-      <div className="grid grid-cols-4 gap-2 mb-4">
-        <div className="bg-gray-100 rounded-lg p-3 h-16"></div>
-        <div className="bg-gray-100 rounded-lg p-3 h-16"></div>
-        <div className="bg-gray-100 rounded-lg p-3 h-16"></div>
-        <div className="bg-gray-100 rounded-lg p-3 h-16"></div>
-      </div>
-      <div className="h-3 bg-gray-200 rounded w-full"></div>
-    </div>
-  )
-}
-
-function SkeletonAlergiCard() {
-  return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 animate-pulse">
-      <div className="flex items-start gap-3">
-        <div className="w-5 h-5 bg-blue-300 rounded-full mt-1 flex-shrink-0"></div>
-        <div className="flex-1">
-          <div className="h-4 bg-blue-200 rounded w-40 mb-3"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded p-2 h-8"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SkeletonHolidayCard() {
-  return (
-    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 animate-pulse">
-      <div className="flex items-start gap-3">
-        <div className="w-5 h-5 bg-purple-300 rounded-full mt-1 flex-shrink-0"></div>
-        <div className="flex-1">
-          <div className="h-4 bg-purple-200 rounded w-40 mb-3"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded p-3 h-12"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ModalMenuDetail({ menu, onClose }: any) {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-md w-full shadow-2xl">
-        <div className="bg-[#1B263A] text-white px-6 py-4 flex justify-between items-center rounded-t-lg">
-          <h3 className="font-bold text-lg">{menu.namaMenu}</h3>
-          <button onClick={onClose} className="hover:opacity-80 transition">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-orange-50 rounded-lg p-4 text-center border border-orange-100">
-              <Flame className="w-6 h-6 text-orange-600 mx-auto mb-2" />
-              <p className="font-bold text-orange-600 text-lg">{Math.round(menu.kalori)}</p>
-              <p className="text-xs text-orange-600 font-medium mt-1">Kalori</p>
-            </div>
-            <div className="bg-blue-50 rounded-lg p-4 text-center border border-blue-100">
-              <Drumstick className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-              <p className="font-bold text-blue-600 text-lg">{menu.protein}g</p>
-              <p className="text-xs text-blue-600 font-medium mt-1">Protein</p>
-            </div>
-            <div className="bg-yellow-50 rounded-lg p-4 text-center border border-yellow-100">
-              <Apple className="w-6 h-6 text-yellow-600 mx-auto mb-2" />
-              <p className="font-bold text-yellow-600 text-lg">{menu.lemak}g</p>
-              <p className="text-xs text-yellow-600 font-medium mt-1">Lemak</p>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4 text-center border border-green-100">
-              <Wheat className="w-6 h-6 text-green-600 mx-auto mb-2" />
-              <p className="font-bold text-green-600 text-lg">{menu.karbohidrat}g</p>
-              <p className="text-xs text-green-600 font-medium mt-1">Karbohidrat</p>
-            </div>
-          </div>
-
-          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 font-medium">Biaya per Tray:</span>
-              <span className="font-bold text-[#D0B064]">Rp {menu.biayaPerTray.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 font-medium">Waktu Masak:</span>
-              <span className="font-semibold text-gray-700">{menu.jamMulaiMasak} - {menu.jamSelesaiMasak}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 font-medium">Total Waktu:</span>
-              <span className="font-semibold text-gray-700">
-                {(() => {
-                  const start = menu.jamMulaiMasak.split(":")
-                  const end = menu.jamSelesaiMasak.split(":")
-                  const duration = (parseInt(end[0]) - parseInt(start[0])) * 60 + (parseInt(end[1]) - parseInt(start[1]))
-                  return `${Math.floor(duration / 60)}h ${duration % 60}m`
-                })()}
-              </span>
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition"
-          >
-            Tutup
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ModalCreateMenuHarian({
-  isOpen,
-  onClose,
-  formData,
-  setFormData,
-  onSubmit,
-  isSubmitting,
-  currentPlanning,
-  alergiList,
-  holidays,
-  ingredientWarnings,
-  validateIngredient,
-}: any) {
-  if (!isOpen) return null
-
-  const minDate = currentPlanning?.tanggalMulai || ""
-  const maxDate = currentPlanning?.tanggalSelesai || ""
-
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
-  }
-
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay()
-  }
-
-  const isDateInRange = (dateStr: string) => {
-    if (!minDate || !maxDate) return false
-    const date = new Date(dateStr)
-    const min = new Date(minDate)
-    const max = new Date(maxDate)
-    return date >= min && date <= max
-  }
-
-  const isHoliday = (dateStr: string) => {
-    return holidays && holidays.some((h: Holiday) => {
-      const holidayDate = new Date(h.tanggal).toISOString().split('T')[0]
-      return holidayDate === dateStr
-    })
-  }
-
-  const getHolidayInfo = (dateStr: string) => {
-    return holidays && holidays.find((h: Holiday) => {
-      const holidayDate = new Date(h.tanggal).toISOString().split('T')[0]
-      return holidayDate === dateStr
-    })
-  }
-
-  const currentMonth = formData.tanggal ? new Date(formData.tanggal) : new Date(minDate)
-  const daysInMonth = getDaysInMonth(currentMonth)
-  const firstDay = getFirstDayOfMonth(currentMonth)
-  const days = []
-
-  // Empty cells for days before month starts
-  for (let i = 0; i < firstDay; i++) {
-    days.push(null)
-  }
-
-  // Days of the month
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push(i)
-  }
-
-  const monthYear = currentMonth.toLocaleDateString("id-ID", { month: "long", year: "numeric" })
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="bg-[#1B263A] text-white px-6 py-4 flex justify-between items-center sticky top-0 z-10">
-          <h3 className="font-bold text-lg">Tambah Menu Harian</h3>
-          <button onClick={onClose} className="hover:opacity-80 transition">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
-          <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-700 border border-blue-200">
-            <p className="font-bold text-blue-900">📍 Untuk: {currentPlanning?.sekolah?.nama}</p>
-            <p className="text-xs mt-2 text-blue-600">
-              {currentPlanning && formatDateSafe(currentPlanning.tanggalMulai)} s/d {currentPlanning && formatDateSafe(currentPlanning.tanggalSelesai)}
-            </p>
-          </div>
-
-          {alergiList.length > 0 && (
-            <div className="bg-amber-50 p-4 rounded-lg text-sm border border-amber-200">
-              <p className="font-bold text-amber-900 mb-2">⚠️ Alergi di Sekolah Ini:</p>
-              <div className="flex flex-wrap gap-2">
-                {alergiList.map((a: AlergiItem, i: number) => (
-                  <span key={i} className="bg-white px-2 py-1 rounded text-xs text-amber-800 border border-amber-300">
-                    {a.nama}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-semibold mb-3 text-gray-700">Pilih Tanggal *</label>
-            
-            {/* Mini Calendar */}
-            <div className="bg-white border border-gray-300 rounded-lg p-4 mb-4">
-              <p className="text-center font-bold text-gray-700 mb-4 text-sm">{monthYear}</p>
-              
-              {/* Weekday headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((day) => (
-                  <div key={day} className="text-center text-xs font-semibold text-gray-600 py-1">
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              {/* Calendar days */}
-              <div className="grid grid-cols-7 gap-1">
-                {days.map((day, idx) => {
-                  if (day === null) {
-                    return <div key={`empty-${idx}`} className="aspect-square"></div>
-                  }
-
-                  const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-                  const inRange = isDateInRange(dateStr)
-                  const holiday = isHoliday(dateStr)
-                  const isSelected = formData.tanggal === dateStr
-                  const holidayInfo = getHolidayInfo(dateStr)
-
-                  return (
-                    <button
-                      key={`day-${day}`}
-                      onClick={() => {
-                        if (inRange && !holiday) {
-                          setFormData({ ...formData, tanggal: dateStr })
-                        }
-                      }}
-                      disabled={!inRange || holiday}
-                      title={holiday ? `Libur: ${holidayInfo?.keterangan}` : ""}
-                      className={`aspect-square rounded-lg text-xs font-medium transition flex items-center justify-center ${
-                        !inRange
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : holiday
-                          ? "bg-red-100 text-red-700 cursor-not-allowed border border-red-300"
-                          : isSelected
-                          ? "bg-[#D0B064] text-white border-2 border-[#D0B064]"
-                          : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 cursor-pointer"
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Legend */}
-              <div className="mt-4 pt-3 border-t border-gray-200 space-y-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-[#D0B064] rounded"></div>
-                  <span className="text-gray-600">Dipilih</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
-                  <span className="text-gray-600">Hari Libur</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-gray-100 rounded"></div>
-                  <span className="text-gray-600">Di luar range</span>
-                </div>
-              </div>
-            </div>
-
-            {formData.tanggal && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-700">
-                <p className="font-semibold">✓ Tanggal dipilih: {formatDateSafe(formData.tanggal)}</p>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-700">Nama Menu *</label>
-            <input
-              type="text"
-              value={formData.namaMenu}
-              onChange={(e) => {
-                setFormData({ ...formData, namaMenu: e.target.value })
-                validateIngredient(e.target.value)
-              }}
-              onBlur={() => validateIngredient(formData.namaMenu)}
-              placeholder="Contoh: Nasi Goreng Ikan"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-            />
-            {ingredientWarnings.hasWarning && (
-              <div className="mt-2 bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>{ingredientWarnings.message}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-semibold mb-2 text-gray-700">Jam Mulai *</label>
-              <input
-                type="time"
-                value={formData.jamMulaiMasak}
-                onChange={(e) => setFormData({ ...formData, jamMulaiMasak: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2 text-gray-700">Jam Selesai *</label>
-              <input
-                type="time"
-                value={formData.jamSelesaiMasak}
-                onChange={(e) => setFormData({ ...formData, jamSelesaiMasak: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-700">Biaya per Tray (Rp) *</label>
-            <input
-              type="number"
-              value={formData.biayaPerTray}
-              onChange={(e) => setFormData({ ...formData, biayaPerTray: e.target.value })}
-              placeholder="50000"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-            />
-          </div>
-
-          <div className="border-t pt-4">
-            <p className="text-xs font-bold text-gray-700 mb-3 uppercase tracking-wider">📊 Informasi Gizi</p>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-2 text-gray-600">Kalori (kcal) *</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={formData.kalori}
-                  onChange={(e) => setFormData({ ...formData, kalori: e.target.value })}
-                  placeholder="300"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-2 text-gray-600">Protein (g) *</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={formData.protein}
-                  onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
-                  placeholder="15"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-2 text-gray-600">Lemak (g) *</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={formData.lemak}
-                  onChange={(e) => setFormData({ ...formData, lemak: e.target.value })}
-                  placeholder="8"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-2 text-gray-600">Karbohidrat (g) *</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={formData.karbohidrat}
-                  onChange={(e) => setFormData({ ...formData, karbohidrat: e.target.value })}
-                  placeholder="45"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t">
-            <button
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 font-medium transition"
-            >
-              Batal
-            </button>
-            <button
-              onClick={onSubmit}
-              disabled={isSubmitting}
-              className="flex-1 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] disabled:opacity-50 font-medium transition"
-            >
-              {isSubmitting ? "Memproses..." : "Tambah"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, memo } from 'react';
+import { useState, useEffect, useMemo, memo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import DapurLayout from '@/components/layout/DapurLayout';
 import { 
@@ -10,7 +10,8 @@ import {
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Link from 'next/link';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://72.60.79.126:3000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz";
+const REFRESH_INTERVAL = 30000; // 30 detik untuk real-time update
 
 async function getAuthToken() {
   if (typeof window === "undefined") return "";
@@ -38,7 +39,6 @@ async function apiCall<T>(endpoint: string, options: any = {}): Promise<T> {
 
     return response.json();
   } catch (error) {
-    console.error(`[API Error] ${endpoint}:`, error);
     throw error;
   }
 }
@@ -76,7 +76,6 @@ const ProductionChart = memo(({ data }: { data: any[] }) => (
       <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} />
       <Tooltip />
       <Legend />
-      <Line type="monotone" dataKey="target" stroke="#f59e0b" strokeWidth={2} name="Target" />
       <Line type="monotone" dataKey="actual" stroke="#10b981" strokeWidth={3} name="Actual" />
     </LineChart>
   </ResponsiveContainer>
@@ -119,6 +118,8 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, trend }: any) => 
 
 const DashboardDapur = () => {
   const router = useRouter();
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  
   const [userInfo, setUserInfo] = useState({
     name: 'Loading...',
     email: '',
@@ -131,6 +132,24 @@ const DashboardDapur = () => {
   const [errorMenuPlanning, setErrorMenuPlanning] = useState<string | null>(null);
   const [todayMenu, setTodayMenu] = useState<any>(null);
 
+  const [stats, setStats] = useState({
+    targetHariIni: 0,
+    sudahPacking: 0,
+    totalTrays: 0,
+    traysAvailable: 0,
+    totalBaskets: 0,
+    basketsAvailable: 0,
+    totalSekolah: 0,
+    sudahDikirim: 0,
+    totalBatch: 0,
+    batchInProgress: 0
+  });
+
+  const [produksiMingguan, setProduksiMingguan] = useState<any[]>([]);
+  const [deliveryTrips, setDeliveryTrips] = useState<any[]>([]);
+  const [recentCheckpoints, setRecentCheckpoints] = useState<any[]>([]);
+
+  // Initialize user info
   useEffect(() => {
     const userData = localStorage.getItem('mbg_user');
     const token = localStorage.getItem('mbg_token');
@@ -153,105 +172,196 @@ const DashboardDapur = () => {
     }
   }, [router]);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoadingMenuPlanning(true);
-        setErrorMenuPlanning(null);
+  // Main data loading function
+  const loadData = useCallback(async () => {
+    try {
+      setLoadingMenuPlanning(true);
+      setErrorMenuPlanning(null);
 
-        const planningRes = await apiCall<any>("/api/menu-planning");
-        const plannings = extractArray(planningRes?.data || []);
+      const planningRes = await apiCall<any>("/api/menu-planning");
+      const plannings = extractArray(planningRes?.data || []);
 
-        const today = new Date();
-        const todayString = today.toISOString().split('T')[0];
+      const today = new Date();
+      const todayString = today.toISOString().split('T')[0];
 
-        let foundTodayMenu: any = null;
+      let foundTodayMenu: any = null;
+      let allMenus: any[] = [];
+      let allDelivery: any[] = [];
 
-        const weeklyStats = await Promise.all(
-          plannings.map(async (planning: any) => {
-            try {
-              const menuRes = await apiCall<any>(`/api/menu-planning/${planning.id}/menu-harian`);
-              const menus = extractArray(menuRes?.data || []);
+      const weeklyStats = await Promise.all(
+        plannings.map(async (planning: any) => {
+          try {
+            const menuRes = await apiCall<any>(`/api/menu-planning/${planning.id}/menu-harian`);
+            const menus = extractArray(menuRes?.data || []);
+            allMenus = [...allMenus, ...menus];
 
-              const dayNames = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-              const daysStatus = dayNames.map((day, idx) => {
-                const dayOfWeek = idx + 1;
-                const hasMenu = menus.some((m: any) => {
+            const dayNames = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+            const daysStatus = dayNames.map((day, idx) => {
+              const dayOfWeek = idx + 1;
+              const hasMenu = menus.some((m: any) => {
+                const menuDate = new Date(m.tanggal);
+                const dateDay = menuDate.getDay();
+                const adjustedDay = dateDay === 0 ? 7 : dateDay;
+                return adjustedDay === dayOfWeek;
+              });
+
+              return {
+                day,
+                completed: hasMenu,
+                menuCount: menus.filter((m: any) => {
                   const menuDate = new Date(m.tanggal);
                   const dateDay = menuDate.getDay();
                   const adjustedDay = dateDay === 0 ? 7 : dateDay;
                   return adjustedDay === dayOfWeek;
-                });
-
-                return {
-                  day,
-                  completed: hasMenu,
-                  menuCount: menus.filter((m: any) => {
-                    const menuDate = new Date(m.tanggal);
-                    const dateDay = menuDate.getDay();
-                    const adjustedDay = dateDay === 0 ? 7 : dateDay;
-                    return adjustedDay === dayOfWeek;
-                  }).length
-                };
-              });
-
-              if (!foundTodayMenu) {
-                const todayMenus = menus.filter((m: any) => {
-                  const menuDate = new Date(m.tanggal).toISOString().split('T')[0];
-                  return menuDate === todayString;
-                });
-                if (todayMenus.length > 0) {
-                  foundTodayMenu = {
-                    ...todayMenus[0],
-                    sekolahNama: planning.sekolah?.nama || 'Unknown'
-                  };
-                }
-              }
-
-              const completedDays = daysStatus.filter(d => d.completed).length;
-              const totalDays = 6;
-
-              return {
-                id: planning.id,
-                mingguanKe: planning.mingguanKe,
-                sekolahId: planning.sekolahId,
-                sekolahNama: planning.sekolah?.nama || 'Unknown',
-                tanggalMulai: planning.tanggalMulai,
-                tanggalSelesai: planning.tanggalSelesai,
-                daysStatus,
-                completedDays,
-                totalDays,
-                status: completedDays === totalDays ? 'COMPLETE' : 'INCOMPLETE',
-                daysLeft: totalDays - completedDays,
-                totalMenuCount: menus.length
+                }).length
               };
-            } catch (err) {
-              console.error(`Gagal process planning ${planning.id}:`, err);
-              return null;
+            });
+
+            if (!foundTodayMenu) {
+              const todayMenus = menus.filter((m: any) => {
+                const menuDate = new Date(m.tanggal).toISOString().split('T')[0];
+                return menuDate === todayString;
+              });
+              if (todayMenus.length > 0) {
+                foundTodayMenu = {
+                  ...todayMenus[0],
+                  sekolahNama: planning.sekolah?.nama || 'Unknown'
+                };
+              }
             }
-          })
-        );
 
-        const validStats = weeklyStats
-          .filter((s) => s !== null)
-          .sort((a, b) => {
-            if (a.status === b.status) return 0;
-            return a.status === 'COMPLETE' ? -1 : 1;
-          });
+            const completedDays = daysStatus.filter(d => d.completed).length;
+            const totalDays = 6;
 
-        setMenuPlanningData(validStats);
-        setTodayMenu(foundTodayMenu);
+            return {
+              id: planning.id,
+              mingguanKe: planning.mingguanKe,
+              sekolahId: planning.sekolahId,
+              sekolahNama: planning.sekolah?.nama || 'Unknown',
+              tanggalMulai: planning.tanggalMulai,
+              tanggalSelesai: planning.tanggalSelesai,
+              daysStatus,
+              completedDays,
+              totalDays,
+              status: completedDays === totalDays ? 'COMPLETE' : 'INCOMPLETE',
+              daysLeft: totalDays - completedDays,
+              totalMenuCount: menus.length
+            };
+          } catch (err) {
+            return null;
+          }
+        })
+      );
+
+      const validStats = weeklyStats
+        .filter((s) => s !== null)
+        .sort((a, b) => {
+          if (a.status === b.status) return 0;
+          return a.status === 'COMPLETE' ? -1 : 1;
+        });
+
+      setMenuPlanningData(validStats);
+      setTodayMenu(foundTodayMenu);
+
+      // Fetch delivery data
+      try {
+        const deliveryRes = await apiCall<any>("/api/sekolah/1/pengiriman").catch(() => null);
+        if (deliveryRes?.data) {
+          allDelivery = Array.isArray(deliveryRes.data) ? deliveryRes.data : [];
+        }
       } catch (err) {
-        console.error('Gagal load data:', err);
-        setErrorMenuPlanning(err instanceof Error ? err.message : 'Gagal memuat data');
-        setMenuPlanningData([]);
-      } finally {
-        setLoadingMenuPlanning(false);
+        // Silent error handling
+      }
+
+      // Process data untuk stats
+      const dateMap: { [key: string]: number } = {};
+      const schoolMap: { [key: string]: number } = {};
+
+      allMenus.forEach((menu) => {
+        if (menu.tanggal) {
+          const date = new Date(menu.tanggal).toLocaleDateString('id-ID', {
+            weekday: 'short',
+            month: 'short',
+            day: '2-digit',
+          });
+          dateMap[date] = (dateMap[date] || 0) + 1;
+        }
+      });
+
+      allDelivery.forEach((delivery) => {
+        const school = delivery.sekolah?.nama || delivery.school || 'Unknown';
+        schoolMap[school] = (schoolMap[school] || 0) + (delivery.jumlahTray || 1);
+      });
+
+      // Set stats
+      const onTime = allDelivery.filter((d) => d.status === 'DELIVERED' || d.scanSekolahTime).length;
+      const late = allDelivery.length - onTime;
+
+      setStats({
+        targetHariIni: allMenus.filter(m => {
+          const menuDate = new Date(m.tanggal).toISOString().split('T')[0];
+          return menuDate === todayString;
+        }).length * 50 || 5000,
+        sudahPacking: allMenus.length,
+        totalTrays: allDelivery.reduce((sum, d) => sum + (d.jumlahTray || 100), 0) || 5500,
+        traysAvailable: Math.max(0, (allDelivery.reduce((sum, d) => sum + (d.jumlahTray || 100), 0) || 5500) - allMenus.length),
+        totalBaskets: 120,
+        basketsAvailable: 85,
+        totalSekolah: plannings.length,
+        sudahDikirim: onTime,
+        totalBatch: Math.ceil(allMenus.length / 500),
+        batchInProgress: Math.ceil(allMenus.length / 500) - onTime
+      });
+
+      // Set produksi mingguan chart data
+      const produksiData = Object.entries(dateMap)
+        .map(([date, count]) => ({ hari: date, actual: count }))
+        .slice(-6);
+      setProduksiMingguan(produksiData);
+
+      // Set delivery trips
+      const deliveryData = Object.entries(schoolMap)
+        .map(([school, trays]) => ({ school, trays }))
+        .slice(0, 5);
+      setDeliveryTrips(deliveryData);
+
+      // Set recent checkpoints
+      const checkpoints = allDelivery
+        .filter(d => d.scanSekolahTime || d.status === 'DELIVERED')
+        .map((d, idx) => ({
+          type: d.status === 'DELIVERED' ? 'SCHOOL_RECEIVED' : 'DRIVER_TO_SCHOOL',
+          school: d.sekolah?.nama || d.school || 'Unknown School',
+          driver: d.driver?.nama || 'Driver',
+          time: d.scanSekolahTime ? new Date(d.scanSekolahTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '00:00'
+        }))
+        .slice(-3);
+      setRecentCheckpoints(checkpoints);
+
+    } catch (err) {
+      setErrorMenuPlanning(err instanceof Error ? err.message : 'Gagal memuat data');
+      setMenuPlanningData([]);
+    } finally {
+      setLoadingMenuPlanning(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Real-time update setup
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      loadData();
+    }, REFRESH_INTERVAL);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
     };
-
-    loadData();
-  }, []);
+  }, [loadData]);
 
   const menuPlanningStats = useMemo(() => {
     const total = menuPlanningData.length || 1;
@@ -260,42 +370,6 @@ const DashboardDapur = () => {
     const critical = menuPlanningData.filter(s => s.daysLeft >= 5).length;
     return { total, complete, incomplete, critical, percentComplete: Math.round((complete / total) * 100) };
   }, [menuPlanningData]);
-
-  const stats = useMemo(() => ({
-    targetHariIni: 5000,
-    sudahPacking: 3850,
-    totalTrays: 5500,
-    traysAvailable: 4200,
-    totalBaskets: 120,
-    basketsAvailable: 85,
-    totalSekolah: 12,
-    sudahDikirim: 8,
-    totalBatch: 3,
-    batchInProgress: 2
-  }), []);
-
-  const produksiMingguan = useMemo(() => [
-    { hari: 'Sen', target: 5000, actual: 4950 },
-    { hari: 'Sel', target: 5000, actual: 5100 },
-    { hari: 'Rab', target: 5000, actual: 4800 },
-    { hari: 'Kam', target: 5000, actual: 5200 },
-    { hari: 'Jum', target: 5000, actual: 4900 },
-    { hari: 'Sab', target: 4500, actual: 4400 }
-  ], []);
-
-  const deliveryTrips = useMemo(() => [
-    { school: 'SMAN 5', trays: 485 },
-    { school: 'SMAN 2', trays: 420 },
-    { school: 'SMP 1', trays: 380 },
-    { school: 'SMK 1', trays: 450 },
-    { school: 'SMAN 3', trays: 395 }
-  ], []);
-
-  const recentCheckpoints = useMemo(() => [
-    { type: 'DRIVER_TO_SCHOOL', school: 'SMAN 5 Karawang', driver: 'Pak Budi', time: '10:45' },
-    { type: 'SCHOOL_RECEIVED', school: 'SMAN 2 Karawang', driver: 'Pak Ahmad', time: '10:30' },
-    { type: 'DRIVER_DEPARTURE', school: 'SMP 1 Karawang', driver: 'Pak Dedi', time: '10:15' }
-  ], []);
 
   const progressPercentage = Math.round((stats.sudahPacking / stats.targetHariIni) * 100);
 
@@ -418,7 +492,7 @@ const DashboardDapur = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <StatCard 
                 title="Target Hari Ini" 
                 value={stats.targetHariIni.toLocaleString()} 
@@ -451,10 +525,10 @@ const DashboardDapur = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-4">
-                  <h4 className="font-semibold text-gray-900 mb-3 text-sm flex items-center gap-2">
+                <div className="p-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 text-sm flex items-center gap-2">
                     <LineChart className="w-4 h-4 text-blue-600" />
                     Grafik Produksi Mingguan
                   </h4>
@@ -462,9 +536,9 @@ const DashboardDapur = () => {
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {todayMenu ? (
-                  <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-4 text-white shadow-lg">
+                  <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-5 text-white shadow-lg">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 bg-white/20 rounded-lg">
@@ -526,12 +600,12 @@ const DashboardDapur = () => {
                   </div>
                 )}
 
-                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2 text-sm">
+                <div className="bg-white rounded-lg p-5 shadow-sm border border-gray-100">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2 text-sm">
                     <Package className="w-4 h-4 text-purple-600" />
                     Status Equipment
                   </h4>
-                  <div className="space-y-2.5">
+                  <div className="space-y-3">
                     <div className="p-2.5 bg-purple-50 rounded-lg border border-purple-100">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs text-purple-700 font-medium">Trays (Baki)</span>
@@ -576,9 +650,9 @@ const DashboardDapur = () => {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                <div className="bg-white rounded-lg p-5 shadow-sm border border-gray-100">
                   <h4 className="font-semibold text-gray-900 mb-3 text-sm">Quick Actions</h4>
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     <button className="w-full flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors font-medium text-sm">
                       <QrCode className="w-4 h-4" />
                       Scan Checkpoint
@@ -595,16 +669,16 @@ const DashboardDapur = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold text-gray-900">Distribusi Hari Ini</h3>
                   <Truck className="w-4 h-4 text-gray-400" />
                 </div>
                 <DeliveryChart data={deliveryTrips} />
                 
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <div className="flex items-center justify-between text-sm mb-1.5">
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-between text-sm mb-2">
                     <span className="text-gray-600">Progress Pengiriman</span>
                     <span className="font-semibold text-gray-900">
                       {stats.sudahDikirim}/{stats.totalSekolah} sekolah
@@ -619,17 +693,17 @@ const DashboardDapur = () => {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold text-gray-900">Tracking Terbaru</h3>
                   <QrCode className="w-4 h-4 text-gray-400" />
                 </div>
                 
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   {recentCheckpoints.map((checkpoint, idx) => (
-                    <div key={idx} className="flex items-start gap-2.5 p-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="p-1.5 bg-green-100 rounded-lg flex-shrink-0">
-                        <MapPin className="w-3.5 h-3.5 text-green-600" />
+                    <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
+                        <MapPin className="w-4 h-4 text-green-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-900">{checkpoint.school}</p>
@@ -642,7 +716,7 @@ const DashboardDapur = () => {
                   ))}
                 </div>
 
-                <button className="w-full mt-3 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium">
+                <button className="w-full mt-4 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium">
                   Lihat Semua Tracking
                 </button>
               </div>

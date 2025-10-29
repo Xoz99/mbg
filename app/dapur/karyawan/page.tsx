@@ -111,6 +111,7 @@ const DataKaryawan = () => {
   const [formData, setFormData] = useState({
     nama: "",
     posisi: "",
+    jenisKelamin: "LAKI_LAKI",
     status: "AKTIF",
   })
   const [fotoFile, setFotoFile] = useState<File | null>(null)
@@ -218,6 +219,7 @@ const DataKaryawan = () => {
       const formDataToSend = new FormData()
       formDataToSend.append("nama", formData.nama)
       formDataToSend.append("posisi", formData.posisi)
+      formDataToSend.append("jenisKelamin", formData.jenisKelamin)
       formDataToSend.append("status", formData.status)
 
       if (fotoFile) {
@@ -239,7 +241,7 @@ const DataKaryawan = () => {
         throw new Error(`API Error: ${response.status} - ${errorData}`)
       }
 
-      setFormData({ nama: "", posisi: "", status: "AKTIF" })
+      setFormData({ nama: "", posisi: "", jenisKelamin: "LAKI_LAKI", status: "AKTIF" })
       setFotoFile(null)
       setFotoPreview("")
       setShowAddModal(false)
@@ -263,6 +265,7 @@ const DataKaryawan = () => {
       const formDataToSend = new FormData()
       formDataToSend.append("nama", formData.nama)
       formDataToSend.append("posisi", formData.posisi)
+      formDataToSend.append("jenisKelamin", formData.jenisKelamin)
       formDataToSend.append("status", formData.status)
 
       if (fotoFile) {
@@ -284,7 +287,7 @@ const DataKaryawan = () => {
         throw new Error(`API Error: ${response.status}`)
       }
 
-      setFormData({ nama: "", posisi: "", status: "AKTIF" })
+      setFormData({ nama: "", posisi: "", jenisKelamin: "LAKI_LAKI", status: "AKTIF" })
       setFotoFile(null)
       setFotoPreview("")
       setShowEditModal(false)
@@ -330,6 +333,7 @@ const DataKaryawan = () => {
     setFormData({
       nama: employee.nama || employee.name || "",
       posisi: employee.posisi || employee.position || "",
+      jenisKelamin: employee.jenisKelamin || "LAKI_LAKI",
       status: employee.status || "AKTIF",
     })
     setFotoPreview("")
@@ -379,6 +383,13 @@ const DataKaryawan = () => {
       },
     }
     return configs[status as keyof typeof configs] || configs.AKTIF
+  }
+
+  const getJenisKelaminDisplay = (jenis: string) => {
+    if (!jenis) return "-"
+    if (jenis === "LAKI_LAKI") return "Laki-laki"
+    if (jenis === "PEREMPUAN") return "Perempuan"
+    return jenis
   }
 
   const StatCard = ({ title, value, subtitle, icon: Icon, color }: any) => (
@@ -565,7 +576,7 @@ const DataKaryawan = () => {
                           </div>
                           <div>
                             <p className="font-semibold text-gray-900">{emp.nama || emp.name}</p>
-                            <p className="text-xs text-gray-500">{emp.email || "-"}</p>
+                            <p className="text-xs text-gray-500">{getJenisKelaminDisplay(emp.jenisKelamin)}</p>
                           </div>
                         </div>
                       </td>
@@ -621,7 +632,7 @@ const DataKaryawan = () => {
                   setShowAddModal(false)
                   setFotoFile(null)
                   setFotoPreview("")
-                  setFormData({ nama: "", posisi: "", status: "AKTIF" })
+                  setFormData({ nama: "", posisi: "", jenisKelamin: "LAKI_LAKI", status: "AKTIF" })
                 }}
                 className="p-2 hover:bg-white/20 rounded-lg transition-colors"
               >
@@ -652,6 +663,18 @@ const DataKaryawan = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
                   placeholder="Contoh: Koki, Staff Packing"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Jenis Kelamin</label>
+                <select
+                  value={formData.jenisKelamin}
+                  onChange={(e) => setFormData({ ...formData, jenisKelamin: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                >
+                  <option value="LAKI_LAKI">Laki-laki</option>
+                  <option value="PEREMPUAN">Perempuan</option>
+                </select>
               </div>
 
               <div>
@@ -713,7 +736,7 @@ const DataKaryawan = () => {
                     setShowAddModal(false)
                     setFotoFile(null)
                     setFotoPreview("")
-                    setFormData({ nama: "", posisi: "", status: "AKTIF" })
+                    setFormData({ nama: "", posisi: "", jenisKelamin: "LAKI_LAKI", status: "AKTIF" })
                   }}
                   className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
                 >
@@ -772,6 +795,18 @@ const DataKaryawan = () => {
                   onChange={(e) => setFormData({ ...formData, posisi: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Jenis Kelamin</label>
+                <select
+                  value={formData.jenisKelamin}
+                  onChange={(e) => setFormData({ ...formData, jenisKelamin: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                >
+                  <option value="LAKI_LAKI">Laki-laki</option>
+                  <option value="PEREMPUAN">Perempuan</option>
+                </select>
               </div>
 
               <div>
@@ -944,6 +979,15 @@ const DataKaryawan = () => {
                       <div>
                         <p className="text-xs text-gray-500">Status</p>
                         <p className="font-semibold text-gray-900">{selectedEmployee.status}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="flex items-center gap-3">
+                      <User className="w-5 h-5 text-gray-600" />
+                      <div>
+                        <p className="text-xs text-gray-500">Jenis Kelamin</p>
+                        <p className="font-semibold text-gray-900">{getJenisKelaminDisplay(selectedEmployee.jenisKelamin)}</p>
                       </div>
                     </div>
                   </div>

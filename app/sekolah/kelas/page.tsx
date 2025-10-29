@@ -153,6 +153,12 @@ const DataKelas = () => {
         kelasList = data;
       }
 
+      // Debug: Log semua kelas dengan ID nya
+      console.log("[DEBUG KELAS] Daftar kelas dengan ID:");
+      kelasList.forEach((kelas: any) => {
+        console.log(`  - Kelas: ${kelas.nama}, ID: ${kelas.id || kelas._id}`);
+      });
+
       // Fetch siswa untuk mendapatkan data lengkap
       let siswaArray: any[] = [];
       try {
@@ -273,7 +279,11 @@ const DataKelas = () => {
 
   // Delete kelas
   const handleDeleteKelas = async (kelasId: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus kelas ini?")) return;
+    console.log("[DELETE] Attempting to delete Kelas ID:", kelasId);
+    if (!confirm("Apakah Anda yakin ingin menghapus kelas ini?")) {
+      console.log("[DELETE] Deletion cancelled by user");
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -479,50 +489,60 @@ const DataKelas = () => {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            {paginatedData.map((kelas) => (
-              <div key={kelas.id || kelas._id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                <div className="bg-gradient-to-br from-[#1B263A] to-[#2A3749] p-5 text-white">
-                  <h3 className="text-2xl font-bold">{kelas.nama || 'Kelas'}</h3>
-                  <p className="text-sm text-white/80">{kelas.waliKelas || 'Wali Kelas: -'}</p>
-                </div>
-
-                <div className="p-5">
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <Users className="w-5 h-5 text-green-600 mx-auto mb-1" />
-                      <p className="text-2xl font-bold text-green-600">{kelas.lakiLaki || 0}</p>
-                      <p className="text-xs text-gray-600">Laki-laki</p>
-                    </div>
-                    <div className="text-center p-3 bg-pink-50 rounded-lg">
-                      <Users className="w-5 h-5 text-pink-600 mx-auto mb-1" />
-                      <p className="text-2xl font-bold text-pink-600">{kelas.perempuan || 0}</p>
-                      <p className="text-xs text-gray-600">Perempuan</p>
-                    </div>
+            {paginatedData.map((kelas) => {
+              const kelasKey = kelas.id || kelas._id;
+              console.log(`[MAP] Rendering Kelas: ${kelas.nama}, ID: ${kelasKey}`);
+              return (
+                <div key={kelasKey} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+                  <div className="bg-gradient-to-br from-[#1B263A] to-[#2A3749] p-5 text-white">
+                    <h3 className="text-2xl font-bold">{kelas.nama || 'Kelas'}</h3>
+                    <p className="text-sm text-white/80">{kelas.waliKelas || 'Wali Kelas: -'}</p>
                   </div>
 
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Total Siswa</span>
-                      <span className="font-semibold text-gray-900">{kelas.totalSiswa || 0} siswa</span>
-                    </div>
-                    {kelas.alergiCount > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-red-600">Alergi</span>
-                        <span className="font-semibold text-red-900">{kelas.alergiCount} siswa</span>
+                  <div className="p-5">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="text-center p-3 bg-green-50 rounded-lg">
+                        <Users className="w-5 h-5 text-green-600 mx-auto mb-1" />
+                        <p className="text-2xl font-bold text-green-600">{kelas.lakiLaki || 0}</p>
+                        <p className="text-xs text-gray-600">Laki-laki</p>
                       </div>
-                    )}
-                  </div>
+                      <div className="text-center p-3 bg-pink-50 rounded-lg">
+                        <Users className="w-5 h-5 text-pink-600 mx-auto mb-1" />
+                        <p className="text-2xl font-bold text-pink-600">{kelas.perempuan || 0}</p>
+                        <p className="text-xs text-gray-600">Perempuan</p>
+                      </div>
+                    </div>
 
-                  <button
-                    onClick={() => setSelectedKelas(kelas)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors font-medium"
-                  >
-                    <Eye className="w-4 h-4" />
-                    Lihat Detail
-                  </button>
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Total Siswa</span>
+                        <span className="font-semibold text-gray-900">{kelas.totalSiswa || 0} siswa</span>
+                      </div>
+                      {kelas.alergiCount > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-red-600">Alergi</span>
+                          <span className="font-semibold text-red-900">{kelas.alergiCount} siswa</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const kelasId = kelas.id || kelas._id;
+                        console.log("[CLICK] Kelas dipilih:", kelas.nama);
+                        console.log("[CLICK] Kelas ID:", kelasId);
+                        console.log("[CLICK] Full Kelas Object:", kelas);
+                        setSelectedKelas(kelas);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Lihat Detail
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="flex items-center justify-between bg-white rounded-xl p-4 shadow-sm border border-gray-100">

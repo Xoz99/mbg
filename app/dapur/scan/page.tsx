@@ -398,7 +398,7 @@ const CheckpointViewPage = () => {
           </div>
           {completedCount === totalCount && (
             <div className="mt-4 p-4 bg-[#1B263A] bg-opacity-5 border border-[#D0B064] rounded-lg">
-              <p className="text-[#1B263A] font-bold text-center">✓ Semua checkpoint sudah selesai!</p>
+              <p className="text-[#F2F9F8] font-bold text-center">✓ Semua checkpoint sudah selesai!</p>
             </div>
           )}
         </div>
