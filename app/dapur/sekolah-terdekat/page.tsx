@@ -7,7 +7,7 @@ import {
   MapPin, RefreshCw, Check, AlertCircle
 } from 'lucide-react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://72.60.79.126:3000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 interface Sekolah {
   id: string;
