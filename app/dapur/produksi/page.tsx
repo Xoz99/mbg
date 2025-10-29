@@ -11,7 +11,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Link from 'next/link';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://72.60.79.126:3000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 async function getAuthToken() {
   if (typeof window === "undefined") return "";

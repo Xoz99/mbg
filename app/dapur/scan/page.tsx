@@ -7,7 +7,7 @@ import {
   Boxes, Navigation, X, ZoomIn
 } from 'lucide-react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://72.60.79.126:3000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 enum TipeCheckpoint {
   MULAI_MEMASAK = 'MULAI_MEMASAK',
