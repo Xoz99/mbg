@@ -37,7 +37,6 @@ const SkeletonChartContainer = () => (
   </div>
 );
 
-// ✅ FIXED: SkeletonTableRow as proper table row
 const SkeletonTableRow = () => (
   <tr className="border-b border-gray-100 hover:bg-gray-50">
     <td className="py-4 px-4"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div></td>
@@ -47,7 +46,6 @@ const SkeletonTableRow = () => (
   </tr>
 );
 
-// ==================== CHART COMPONENTS ====================
 
 const GiziDistributionChart = memo(({ data }: { data: any[] }) => (
   <ResponsiveContainer width="100%" height={250}>
@@ -104,7 +102,7 @@ const ConsumptionChart = memo(({ data }: { data: any[] }) => (
 
 ConsumptionChart.displayName = 'ConsumptionChart';
 
-// ==================== STAT CARD ====================
+
 
 const StatCard = ({ title, value, subtitle, icon: Icon, color, trend }: any) => (
   <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
@@ -125,9 +123,7 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, trend }: any) => 
   </div>
 );
 
-// ==================== KALENDER REMINDER ====================
 
-// ✅ FIXED: KalenderReminder dengan useEffect untuk menghindari hydration mismatch
 const KalenderReminder = ({ reminder }: { reminder: any }) => {
   const [mounted, setMounted] = useState(false);
   const [formattedDate, setFormattedDate] = useState('');
@@ -145,10 +141,11 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
   }, []);
 
   useEffect(() => {
-    if (!mounted || !reminder?.tanggalMulai) return;
+    if (!mounted || !reminder?.tanggalMulai && !reminder?.tanggal) return;
 
     const today = new Date();
-    const eventDate = new Date(reminder.tanggalMulai);
+    const dateToUse = reminder?.tanggalMulai || reminder?.tanggal;
+    const eventDate = new Date(dateToUse);
     const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     let bgColor = 'from-green-50 to-green-100';
@@ -177,7 +174,8 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
       statusText = 'Sudah Berlalu';
     }
 
-    const formatted = new Date(reminder.tanggalMulai).toLocaleDateString('id-ID', {
+    const dateToFormat = reminder?.tanggalMulai || reminder?.tanggal;
+    const formatted = new Date(dateToFormat).toLocaleDateString('id-ID', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -219,7 +217,7 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
         )}
       </div>
       <div className="flex-1">
-        <h3 className={`font-semibold ${daysStatus.textColor} mb-1`}>{reminder.deskripsi}</h3>
+        <h3 className={`font-semibold ${daysStatus.textColor} mb-1`}>{reminder.deskripsi || reminder.namaSekolah || 'Jadwal Pengiriman'}</h3>
         <div className="flex items-center gap-2 text-sm">
           <Clock className="w-4 h-4" />
           <span className={daysStatus.textColor}>
@@ -234,9 +232,12 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
   );
 };
 
-// ==================== MAIN COMPONENT ====================
 
 const DashboardSekolah = () => {
+  // ✅ FIX: Gunakan useRef untuk track initialization
+  const hasInitialized = useRef(false);
+  const fetchInProgress = useRef(false);
+
   const [loading, setLoading] = useState(true);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [sekolahId, setSekolahId] = useState<string | null>(null);
@@ -277,9 +278,12 @@ const DashboardSekolah = () => {
     { hari: 'Jumat', porsi: 0 }
   ]);
 
-  // ✅ FIXED: useEffect untuk mendapatkan authToken dan sekolahId dari localStorage
+  // ✅ FIX #1: Effect untuk initialize - HANYA SEKALI
   useEffect(() => {
+    if (hasInitialized.current) return; // ✅ Prevent re-run
     if (typeof window === 'undefined') return;
+
+    hasInitialized.current = true;
 
     const token = localStorage.getItem('authToken');
     const schoolId = localStorage.getItem('sekolahId');
@@ -292,44 +296,50 @@ const DashboardSekolah = () => {
 
     setAuthToken(token);
     setSekolahId(schoolId);
-  }, []);
+  }, []); // ✅ Empty dependency array - hanya run sekali
 
-  // Fetch data ketika authToken dan sekolahId tersedia
+
+  // ✅ FIX #2: Effect untuk fetch data - memiliki guard untuk prevent duplicate
   useEffect(() => {
     if (!authToken || !sekolahId) return;
+    if (fetchInProgress.current) return; // ✅ Prevent duplicate fetch
+    if (error && error.includes('Token tidak ditemukan')) return;
 
     const fetchData = async () => {
+      if (fetchInProgress.current) return; // ✅ Double check
+      
       try {
+        fetchInProgress.current = true;
         setLoading(true);
 
-        // ✅ FIXED: Fetch siswa dengan error handling
-        await fetchSiswaData(sekolahId, authToken);
-
-        // ✅ FIXED: Fetch kelas dengan error handling
-        await fetchKelasData(sekolahId, authToken);
-
-        // ✅ FIXED: Fetch absensi dengan error handling
-        await fetchAbsensiData(sekolahId, authToken);
-
-        // Fetch reminder (asumsi endpoint ini ada)
-        await fetchReminderData(sekolahId, authToken);
+        // ✅ Fetch semua data secara parallel
+        await Promise.all([
+          fetchSiswaData(sekolahId, authToken),
+          fetchKelasData(sekolahId, authToken),
+          fetchAbsensiData(sekolahId, authToken),
+          fetchPengirimanData(sekolahId, authToken),
+          fetchKalenderAkademik(authToken)
+        ]);
 
         setLoading(false);
       } catch (err) {
         console.error('Error fetching data:', err);
         setError(err instanceof Error ? err.message : 'Gagal memuat data');
         setLoading(false);
+      } finally {
+        fetchInProgress.current = false;
       }
     };
 
     fetchData();
-  }, [authToken, sekolahId]);
+  }, [authToken, sekolahId, error]); // ✅ Dependencies yang tepat
 
-  // ✅ FIXED: Fungsi fetch siswa dengan error handling
+
+  // ✅ FIX #3: ENDPOINT SISWA - Gunakan /api/sekolah/:sekolahId/siswa
   const fetchSiswaData = async (schoolId: string, token: string) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/siswa?sekolahId=${schoolId}`,
+        `${API_BASE_URL}/api/sekolah/${schoolId}/siswa?page=1&limit=100`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -348,20 +358,30 @@ const DashboardSekolah = () => {
       }
 
       const data = await response.json();
-      setSiswaList(data.data || []);
+      
+      // Handle response format - sama seperti DataSiswa.tsx
+      let siswaData = Array.isArray(data.data?.data)
+        ? data.data.data
+        : Array.isArray(data.data)
+        ? data.data
+        : [];
+      
+      setSiswaList(siswaData);
 
-      // Update stats
-      const totalSiswa = data.data?.length || 0;
-      const normalGizi = data.data?.filter((s: any) => s.statusGizi === 'normal').length || 0;
-      const giziKurang = data.data?.filter((s: any) => s.statusGizi === 'kurang').length || 0;
-      const stuntingRisiko = data.data?.filter((s: any) => s.statusGizi === 'stunting').length || 0;
+      // Update stats - gunakan statusGizi langsung dari API
+      const totalSiswa = siswaData.length || 0;
+      const normalGizi = siswaData.filter((s: any) => s.statusGizi === 'NORMAL').length || 0;
+      const giziKurang = siswaData.filter((s: any) => s.statusGizi === 'GIZI_KURANG').length || 0;
+      const giziBuruk = siswaData.filter((s: any) => s.statusGizi === 'GIZI_BURUK').length || 0;
+      const obesitas = siswaData.filter((s: any) => s.statusGizi === 'OBESITAS').length || 0;
+      const berlebih = obesitas;
 
       setStats(prev => ({
         ...prev,
         totalSiswa,
         normalGizi,
         giziKurang,
-        stuntingRisiko,
+        stuntingRisiko: giziBuruk,
         rataGizi: totalSiswa > 0 ? Math.round((normalGizi / totalSiswa) * 100) : 0
       }));
 
@@ -369,8 +389,8 @@ const DashboardSekolah = () => {
       setSiswaDiagram([
         { name: 'Normal', value: normalGizi },
         { name: 'Kurang', value: giziKurang },
-        { name: 'Risiko Stunting', value: stuntingRisiko },
-        { name: 'Berlebih', value: totalSiswa - normalGizi - giziKurang - stuntingRisiko }
+        { name: 'Risiko Stunting', value: giziBuruk },
+        { name: 'Berlebih', value: berlebih }
       ]);
     } catch (err) {
       console.error('Error fetching siswa:', err);
@@ -378,11 +398,10 @@ const DashboardSekolah = () => {
     }
   };
 
-  // ✅ FIXED: Fungsi fetch kelas dengan error handling
   const fetchKelasData = async (schoolId: string, token: string) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/kelas?sekolahId=${schoolId}`,
+        `${API_BASE_URL}/api/sekolah/${schoolId}/kelas?page=1&limit=100`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -401,7 +420,74 @@ const DashboardSekolah = () => {
       }
 
       const data = await response.json();
-      const kelasData = data.data || [];
+      
+      // Handle response format - sama seperti DataKelas.tsx
+      let kelasData = [];
+      if (Array.isArray(data.data?.data)) {
+        kelasData = data.data.data;
+      } else if (Array.isArray(data.data)) {
+        kelasData = data.data;
+      } else if (Array.isArray(data)) {
+        kelasData = data;
+      }
+
+      // Fetch siswa untuk mendapatkan count per kelas
+      let siswaArray: any[] = [];
+      try {
+        const siswaRes = await fetch(
+          `${API_BASE_URL}/api/sekolah/${schoolId}/siswa?page=1&limit=100`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        if (siswaRes.ok) {
+          const siswaData = await siswaRes.json();
+          siswaArray = Array.isArray(siswaData.data?.data) 
+            ? siswaData.data.data 
+            : Array.isArray(siswaData.data) 
+            ? siswaData.data 
+            : [];
+        }
+      } catch (err) {
+        console.error('Siswa fetch error:', err);
+      }
+
+      // Calculate siswa per kelas
+      const siswaPerKelas: { [key: string]: { laki: number; perempuan: number; alergi: number } } = {};
+      
+      siswaArray.forEach((siswa: any) => {
+        const kelasId = siswa.kelasId?.id || siswa.kelasId;
+        if (!siswaPerKelas[kelasId]) {
+          siswaPerKelas[kelasId] = { laki: 0, perempuan: 0, alergi: 0 };
+        }
+        if (siswa.jenisKelamin === 'LAKI_LAKI') {
+          siswaPerKelas[kelasId].laki++;
+        } else {
+          siswaPerKelas[kelasId].perempuan++;
+        }
+        
+        // Count alergi
+        if (siswa.alergi) {
+          if (Array.isArray(siswa.alergi) && siswa.alergi.length > 0) {
+            siswaPerKelas[kelasId].alergi++;
+          } else if (typeof siswa.alergi === 'string' && siswa.alergi.trim() !== '') {
+            siswaPerKelas[kelasId].alergi++;
+          }
+        }
+      });
+
+      // Update kelas dengan siswa count
+      kelasData = kelasData.map((kelas: any) => ({
+        ...kelas,
+        totalSiswa: (siswaPerKelas[kelas.id]?.laki || 0) + (siswaPerKelas[kelas.id]?.perempuan || 0) || kelas.totalSiswa || 0,
+        lakiLaki: siswaPerKelas[kelas.id]?.laki || kelas.lakiLaki || 0,
+        perempuan: siswaPerKelas[kelas.id]?.perempuan || kelas.perempuan || 0,
+        alergiCount: siswaPerKelas[kelas.id]?.alergi || kelas.alergiCount || 0
+      }));
+
       setKelasList(kelasData);
 
       setStats(prev => ({
@@ -414,51 +500,177 @@ const DashboardSekolah = () => {
     }
   };
 
-  // ✅ FIXED: Fungsi fetch absensi dengan error handling
+
   const fetchAbsensiData = async (schoolId: string, token: string) => {
     try {
-      const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/absensi?sekolahId=${schoolId}&tanggal=${today}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
+      // ✅ STEP 1: Hitung range minggu ini (Senin-Jumat)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const dayOfWeek = today.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+      const mondayDate = new Date(today);
+      mondayDate.setDate(today.getDate() - daysToMonday);
+      mondayDate.setHours(0, 0, 0, 0);
+
+      const fridayDate = new Date(mondayDate);
+      fridayDate.setDate(mondayDate.getDate() + 4);
+      fridayDate.setHours(23, 59, 59, 999);
+
+      const mondayString = mondayDate.toISOString().split('T')[0];
+      const fridayString = fridayDate.toISOString().split('T')[0];
+      const todayString = today.toISOString().split('T')[0];
+
+      console.log(`[ABSENSI] Range minggu ini: ${mondayString} - ${fridayString}`);
+
+      // ✅ STEP 2: Get all kelas
+      const kelasRes = await fetch(
+        `${API_BASE_URL}/api/sekolah/${schoolId}/kelas?page=1&limit=100`,
+        { headers }
       );
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.warn('Endpoint absensi tidak ditemukan (404)');
-          return;
-        }
-        throw new Error(`HTTP ${response.status}: Gagal fetch absensi`);
+      if (!kelasRes.ok) {
+        console.warn('[ABSENSI] Failed to fetch kelas');
+        setStats(prev => ({
+          ...prev,
+          hadirHariIni: 0,
+          pengirimanSelesai: 0,
+          sudahMakan: 0
+        }));
+        return;
       }
 
-      const data = await response.json();
-      const absensiData = data.data || [];
+      const kelasData = await kelasRes.json();
+      let kelasList = Array.isArray(kelasData.data?.data)
+        ? kelasData.data.data
+        : Array.isArray(kelasData.data)
+        ? kelasData.data
+        : [];
 
-      // Count hadir hari ini
-      const hadirCount = absensiData.filter((a: any) => a.status === 'hadir').length;
+      // ✅ STEP 3: Initialize chart data
+      const daysOfWeek = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+      const chartDataByDate: { [key: string]: { hari: string; hadir: number; tidakHadir: number } } = {};
 
+      for (let i = 0; i < 5; i++) {
+        const dateForDay = new Date(mondayDate);
+        dateForDay.setDate(mondayDate.getDate() + i);
+        const dateString = dateForDay.toISOString().split('T')[0];
+        chartDataByDate[dateString] = {
+          hari: daysOfWeek[i],
+          hadir: 0,
+          tidakHadir: 0
+        };
+      }
+
+      let totalHadirHariIni = 0;
+
+      // ✅ STEP 4: Fetch absensi untuk setiap kelas
+      const absensiPromises = kelasList.map(async (kelas: any) => {
+        try {
+          const absenRes = await fetch(
+            `${API_BASE_URL}/api/kelas/${kelas.id}/absensi`,
+            { headers }
+          );
+
+          if (!absenRes.ok) {
+            console.warn(`[ABSENSI] Failed to fetch absensi for kelas ${kelas.nama}`);
+            return 0;
+          }
+
+          const absenData = await absenRes.json();
+          let absensiList = Array.isArray(absenData.data?.data)
+            ? absenData.data.data
+            : Array.isArray(absenData.data)
+            ? absenData.data
+            : [];
+
+          let hadirToday = 0;
+
+          // ✅ STEP 5: Filter & aggregate hanya untuk minggu ini
+          for (const a of absensiList) {
+            if (!a.tanggal) continue;
+
+            try {
+              const eventDate = new Date(a.tanggal);
+              eventDate.setHours(0, 0, 0, 0);
+              const absenDateString = eventDate.toISOString().split('T')[0];
+
+              if (absenDateString < mondayString || absenDateString > fridayString) {
+                continue;
+              }
+
+              if (chartDataByDate[absenDateString]) {
+                if (a.jumlahHadir !== undefined && a.jumlahHadir !== null) {
+                  chartDataByDate[absenDateString].hadir += a.jumlahHadir;
+                } else if (a.status === 'hadir' || a.status === 'Hadir' || a.status === 'HADIR') {
+                  chartDataByDate[absenDateString].hadir += 1;
+                }
+
+                if (a.jumlahTidakHadir !== undefined && a.jumlahTidakHadir !== null) {
+                  chartDataByDate[absenDateString].tidakHadir += a.jumlahTidakHadir;
+                } else if (a.status === 'tidak_hadir' || a.status === 'Tidak Hadir' || a.status === 'TIDAK_HADIR') {
+                  chartDataByDate[absenDateString].tidakHadir += 1;
+                }
+              }
+
+              if (absenDateString === todayString) {
+                if (a.jumlahHadir !== undefined && a.jumlahHadir !== null) {
+                  hadirToday += a.jumlahHadir;
+                } else if (a.status === 'hadir' || a.status === 'Hadir' || a.status === 'HADIR') {
+                  hadirToday += 1;
+                }
+              }
+            } catch (e) {
+              console.warn('[ABSENSI] Error parsing date:', e);
+              continue;
+            }
+          }
+
+          return hadirToday;
+        } catch (err) {
+          console.warn(`[ABSENSI] Error fetching for kelas ${kelas.id}:`, err);
+          return 0;
+        }
+      });
+
+      const hadirPerKelas = await Promise.all(absensiPromises);
+      totalHadirHariIni = hadirPerKelas.reduce((sum, count) => sum + count, 0);
+
+      // ✅ STEP 6: Convert ke chart format
+      const chartData = Object.keys(chartDataByDate)
+        .sort()
+        .map(dateKey => chartDataByDate[dateKey]);
+
+      // ✅ STEP 7: Update states
+      setAbsensiChart(chartData);
       setStats(prev => ({
         ...prev,
-        hadirHariIni: hadirCount,
-        pengirimanSelesai: Math.floor(hadirCount * 0.8), // Asumsi
-        sudahMakan: hadirCount
+        hadirHariIni: totalHadirHariIni,
+        pengirimanSelesai: Math.floor(totalHadirHariIni * 0.8),
+        sudahMakan: totalHadirHariIni
       }));
     } catch (err) {
-      console.error('Error fetching absensi:', err);
+      console.error('[ABSENSI] Error aggregating:', err);
+      setStats(prev => ({
+        ...prev,
+        hadirHariIni: 0,
+        pengirimanSelesai: 0,
+        sudahMakan: 0
+      }));
     }
   };
 
-  // ✅ FIXED: Fungsi fetch reminder dengan error handling
-  const fetchReminderData = async (schoolId: string, token: string) => {
+  // ✅ FIX #3: FETCH PENGIRIMAN
+  const fetchPengirimanData = async (schoolId: string, token: string) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/reminder?sekolahId=${schoolId}`,
+        `${API_BASE_URL}/api/sekolah/${schoolId}/pengiriman`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -468,19 +680,76 @@ const DashboardSekolah = () => {
       );
 
       if (!response.ok) {
-        console.warn('Endpoint reminder tidak ditemukan atau error');
+        console.warn('Endpoint pengiriman tidak ditemukan atau error');
         return;
       }
 
       const data = await response.json();
-      setKalenderReminder(data.data?.[0] || null);
+      
+      if (Array.isArray(data.data) && data.data.length > 0) {
+        const latestPengiriman = data.data[0];
+        setKalenderReminder({
+          tanggalMulai: latestPengiriman.tanggal || latestPengiriman.createdAt,
+          deskripsi: `Pengiriman ke ${latestPengiriman.namaSekolah || 'Sekolah'}`,
+          status: latestPengiriman.status
+        });
+      }
     } catch (err) {
-      console.error('Error fetching reminder:', err);
+      console.error('Error fetching pengiriman:', err);
       setKalenderReminder(null);
     }
   };
 
-  // Loading state
+  // ✅ FETCH KALENDER AKADEMIK
+  const fetchKalenderAkademik = async (token: string) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/kalender-akademik`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        console.warn('Endpoint kalender akademik tidak ditemukan');
+        return;
+      }
+
+      const data = await response.json();
+      
+      let kalenders = [];
+      if (data.data?.kalenders && Array.isArray(data.data.kalenders)) {
+        kalenders = data.data.kalenders;
+      } else if (data.kalenders && Array.isArray(data.kalenders)) {
+        kalenders = data.kalenders;
+      } else if (Array.isArray(data.data)) {
+        kalenders = data.data;
+      } else if (Array.isArray(data)) {
+        kalenders = data;
+      }
+
+      if (kalenders.length > 0) {
+        const upcomingEvent = kalenders.find((k: any) => {
+          const eventDate = new Date(k.tanggalMulai);
+          return eventDate >= new Date();
+        }) || kalenders[0];
+
+        if (upcomingEvent && !kalenderReminder) {
+          setKalenderReminder({
+            tanggalMulai: upcomingEvent.tanggalMulai,
+            deskripsi: upcomingEvent.deskripsi || 'Kegiatan akademik',
+            status: 'scheduled'
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching kalender akademik:', err);
+    }
+  };
+
   if (loading) {
     return (
       <SekolahLayout currentPage="dashboard">
@@ -503,7 +772,6 @@ const DashboardSekolah = () => {
 
           <SkeletonChartContainer />
 
-          {/* ✅ FIXED: Skeleton table dengan proper structure */}
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
             <div className="h-6 w-32 bg-gray-200 rounded mb-4 animate-pulse"></div>
             <div className="overflow-x-auto">

@@ -11,7 +11,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import Link from 'next/link';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz";
-const REFRESH_INTERVAL = 30000; // 30 detik untuk real-time update
+const REFRESH_INTERVAL = 300000;
 
 async function getAuthToken() {
   if (typeof window === "undefined") return "";

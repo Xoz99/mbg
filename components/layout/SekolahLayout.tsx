@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, ReactNode, useEffect } from 'react';
+import { useState, ReactNode, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Home,
@@ -230,6 +230,11 @@ const BubbleReport = ({
 // SekolahLayout Component
 const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutProps) => {
   const router = useRouter();
+  
+  // ✅ FIX: useRef untuk track initialization
+  const hasInitialized = useRef(false);
+  const fetchInProgress = useRef(false);
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
@@ -264,7 +269,13 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
     { id: 'daerah', name: 'Daerah' }
   ];
 
+  // ✅ FIX #1: Initialization effect dengan guard
   useEffect(() => {
+    if (hasInitialized.current) return;  // ← GUARD BARU
+    if (typeof window === 'undefined') return;
+
+    hasInitialized.current = true;  // ← SET FLAG
+
     const userData = localStorage.getItem('mbg_user');
     const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
     const storedSekolahId = localStorage.getItem('sekolahId');
@@ -277,14 +288,14 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
     try {
       const user = JSON.parse(userData);
       setAuthToken(token);
-
-      // Jika ada sekolahId di localStorage, gunakan itu
+      
+      // Set sekolahId - bisa dari localStorage atau kosong (akan fetch nanti)
       if (storedSekolahId) {
         setSekolahId(storedSekolahId);
         console.log("[SEKOLAH LAYOUT] Sekolah ID dari localStorage:", storedSekolahId);
       } else {
-        // Cari sekolah berdasarkan PIC user
-        findSekolahByPIC(user.id, token);
+        // Trigger findSekolahByPIC dengan set empty sekolahId
+        setSekolahId('');  // ← Akan trigger effect #2 untuk cari PIC
       }
     } catch (err) {
       console.error('Error parsing user data:', err);
@@ -292,16 +303,44 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
     }
   }, [router]);
 
-  // Fetch sekolah detail setelah sekolahId ada
+  // ✅ FIX #2: Fetch sekolah detail dengan guard
   useEffect(() => {
-    if (sekolahId && authToken) {
-      fetchSekolahDetail(sekolahId, authToken);
-    }
+    if (!sekolahId && !authToken) return;  // ← Guard #1
+    if (fetchInProgress.current) return;  // ← Guard #2: Prevent duplicate fetch
+
+    const fetchData = async () => {
+      if (fetchInProgress.current) return;  // ← Double check
+      
+      try {
+        fetchInProgress.current = true;  // ← SET FLAG
+        setLoading(true);
+
+        // Jika sekolahId kosong, cari berdasarkan PIC
+        if (!sekolahId) {
+          const userData = localStorage.getItem('mbg_user');
+          if (userData && authToken) {
+            const user = JSON.parse(userData);
+            await findSekolahByPIC(user.id, authToken);
+          }
+        } else {
+          // Fetch detail sekolah yang sudah ada
+          await fetchSekolahDetail(sekolahId, authToken);
+        }
+
+        setLoading(false);
+      } catch (err) {
+        console.error('[SEKOLAH LAYOUT] Error in fetch:', err);
+        setLoading(false);
+      } finally {
+        fetchInProgress.current = false;  // ← RESET FLAG
+      }
+    };
+
+    fetchData();
   }, [sekolahId, authToken]);
 
   const findSekolahByPIC = async (picId: string, token: string) => {
     try {
-      setLoading(true);
       console.log("[SEKOLAH LAYOUT] Mencari sekolah untuk PIC ID:", picId);
 
       const response = await fetch(
@@ -349,23 +388,20 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
 
       if (foundSekolah) {
         localStorage.setItem('sekolahId', foundSekolah.id);
-        setSekolahId(foundSekolah.id);
-        updateSekolahInfo(foundSekolah);
+        setSekolahId(foundSekolah.id);  // ← Ini akan trigger effect #2 untuk fetch detail
+        // ❌ JANGAN panggil updateSekolahInfo di sini
       } else {
         console.warn("[SEKOLAH LAYOUT] Sekolah tidak ditemukan untuk PIC ini");
         setError('Sekolah tidak ditemukan untuk PIC ini');
-        setLoading(false);
       }
     } catch (err) {
       console.error("[SEKOLAH LAYOUT] Error mencari sekolah:", err);
       setError('Gagal mencari sekolah');
-      setLoading(false);
     }
   };
 
   const fetchSekolahDetail = async (sekolahId: string, token: string) => {
     try {
-      setLoading(true);
       console.log("[SEKOLAH LAYOUT] Fetch detail sekolah:", sekolahId);
 
       const response = await fetch(
@@ -398,11 +434,13 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
     } catch (err) {
       console.error("[SEKOLAH LAYOUT] Error fetch detail:", err);
       setError('Gagal memuat data sekolah');
-      setLoading(false);
     }
   };
 
+  // ✅ FIX #3: updateSekolahInfo dengan guard
   const updateSekolahInfo = (sekolah: any) => {
+    if (!sekolah) return;  // ← GUARD: Jangan update jika sekolah null
+
     // Ambil PIC dari picSekolah array
     const picData = sekolah.picSekolah && Array.isArray(sekolah.picSekolah) && sekolah.picSekolah.length > 0 
       ? sekolah.picSekolah[0] 
@@ -424,7 +462,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
     });
 
     setError(null);
-    setLoading(false);
+    // ❌ JANGAN ubah loading state di sini, biarkan effect handle
   };
 
   const extractKota = (alamat: string): string => {

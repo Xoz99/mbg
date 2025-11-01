@@ -141,12 +141,6 @@ const LoginPage = () => {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#0b1f3a] via-[#24364a] to-[#dfe4ea] flex items-center justify-center p-4">
-      <img
-        src="/logo/bgn_logo.png"
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none select-none absolute inset-0 mx-auto my-0 h-auto object-contain opacity-10 w-[1100px] md:w-[1400px]"
-      />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-[#dfe4ea] to-transparent"
@@ -154,11 +148,8 @@ const LoginPage = () => {
       
       <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-24 h-24 rounded-2xl mb-4 bg-white shadow-xl">
-            <img src="/logo/bgn_logo.png" alt="Logo BGN" className="w-16 h-16 object-contain" />
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-1">Makan Bergizi Gratis</h1>
-          <p className="text-white/70 text-sm">Sistem Manajemen Program MBG</p>
+          <h1 className="text-2xl font-bold text-white mb-1">SELAMAT DATANG</h1>
+          <p className="text-white/70 text-sm">Sistem XXX XXX XXX</p>
         </div>
 
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/50">
@@ -220,7 +211,7 @@ const LoginPage = () => {
         </div>
 
         <p className="text-center text-sm text-white/60 mt-6">
-          © 2025 Program Makan Bergizi Gratis
+          © 2025 XXX XXX XXX
         </p>
       </div>
     </div>
