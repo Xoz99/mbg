@@ -381,12 +381,8 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
 const DashboardSekolah = () => {
   const hasInitialized = useRef(false)
   const fetchInProgress = useRef(false)
-  const lastFetchTime = useRef(0)
-  const FETCH_COOLDOWN = 5000 // 5 second cooldown between fetches
 
   const [loading, setLoading] = useState(true)
-  const [authToken, setAuthToken] = useState<string | null>(null)
-  const [sekolahId, setSekolahId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState({
     totalSiswa: 0,
@@ -426,28 +422,10 @@ const DashboardSekolah = () => {
   ])
   const [menuHariIni, setMenuHariIni] = useState<any>(null)
 
-  useEffect(() => {
-    if (hasInitialized.current) return
-    if (typeof window === "undefined") return
-
-    hasInitialized.current = true
-
-    const token = localStorage.getItem("authToken")
-    const schoolId = localStorage.getItem("sekolahId")
-
-    if (!token) {
-      setError("Token tidak ditemukan. Silakan login terlebih dahulu.")
-      setLoading(false)
-      return
-    }
-
-    setAuthToken(token)
-    setSekolahId(schoolId)
-    setLoading(false)
-  }, [])
-
-  const fetchSiswaData = useCallback(async (schoolId: string, token: string) => {
+  // ✅ REFACTORED: Return data instead of setState
+  const fetchSiswaDataReturn = useCallback(async (schoolId: string, token: string) => {
     try {
+      console.time("fetchSiswa")
       const response = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/siswa?page=1&limit=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -456,48 +434,33 @@ const DashboardSekolah = () => {
       })
 
       if (!response.ok) {
-        if (response.status === 404) {
-          setSiswaList([])
-          return
-        }
+        if (response.status === 404) return { siswa: [], gizi: { normal: 0, kurang: 0, buruk: 0, obesitas: 0 } }
         throw new Error(`HTTP ${response.status}: Gagal fetch siswa`)
       }
 
       const data = await response.json()
-
       const siswaData = Array.isArray(data.data?.data) ? data.data.data : Array.isArray(data.data) ? data.data : []
 
-      setSiswaList(siswaData)
-
-      const totalSiswa = siswaData.length || 0
       const normalGizi = siswaData.filter((s: any) => s.statusGizi === "NORMAL").length || 0
       const giziKurang = siswaData.filter((s: any) => s.statusGizi === "GIZI_KURANG").length || 0
       const giziBuruk = siswaData.filter((s: any) => s.statusGizi === "GIZI_BURUK").length || 0
       const obesitas = siswaData.filter((s: any) => s.statusGizi === "OBESITAS").length || 0
 
-      setStats((prev) => ({
-        ...prev,
-        totalSiswa,
-        normalGizi,
-        giziKurang,
-        stuntingRisiko: giziBuruk,
-        rataGizi: totalSiswa > 0 ? Math.round((normalGizi / totalSiswa) * 100) : 0,
-      }))
-
-      setSiswaDiagram([
-        { name: "Normal", value: normalGizi },
-        { name: "Kurang", value: giziKurang },
-        { name: "Risiko Stunting", value: giziBuruk },
-        { name: "Berlebih", value: obesitas },
-      ])
+      console.timeEnd("fetchSiswa")
+      return {
+        siswa: siswaData,
+        gizi: { normal: normalGizi, kurang: giziKurang, buruk: giziBuruk, obesitas },
+      }
     } catch (err) {
       console.error("Error fetching siswa:", err)
-      setSiswaList([])
+      return { siswa: [], gizi: { normal: 0, kurang: 0, buruk: 0, obesitas: 0 } }
     }
   }, [])
 
-  const fetchKelasData = useCallback(async (schoolId: string, token: string) => {
+  // ✅ REFACTORED: Return data instead of setState
+  const fetchKelasDataReturn = useCallback(async (schoolId: string, token: string) => {
     try {
+      console.time("fetchKelas")
       const response = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/kelas?page=1&limit=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -506,15 +469,11 @@ const DashboardSekolah = () => {
       })
 
       if (!response.ok) {
-        if (response.status === 404) {
-          setKelasList([])
-          return
-        }
+        if (response.status === 404) return []
         throw new Error(`HTTP ${response.status}: Gagal fetch kelas`)
       }
 
       const data = await response.json()
-
       let kelasData = []
       if (Array.isArray(data.data?.data)) {
         kelasData = data.data.data
@@ -575,20 +534,18 @@ const DashboardSekolah = () => {
         alergiCount: siswaPerKelas[kelas.id]?.alergi || kelas.alergiCount || 0,
       }))
 
-      setKelasList(kelasData)
-
-      setStats((prev) => ({
-        ...prev,
-        totalKelas: kelasData.length,
-      }))
+      console.timeEnd("fetchKelas")
+      return kelasData
     } catch (err) {
       console.error("Error fetching kelas:", err)
-      setKelasList([])
+      return []
     }
   }, [])
 
-  const fetchAbsensiData = useCallback(async (schoolId: string, token: string) => {
+  // ✅ REFACTORED: Return data instead of setState
+  const fetchAbsensiDataReturn = useCallback(async (schoolId: string, token: string) => {
     try {
+      console.time("fetchAbsensi")
       const headers = {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -615,13 +572,16 @@ const DashboardSekolah = () => {
       const kelasRes = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/kelas?page=1&limit=100`, { headers })
 
       if (!kelasRes.ok) {
-        setStats((prev) => ({
-          ...prev,
+        return {
+          chart: [
+            { hari: "Senin", hadir: 0, tidakHadir: 0 },
+            { hari: "Selasa", hadir: 0, tidakHadir: 0 },
+            { hari: "Rabu", hadir: 0, tidakHadir: 0 },
+            { hari: "Kamis", hadir: 0, tidakHadir: 0 },
+            { hari: "Jumat", hadir: 0, tidakHadir: 0 },
+          ],
           hadirHariIni: 0,
-          pengirimanSelesai: 0,
-          sudahMakan: 0,
-        }))
-        return
+        }
       }
 
       const kelasData = await kelasRes.json()
@@ -647,94 +607,96 @@ const DashboardSekolah = () => {
 
       let totalHadirHariIni = 0
 
-      const absensiPromises = kelasList.map(async (kelas: any) => {
-        try {
-          const absenRes = await fetch(`${API_BASE_URL}/api/kelas/${kelas.id}/absensi`, { headers })
+      // ✅ BATCH: Limit concurrent requests
+      const batchSize = 3
+      for (let i = 0; i < kelasList.length; i += batchSize) {
+        const batch = kelasList.slice(i, i + batchSize)
+        const absensiPromises = batch.map(async (kelas: any) => {
+          try {
+            const absenRes = await fetch(`${API_BASE_URL}/api/kelas/${kelas.id}/absensi`, { headers })
 
-          if (!absenRes.ok) {
-            return 0
-          }
+            if (!absenRes.ok) return 0
 
-          const absenData = await absenRes.json()
-          const absensiList = Array.isArray(absenData.data?.data)
-            ? absenData.data.data
-            : Array.isArray(absenData.data)
-              ? absenData.data
-              : []
+            const absenData = await absenRes.json()
+            const absensiList = Array.isArray(absenData.data?.data)
+              ? absenData.data.data
+              : Array.isArray(absenData.data)
+                ? absenData.data
+                : []
 
-          let hadirToday = 0
+            let hadirToday = 0
 
-          for (const a of absensiList) {
-            if (!a.tanggal) continue
+            for (const a of absensiList) {
+              if (!a.tanggal) continue
 
-            try {
-              const eventDate = new Date(a.tanggal)
-              eventDate.setHours(0, 0, 0, 0)
-              const absenDateString = eventDate.toISOString().split("T")[0]
+              try {
+                const eventDate = new Date(a.tanggal)
+                eventDate.setHours(0, 0, 0, 0)
+                const absenDateString = eventDate.toISOString().split("T")[0]
 
-              if (absenDateString < mondayString || absenDateString > fridayString) {
+                if (absenDateString < mondayString || absenDateString > fridayString) continue
+
+                if (chartDataByDate[absenDateString]) {
+                  if (a.jumlahHadir !== undefined && a.jumlahHadir !== null) {
+                    chartDataByDate[absenDateString].hadir += a.jumlahHadir
+                  } else if (a.status === "hadir" || a.status === "Hadir" || a.status === "HADIR") {
+                    chartDataByDate[absenDateString].hadir += 1
+                  }
+
+                  if (a.jumlahTidakHadir !== undefined && a.jumlahTidakHadir !== null) {
+                    chartDataByDate[absenDateString].tidakHadir += a.jumlahTidakHadir
+                  } else if (a.status === "tidak_hadir" || a.status === "Tidak Hadir" || a.status === "TIDAK_HADIR") {
+                    chartDataByDate[absenDateString].tidakHadir += 1
+                  }
+                }
+
+                if (absenDateString === todayString) {
+                  if (a.jumlahHadir !== undefined && a.jumlahHadir !== null) {
+                    hadirToday += a.jumlahHadir
+                  } else if (a.status === "hadir" || a.status === "Hadir" || a.status === "HADIR") {
+                    hadirToday += 1
+                  }
+                }
+              } catch (e) {
                 continue
               }
-
-              if (chartDataByDate[absenDateString]) {
-                if (a.jumlahHadir !== undefined && a.jumlahHadir !== null) {
-                  chartDataByDate[absenDateString].hadir += a.jumlahHadir
-                } else if (a.status === "hadir" || a.status === "Hadir" || a.status === "HADIR") {
-                  chartDataByDate[absenDateString].hadir += 1
-                }
-
-                if (a.jumlahTidakHadir !== undefined && a.jumlahTidakHadir !== null) {
-                  chartDataByDate[absenDateString].tidakHadir += a.jumlahTidakHadir
-                } else if (a.status === "tidak_hadir" || a.status === "Tidak Hadir" || a.status === "TIDAK_HADIR") {
-                  chartDataByDate[absenDateString].tidakHadir += 1
-                }
-              }
-
-              if (absenDateString === todayString) {
-                if (a.jumlahHadir !== undefined && a.jumlahHadir !== null) {
-                  hadirToday += a.jumlahHadir
-                } else if (a.status === "hadir" || a.status === "Hadir" || a.status === "HADIR") {
-                  hadirToday += 1
-                }
-              }
-            } catch (e) {
-              continue
             }
+
+            return hadirToday
+          } catch (err) {
+            return 0
           }
+        })
 
-          return hadirToday
-        } catch (err) {
-          return 0
-        }
-      })
-
-      const hadirPerKelas = await Promise.all(absensiPromises)
-      totalHadirHariIni = hadirPerKelas.reduce((sum, count) => sum + count, 0)
+        const hadirPerKelas = await Promise.all(absensiPromises)
+        totalHadirHariIni += hadirPerKelas.reduce((sum, count) => sum + count, 0)
+      }
 
       const chartData = Object.keys(chartDataByDate)
         .sort()
         .map((dateKey) => chartDataByDate[dateKey])
 
-      setAbsensiChart(chartData)
-      setStats((prev) => ({
-        ...prev,
-        hadirHariIni: totalHadirHariIni,
-        pengirimanSelesai: Math.floor(totalHadirHariIni * 0.8),
-        sudahMakan: totalHadirHariIni,
-      }))
+      console.timeEnd("fetchAbsensi")
+      return { chart: chartData, hadirHariIni: totalHadirHariIni }
     } catch (err) {
       console.error("[ABSENSI] Error aggregating:", err)
-      setStats((prev) => ({
-        ...prev,
+      return {
+        chart: [
+          { hari: "Senin", hadir: 0, tidakHadir: 0 },
+          { hari: "Selasa", hadir: 0, tidakHadir: 0 },
+          { hari: "Rabu", hadir: 0, tidakHadir: 0 },
+          { hari: "Kamis", hadir: 0, tidakHadir: 0 },
+          { hari: "Jumat", hadir: 0, tidakHadir: 0 },
+        ],
         hadirHariIni: 0,
-        pengirimanSelesai: 0,
-        sudahMakan: 0,
-      }))
+      }
     }
   }, [])
 
-  const fetchPengirimanData = useCallback(async (schoolId: string, token: string) => {
+  // ✅ REFACTORED: Return data instead of setState
+  const fetchPengirimanDataReturn = useCallback(async (schoolId: string, token: string) => {
     try {
+      console.time("fetchPengiriman")
       const response = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/pengiriman`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -742,87 +704,89 @@ const DashboardSekolah = () => {
         },
       })
 
-      if (!response.ok) {
-        return
-      }
+      if (!response.ok) return null
 
       const data = await response.json()
 
       if (Array.isArray(data.data) && data.data.length > 0) {
         const latestPengiriman = data.data[0]
-        setKalenderReminder({
+        console.timeEnd("fetchPengiriman")
+        return {
           tanggalMulai: latestPengiriman.tanggal || latestPengiriman.createdAt,
           deskripsi: `Pengiriman ke ${latestPengiriman.namaSekolah || "Sekolah"}`,
           status: latestPengiriman.status,
-        })
+        }
       }
+
+      console.timeEnd("fetchPengiriman")
+      return null
     } catch (err) {
       console.error("Error fetching pengiriman:", err)
-      setKalenderReminder(null)
+      return null
     }
   }, [])
 
-  const fetchKalenderAkademik = useCallback(
-    async (token: string) => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/kalender-akademik`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
+  // ✅ REFACTORED: Return data instead of setState
+  const fetchKalenderAkademikReturn = useCallback(async (token: string) => {
+    try {
+      console.time("fetchKalender")
+      const response = await fetch(`${API_BASE_URL}/api/kalender-akademik`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
 
-        if (!response.ok) {
-          setKalenderList([])
-          return
-        }
+      if (!response.ok) return { list: [], reminder: null }
 
-        const data = await response.json()
+      const data = await response.json()
 
-        let kalenders = []
-        if (data.data?.kalenders && Array.isArray(data.data.kalenders)) {
-          kalenders = data.data.kalenders
-        } else if (data.kalenders && Array.isArray(data.kalenders)) {
-          kalenders = data.kalenders
-        } else if (Array.isArray(data.data)) {
-          kalenders = data.data
-        } else if (Array.isArray(data)) {
-          kalenders = data
-        }
+      let kalenders = []
+      if (data.data?.kalenders && Array.isArray(data.data.kalenders)) {
+        kalenders = data.data.kalenders
+      } else if (data.kalenders && Array.isArray(data.kalenders)) {
+        kalenders = data.kalenders
+      } else if (Array.isArray(data.data)) {
+        kalenders = data.data
+      } else if (Array.isArray(data)) {
+        kalenders = data
+      }
 
-        const sortedKalenders = kalenders.sort((a: any, b: any) => {
-          const dateA = new Date(a.tanggalMulai).getTime()
-          const dateB = new Date(b.tanggalMulai).getTime()
-          return dateA - dateB
-        })
+      const sortedKalenders = kalenders.sort((a: any, b: any) => {
+        const dateA = new Date(a.tanggalMulai).getTime()
+        const dateB = new Date(b.tanggalMulai).getTime()
+        return dateA - dateB
+      })
 
-        setKalenderList(sortedKalenders)
+      let reminder = null
+      if (sortedKalenders.length > 0) {
+        const upcomingEvent =
+          sortedKalenders.find((k: any) => {
+            const eventDate = new Date(k.tanggalMulai)
+            return eventDate >= new Date()
+          }) || sortedKalenders[0]
 
-        if (sortedKalenders.length > 0) {
-          const upcomingEvent =
-            sortedKalenders.find((k: any) => {
-              const eventDate = new Date(k.tanggalMulai)
-              return eventDate >= new Date()
-            }) || sortedKalenders[0]
-
-          if (upcomingEvent && !kalenderReminder) {
-            setKalenderReminder({
-              tanggalMulai: upcomingEvent.tanggalMulai,
-              deskripsi: upcomingEvent.deskripsi || "Kegiatan akademik",
-              status: "scheduled",
-            })
+        if (upcomingEvent) {
+          reminder = {
+            tanggalMulai: upcomingEvent.tanggalMulai,
+            deskripsi: upcomingEvent.deskripsi || "Kegiatan akademik",
+            status: "scheduled",
           }
         }
-      } catch (err) {
-        console.error("Error fetching kalender akademik:", err)
-        setKalenderList([])
       }
-    },
-    [kalenderReminder],
-  )
 
-  const fetchMenuHariIni = useCallback(async (token: string) => {
+      console.timeEnd("fetchKalender")
+      return { list: sortedKalenders, reminder }
+    } catch (err) {
+      console.error("Error fetching kalender akademik:", err)
+      return { list: [], reminder: null }
+    }
+  }, [])
+
+  // ✅ REFACTORED: Return data instead of setState
+  const fetchMenuHariIniReturn = useCallback(async (token: string) => {
     try {
+      console.time("fetchMenu")
       const response = await fetch(`${API_BASE_URL}/api/menu-harian/today`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -831,8 +795,8 @@ const DashboardSekolah = () => {
       })
 
       if (!response.ok) {
-        setMenuHariIni(null)
-        return
+        console.timeEnd("fetchMenu")
+        return null
       }
 
       const data = await response.json()
@@ -851,57 +815,111 @@ const DashboardSekolah = () => {
         menu = data
       }
 
-      if (menu) {
-        setMenuHariIni(menu)
-      } else {
-        setMenuHariIni(null)
-      }
+      console.timeEnd("fetchMenu")
+      return menu || null
     } catch (err) {
       console.error("Error fetching menu harian:", err)
-      setMenuHariIni(null)
+      return null
     }
   }, [])
 
+  // ✅ MAIN EFFECT: Collect all data, then batch setState ONCE!
   useEffect(() => {
-    if (!authToken || !sekolahId) return
-    if (fetchInProgress.current) return
+    if (hasInitialized.current) return
+    if (typeof window === "undefined") return
 
-    const now = Date.now()
-    if (now - lastFetchTime.current < FETCH_COOLDOWN) return
+    hasInitialized.current = true
+
+    const token = localStorage.getItem("authToken")
+    const schoolId = localStorage.getItem("sekolahId")
+
+    if (!token || !schoolId) {
+      setError("Token tidak ditemukan. Silakan login terlebih dahulu.")
+      setLoading(false)
+      return
+    }
 
     const fetchAllData = async () => {
       if (fetchInProgress.current) return
 
       try {
         fetchInProgress.current = true
-        lastFetchTime.current = Date.now()
+        console.log("🔄 [FETCH] Starting all data fetch...")
+        console.time("Total Fetch Time")
 
-        await Promise.all([
-          fetchSiswaData(sekolahId, authToken),
-          fetchKelasData(sekolahId, authToken),
-          fetchAbsensiData(sekolahId, authToken),
-          fetchPengirimanData(sekolahId, authToken),
-          fetchKalenderAkademik(authToken),
-          fetchMenuHariIni(authToken),
+        // ✅ COLLECT all data first (no setState yet!)
+        const [siswaResult, kelasResult, absensiResult, pengirimanResult, kalenderResult, menuResult] =
+          await Promise.all([
+            fetchSiswaDataReturn(schoolId, token),
+            fetchKelasDataReturn(schoolId, token),
+            fetchAbsensiDataReturn(schoolId, token),
+            fetchPengirimanDataReturn(schoolId, token),
+            fetchKalenderAkademikReturn(token),
+            fetchMenuHariIniReturn(token),
+          ])
+
+        // ✅ BATCH UPDATE: setState ONCE with all collected data!
+        console.log("✅ [FETCH] All data collected, updating state...")
+
+        // Update stats from siswa data
+        const totalSiswa = siswaResult.siswa.length
+        const rataGizi = totalSiswa > 0 ? Math.round((siswaResult.gizi.normal / totalSiswa) * 100) : 0
+
+        setStats({
+          totalSiswa,
+          normalGizi: siswaResult.gizi.normal,
+          giziKurang: siswaResult.gizi.kurang,
+          stuntingRisiko: siswaResult.gizi.buruk,
+          hadirHariIni: absensiResult.hadirHariIni,
+          pengirimanSelesai: Math.floor(absensiResult.hadirHariIni * 0.8),
+          totalPengiriman: 0,
+          sudahMakan: absensiResult.hadirHariIni,
+          totalKelas: kelasResult.length,
+          rataGizi,
+        })
+
+        setSiswaList(siswaResult.siswa)
+        setKelasList(kelasResult)
+        setAbsensiChart(absensiResult.chart)
+        setSiswaDiagram([
+          { name: "Normal", value: siswaResult.gizi.normal },
+          { name: "Kurang", value: siswaResult.gizi.kurang },
+          { name: "Risiko Stunting", value: siswaResult.gizi.buruk },
+          { name: "Berlebih", value: siswaResult.gizi.obesitas },
         ])
+
+        if (pengirimanResult) {
+          setKalenderReminder(pengirimanResult)
+        }
+
+        if (kalenderResult.reminder) {
+          setKalenderReminder(kalenderResult.reminder)
+        }
+        setKalenderList(kalenderResult.list)
+
+        if (menuResult) {
+          setMenuHariIni(menuResult)
+        }
+
+        console.timeEnd("Total Fetch Time")
+        console.log("✅ [FETCH] All state updated!")
       } catch (err) {
-        console.error("Error fetching data:", err)
+        console.error("❌ [FETCH] Error:", err)
         setError(err instanceof Error ? err.message : "Gagal memuat data")
       } finally {
         fetchInProgress.current = false
+        setLoading(false)
       }
     }
 
     fetchAllData()
   }, [
-    authToken,
-    sekolahId,
-    fetchSiswaData,
-    fetchKelasData,
-    fetchAbsensiData,
-    fetchPengirimanData,
-    fetchKalenderAkademik,
-    fetchMenuHariIni,
+    fetchSiswaDataReturn,
+    fetchKelasDataReturn,
+    fetchAbsensiDataReturn,
+    fetchPengirimanDataReturn,
+    fetchKalenderAkademikReturn,
+    fetchMenuHariIniReturn,
   ])
 
   if (loading) {
@@ -943,7 +961,7 @@ const DashboardSekolah = () => {
     )
   }
 
-  if (error && !authToken) {
+  if (error && !localStorage.getItem("authToken")) {
     return (
       <SekolahLayout currentPage="dashboard">
         <div className="p-6 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 m-6">
@@ -973,20 +991,20 @@ const DashboardSekolah = () => {
             {/* Menu Harian Card */}
             {menuHariIni && (
               <div className="bg-gradient-to-r from-[#1B263A] to-[#243B55] rounded-2xl p-6 text-white shadow-lg h-fit">
-              <div className="mb-8">
+                <div className="mb-8">
                   <p className="text-xs font-semibold opacity-90 tracking-widest uppercase">Menu Hari Ini</p>
                   <h2 className="text-4xl font-bold mb-2 mt-2">{menuHariIni.namaMenu || "-"}</h2>
                   <p className="text-sm opacity-90">{menuHariIni.menuPlanning?.sekolah?.nama || "Sekolah"}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-8 mb-8">
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4 backdrop-blur-sm">
-                <p className="text-sm opacity-90 mb-2">Kalori</p>
+                  <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4 backdrop-blur-sm">
+                    <p className="text-sm opacity-90 mb-2">Kalori</p>
                     <p className="text-3xl font-bold">{menuHariIni.kalori || 0}</p>
                     <p className="text-xs opacity-75 mt-1">kcal</p>
                   </div>
                   <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4 backdrop-blur-sm">
-                  <p className="text-sm opacity-90 mb-2">Protein</p>
+                    <p className="text-sm opacity-90 mb-2">Protein</p>
                     <p className="text-3xl font-bold">{menuHariIni.protein || 0}</p>
                     <p className="text-xs opacity-75 mt-1">g</p>
                   </div>

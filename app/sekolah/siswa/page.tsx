@@ -160,7 +160,7 @@ const getStuntingColor = (status: string) => {
 const displayStatusText = (status: string) => {
   const map: { [key: string]: string } = {
     NORMAL: "Normal",
-    GIZI_KURANG: "Gizi Kurang",
+    OBESITAS: "OBESITAS",
     GIZI_BURUK: "Gizi Buruk",
     STUNTED: "Stunted",
     SEVERELY_STUNTED: "Severely Stunted",
@@ -946,7 +946,7 @@ const DataSiswa = () => {
             >
               <option value="semua">Semua Status</option>
               <option value="NORMAL">Normal</option>
-              <option value="GIZI_KURANG">Gizi Kurang</option>
+              <option value="OBESITAS">Obesitas</option>
               <option value="GIZI_BURUK">Gizi Buruk</option>
             </select>
           </div>
