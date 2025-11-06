@@ -68,8 +68,8 @@ const ModalForm = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-lg max-w-md w-full">
+    <div className="fixed inset-0 bg-white/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-100">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-lg font-bold text-gray-900">
             {initialData ? 'Edit Kegiatan' : 'Tambah Kegiatan'}
@@ -153,8 +153,8 @@ const ModalDetail = ({
   if (!isOpen || !data) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-lg max-w-md w-full">
+    <div className="fixed inset-0 bg-white/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-100">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-lg font-bold text-gray-900">Detail Kegiatan</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -224,8 +224,8 @@ const ModalDelete = ({
   if (!isOpen || !data) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-lg max-w-sm w-full">
+    <div className="fixed inset-0 bg-white/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full border border-gray-100">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
@@ -320,14 +320,12 @@ const KalenderAkademik = () => {
   // Init
   useEffect(() => {
     const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
-    // Coba berbagai key yang mungkin tersimpan
     const sekolah = localStorage.getItem("userSekolahId") 
       || localStorage.getItem("sekolahId")
       || localStorage.getItem("schoolId");
 
     console.log('Token:', token ? 'Found' : 'Not found');
     console.log('Sekolah ID:', sekolah);
-    console.log('All localStorage keys:', Object.keys(localStorage));
 
     if (token) setAuthToken(token);
     if (sekolah) setSekolahId(sekolah);
@@ -460,13 +458,16 @@ const KalenderAkademik = () => {
     }
   };
 
-  // Delete
+  // Delete - PERBAIKAN DISINI
   const handleDelete = async () => {
     if (!authToken || !selected) return;
 
     try {
       setIsSubmitting(true);
       setError(null);
+
+      console.log('Deleting item with ID:', selected.id);
+      console.log('Delete URL:', `${API_BASE_URL}/api/kalender-akademik/${selected.id}`);
 
       const res = await fetch(
         `${API_BASE_URL}/api/kalender-akademik/${selected.id}`,
@@ -479,16 +480,40 @@ const KalenderAkademik = () => {
         }
       );
 
-      if (!res.ok) throw new Error('Gagal menghapus');
+      console.log('Delete response status:', res.status);
 
-      setSuccess('Kegiatan berhasil dihapus');
-      setShowDelete(false);
-      setSelected(null);
+      // Check response
+      const contentType = res.headers.get("content-type");
+      let responseData;
+      
+      if (contentType && contentType.includes("application/json")) {
+        responseData = await res.json();
+        console.log('Delete response data:', responseData);
+      } else {
+        responseData = await res.text();
+        console.log('Delete response text:', responseData);
+      }
 
-      setTimeout(() => setSuccess(null), 3000);
-      await fetchData();
+      // Accept 200, 204, or any 2xx status as success
+      if (res.ok || res.status === 204) {
+        setSuccess('Kegiatan berhasil dihapus');
+        setShowDelete(false);
+        setSelected(null);
+
+        setTimeout(() => setSuccess(null), 3000);
+        
+        // Fetch ulang data setelah delete berhasil
+        setTimeout(() => {
+          console.log('Fetching data after delete...');
+          fetchData();
+        }, 300);
+      } else {
+        throw new Error(responseData.message || responseData || 'Gagal menghapus kegiatan');
+      }
     } catch (err: any) {
-      setError(err.message || 'Gagal menghapus');
+      console.error('Delete error:', err);
+      setError(err.message || 'Gagal menghapus kegiatan');
+      setTimeout(() => setError(null), 5000);
     } finally {
       setIsSubmitting(false);
     }

@@ -7,8 +7,8 @@ import {
   Home, Building2, Plus, GraduationCap, Users, BarChart3, 
   Menu, X, LogOut, Settings, MapPin, ShieldAlert, Utensils,
   Loader2,
-  TicketCheck,
-  TicketIcon
+  TicketIcon,
+  ChevronDown
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -20,6 +20,7 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [expandedMenu, setExpandedMenu] = useState<string | null>('manajemen');
   const [userInfo, setUserInfo] = useState({
     name: 'Loading...',
     email: '',
@@ -62,14 +63,56 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
   const getNavigation = () => {
     return [
       { id: 'dashboard', name: 'Dashboard', icon: Home, path: '/admin/dashboard' },
-      { id: 'dapur', name: 'Manajemen Dapur', icon: Building2, path: '/admin/dapur' },
-      { id: 'register-pic', name: 'Register PIC Dapur', icon: Plus, path: '/admin/register-pic' },
-      { id: 'sekolah', name: 'Manajemen Sekolah', icon: GraduationCap, path: '/admin/sekolah' },
-      { id: 'register-pic-sekolah', name: 'Register PIC Sekolah', icon: Plus, path: '/admin/register-pic-sekolah'},
-      { id: 'user', name: 'User Management', icon: Users, path: '/admin/user' },
-      { id: 'LinkDapurSekolah', name: 'Dapur Ke Sekolah', icon: Utensils, path: '/admin/LinkDapurSekolah' },
-      { id: 'tickets', name: 'Laporan tiketing', icon: TicketIcon, path: '/admin/tickets' },
-      { id: 'laporan', name: 'Laporan & Analytics', icon: BarChart3, path: '/admin/laporan' },
+      
+      // KATEGORI: MANAJEMEN
+      {
+        id: 'manajemen',
+        name: 'Manajemen',
+        icon: Building2,
+        hasSubmenu: true,
+        submenu: [
+          { id: 'dapur', name: 'Manajemen Dapur', path: '/admin/dapur' },
+          { id: 'sekolah', name: 'Manajemen Sekolah', path: '/admin/sekolah' },
+          { id: 'user', name: 'User Management', path: '/admin/user' },
+        ]
+      },
+
+      // KATEGORI: REGISTRASI
+      {
+        id: 'registrasi',
+        name: 'Registrasi',
+        icon: Plus,
+        hasSubmenu: true,
+        submenu: [
+          { id: 'register-pic', name: 'Register PIC Dapur', path: '/admin/register-pic' },
+          { id: 'register-pic-sekolah', name: 'Register PIC Sekolah', path: '/admin/register-pic-sekolah' },
+        ]
+      },
+
+      // KATEGORI: OPERASIONAL
+      {
+        id: 'operasional',
+        name: 'Operasional',
+        icon: Utensils,
+        hasSubmenu: true,
+        submenu: [
+          { id: 'LinkDapurSekolah', name: 'Dapur Ke Sekolah', path: '/admin/LinkDapurSekolah' },
+          { id: 'tickets', name: 'Laporan Tiketing', path: '/admin/tickets' },
+        ]
+      },
+
+      // KATEGORI: LAPORAN
+      {
+        id: 'laporan',
+        name: 'Laporan',
+        icon: BarChart3,
+        hasSubmenu: true,
+        submenu: [
+          { id: 'laporan-analytics', name: 'Laporan & Analytics', path: '/admin/laporan' },
+        ]
+      },
+
+      // PENGATURAN (direct link)
       { id: 'settings', name: 'Pengaturan Sistem', icon: Settings, path: '/admin/settings' },
     ];
   };
@@ -90,6 +133,10 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
       document.cookie = 'mbg_token=; path=/; max-age=0';
     }
     router.push('/auth/login');
+  };
+
+  const toggleMenu = (menuId: string) => {
+    setExpandedMenu(expandedMenu === menuId ? null : menuId);
   };
 
   return (
@@ -147,7 +194,7 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
             ) : (
               <>
                 <div className="flex items-start gap-2 mb-2">
-                  <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-400" />
+                  <ShieldAlert className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-400" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-400">Administrator</p>
                     <p className="font-semibold text-sm text-white truncate">{userInfo.name}</p>
@@ -166,22 +213,75 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
+          {navigation.map((item: any) => {
             const Icon = item.icon;
             const isActive = currentPage === item.id;
+            const isSubmenuOpen = expandedMenu === item.id;
+
             return (
-              <button
-                key={item.id}
-                onClick={() => handleNavigation(item.path)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                  isActive 
-                    ? 'bg-red-500 text-white shadow-lg' 
-                    : 'text-gray-300 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                {sidebarOpen && <span className="font-medium text-sm">{item.name}</span>}
-              </button>
+              <div key={item.id}>
+                <button
+                  onClick={() => {
+                    if (item.hasSubmenu) {
+                      toggleMenu(item.id);
+                    } else {
+                      handleNavigation(item.path);
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                    isActive 
+                      ? 'bg-red-500 text-white shadow-lg' 
+                      : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  {sidebarOpen && (
+                    <>
+                      <span className="font-medium text-sm flex-1 text-left">{item.name}</span>
+                      {item.hasSubmenu && (
+                        <ChevronDown 
+                          className={`w-4 h-4 transition-transform ${
+                            isSubmenuOpen ? 'rotate-180' : ''
+                          }`}
+                        />
+                      )}
+                    </>
+                  )}
+                </button>
+
+                {/* Submenu dengan Animasi */}
+                {item.hasSubmenu && sidebarOpen && (
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                      isSubmenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                    }`}
+                  >
+                    <div className="ml-4 mt-1 space-y-1 border-l border-white/10 pl-0">
+                      {item.submenu.map((subitem: any, index: number) => (
+                        <button
+                          key={subitem.id}
+                          onClick={() => handleNavigation(subitem.path)}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm transform ${
+                            isSubmenuOpen
+                              ? 'translate-x-0 opacity-100'
+                              : '-translate-x-2 opacity-0'
+                          } ${
+                            currentPage === subitem.id
+                              ? 'bg-red-500/30 text-red-300 font-medium'
+                              : 'text-gray-400 hover:text-white hover:bg-white/5'
+                          }`}
+                          style={{
+                            transitionDelay: isSubmenuOpen ? `${index * 50}ms` : '0ms',
+                          }}
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                          <span className="text-left">{subitem.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>

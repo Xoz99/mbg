@@ -16,7 +16,8 @@ import {
   Loader2,
   AlertCircle,
   Plus,
-  Trash2
+  Trash2,
+  ClipboardCheck
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -78,11 +79,14 @@ const DataKelas = () => {
   // API State
   const [kelasData, setKelasData] = useState<any[]>([]);
   const [siswaData, setSiswaData] = useState<any[]>([]);
+  const [absensiData, setAbsensiData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingAbsensi, setLoadingAbsensi] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState("");
   const [sekolahId, setSekolahId] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAbsensiModal, setShowAbsensiModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Form state
@@ -96,6 +100,13 @@ const DataKelas = () => {
     perempuan: 0,
     alergiCount: 0,
     alergiList: "",
+  });
+
+  // Absensi form state
+  const [absensiForm, setAbsensiForm] = useState({
+    tanggal: new Date().toISOString().split('T')[0],
+    jumlahHadir: 0,
+    keterangan: "",
   });
 
   const isFetchingRef = useRef(false);
@@ -177,6 +188,78 @@ const DataKelas = () => {
 
       setSiswaData(siswaArray);
 
+      // Fetch absensi untuk mendapatkan data kehadiran hari ini
+      console.log("[FETCH ABSENSI] Mulai fetch absensi hari ini...");
+      setLoadingAbsensi(true);
+      
+      const absensiPerKelas: { [key: string]: number } = {};
+      const today = new Date().toISOString().split('T')[0];
+      
+      try {
+        // Fetch absensi untuk semua kelas
+        const absensiPromises = kelasList.map(async (kelas: any) => {
+          try {
+            const absensiUrl = `${API_BASE_URL}/api/kelas/${kelas.id}/absensi?tanggal=${today}`;
+            console.log(`[FETCH ABSENSI] Fetching for kelas ${kelas.nama}:`, absensiUrl);
+            
+            const absensiRes = await fetch(absensiUrl, { headers });
+            
+            console.log(`[FETCH ABSENSI] Response status for ${kelas.nama}:`, absensiRes.status);
+            
+            if (absensiRes.ok) {
+              const absensiData = await absensiRes.json();
+              console.log(`[FETCH ABSENSI] Response data for ${kelas.nama}:`, absensiData);
+              
+              // Handle berbagai format response
+              let absensiList = [];
+              if (Array.isArray(absensiData.data?.data)) {
+                absensiList = absensiData.data.data;
+              } else if (Array.isArray(absensiData.data)) {
+                absensiList = absensiData.data;
+              } else if (Array.isArray(absensiData)) {
+                absensiList = absensiData;
+              } else if (absensiData.data && typeof absensiData.data === 'object') {
+                // Jika data adalah object tunggal (bukan array)
+                absensiList = [absensiData.data];
+              }
+              
+              console.log(`[FETCH ABSENSI] Absensi list for ${kelas.nama}:`, absensiList);
+              
+              // Ambil jumlahHadir dari data absensi hari ini
+              if (absensiList.length > 0) {
+                const todayAbsensi = absensiList.find((a: any) => {
+                  const absensiDate = new Date(a.tanggal).toISOString().split('T')[0];
+                  return absensiDate === today;
+                });
+                
+                if (todayAbsensi && todayAbsensi.jumlahHadir !== undefined) {
+                  absensiPerKelas[kelas.id] = todayAbsensi.jumlahHadir;
+                  console.log(`[FETCH ABSENSI] Kelas ${kelas.nama} - Hadir: ${todayAbsensi.jumlahHadir}`);
+                }
+              }
+              
+              return {
+                kelasId: kelas.id,
+                data: absensiList
+              };
+            }
+          } catch (err) {
+            console.error(`[FETCH ABSENSI] Error for kelas ${kelas.id}:`, err);
+          }
+          return { kelasId: kelas.id, data: [] };
+        });
+
+        const absensiResults = await Promise.all(absensiPromises);
+        const allAbsensi = absensiResults.flatMap(r => r.data);
+        setAbsensiData(allAbsensi);
+        
+        console.log("[FETCH ABSENSI] Kehadiran per kelas:", absensiPerKelas);
+      } catch (err) {
+        console.error('[FETCH ABSENSI] Global error:', err);
+      } finally {
+        setLoadingAbsensi(false);
+      }
+
       // Calculate siswa per kelas dan alergi
       const siswaPerKelas: { [key: string]: { laki: number; perempuan: number; alergi: number } } = {};
       
@@ -201,13 +284,14 @@ const DataKelas = () => {
         }
       });
 
-      // Update kelas dengan siswa count
+      // Update kelas dengan siswa count dan kehadiran dari absensiPerKelas
       kelasList = kelasList.map((kelas: any) => ({
         ...kelas,
         totalSiswa: (siswaPerKelas[kelas.id]?.laki || 0) + (siswaPerKelas[kelas.id]?.perempuan || 0) || kelas.totalSiswa || 0,
         lakiLaki: siswaPerKelas[kelas.id]?.laki || kelas.lakiLaki || 0,
         perempuan: siswaPerKelas[kelas.id]?.perempuan || kelas.perempuan || 0,
-        alergiCount: siswaPerKelas[kelas.id]?.alergi || kelas.alergiCount || 0
+        alergiCount: siswaPerKelas[kelas.id]?.alergi || kelas.alergiCount || 0,
+        hadirHariIni: absensiPerKelas[kelas.id] || 0
       }));
 
       console.log("[FETCH KELAS] Total kelas:", kelasList.length);
@@ -272,6 +356,84 @@ const DataKelas = () => {
     } catch (err) {
       alert(`Gagal: ${err instanceof Error ? err.message : "Unknown error"}`);
       console.error("[CREATE KELAS] Error:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Create absensi untuk kelas
+  const handleCreateAbsensi = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedKelas) {
+      alert("Kelas tidak dipilih");
+      return;
+    }
+
+    if (!absensiForm.tanggal) {
+      alert("Tanggal harus diisi");
+      return;
+    }
+
+    if (absensiForm.jumlahHadir < 0) {
+      alert("Jumlah hadir tidak boleh negatif");
+      return;
+    }
+
+    if (absensiForm.jumlahHadir > selectedKelas.totalSiswa) {
+      alert(`Jumlah hadir tidak boleh melebihi total siswa (${selectedKelas.totalSiswa})`);
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const kelasId = selectedKelas.id || selectedKelas._id;
+      
+      const payload = {
+        tanggal: absensiForm.tanggal,
+        jumlahHadir: parseInt(absensiForm.jumlahHadir.toString()),
+        keterangan: absensiForm.keterangan,
+      };
+
+      console.log("[CREATE ABSENSI] Kelas ID:", kelasId);
+      console.log("[CREATE ABSENSI] Payload:", JSON.stringify(payload, null, 2));
+
+      const url = `${API_BASE_URL}/api/kelas/${kelasId}/absensi`;
+      console.log("[CREATE ABSENSI] URL:", url);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("[CREATE ABSENSI] Response status:", response.status);
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        throw new Error(`API Error ${response.status}: ${responseText}`);
+      }
+
+      const data = JSON.parse(responseText);
+      console.log("[CREATE ABSENSI] Success:", data);
+
+      setAbsensiForm({
+        tanggal: new Date().toISOString().split('T')[0],
+        jumlahHadir: 0,
+        keterangan: "",
+      });
+      setShowAbsensiModal(false);
+      
+      // Refresh data untuk update hadirHariIni
+      await fetchKelas();
+      
+      alert("Absensi berhasil dibuat!");
+    } catch (err) {
+      alert(`Gagal membuat absensi: ${err instanceof Error ? err.message : "Unknown error"}`);
+      console.error("[CREATE ABSENSI] Error:", err);
     } finally {
       setSubmitting(false);
     }
@@ -433,8 +595,8 @@ const DataKelas = () => {
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md"
-        >
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#1B263A] text-white rounded-lg hover:bg-[#24314d] transition-colors font-semibold shadow-md"
+          >
           <Plus className="w-5 h-5" />
           Tambah Kelas
         </button>
@@ -495,8 +657,7 @@ const DataKelas = () => {
               return (
                 <div key={kelasKey} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                   <div className="bg-gradient-to-br from-[#1B263A] to-[#2A3749] p-5 text-white">
-                    <h3 className="text-2xl font-bold">{kelas.nama || 'Kelas'}</h3>
-                    <p className="text-sm text-white/80">{kelas.waliKelas || 'Wali Kelas: -'}</p>
+                    <h3 className="text-2xl font-bold">Kelas: {kelas.nama || 'Kelas'}</h3>
                   </div>
 
                   <div className="p-5">
@@ -570,6 +731,7 @@ const DataKelas = () => {
         </>
       )}
 
+      {/* Modal Tambah Kelas */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
@@ -594,102 +756,7 @@ const DataKelas = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Tingkat</label>
-                  <select
-                    value={formData.tingkat}
-                    onChange={(e) => setFormData({ ...formData, tingkat: parseInt(e.target.value) })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value={10}>X</option>
-                    <option value={11}>XI</option>
-                    <option value={12}>XII</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Jurusan</label>
-                  <select
-                    value={formData.jurusan}
-                    onChange={(e) => setFormData({ ...formData, jurusan: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="IPA">IPA</option>
-                    <option value="IPS">IPS</option>
-                  </select>
-                </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Wali Kelas</label>
-                <input
-                  type="text"
-                  value={formData.waliKelas}
-                  onChange={(e) => setFormData({ ...formData, waliKelas: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Nama Wali Kelas"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Total Siswa</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.totalSiswa}
-                  onChange={(e) => setFormData({ ...formData, totalSiswa: parseInt(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Contoh: 35"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Laki-laki</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.lakiLaki}
-                    onChange={(e) => setFormData({ ...formData, lakiLaki: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Contoh: 17"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Perempuan</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.perempuan}
-                    onChange={(e) => setFormData({ ...formData, perempuan: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Contoh: 18"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Siswa dengan Alergi</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.alergiCount}
-                  onChange={(e) => setFormData({ ...formData, alergiCount: parseInt(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Contoh: 5"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Daftar Alergi</label>
-                <textarea
-                  value={formData.alergiList}
-                  onChange={(e) => setFormData({ ...formData, alergiList: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Contoh: Udang, Telur, Kacang"
-                  rows={2}
-                />
-              </div>
-
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
@@ -701,8 +768,8 @@ const DataKelas = () => {
                 <button
                   onClick={handleCreateKelas}
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                >
+                  className="flex-1 px-4 py-2.5 bg-[#1B263A] text-white rounded-xl hover:bg-[#24314d] transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
                   {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
                   Tambah
                 </button>
@@ -712,14 +779,80 @@ const DataKelas = () => {
         </div>
       )}
 
-      {selectedKelas && (
+      {/* Modal Create Absensi */}
+      {showAbsensiModal && selectedKelas && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
+          <div className="bg-gradient-to-r from-[#1B263A] to-[#24314d] text-white px-6 py-5 flex items-center justify-between rounded-t-2xl">
+          <div>
+                <h3 className="text-xl font-bold">Buat Absensi</h3>
+                <p className="text-sm text-white/80 mt-1">Kelas {selectedKelas.nama}</p>
+              </div>
+              <button onClick={() => setShowAbsensiModal(false)} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateAbsensi} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Tanggal Absensi <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={absensiForm.tanggal}
+                  onChange={(e) => setAbsensiForm({ ...absensiForm, tanggal: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Jumlah Siswa Hadir <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  max={selectedKelas.totalSiswa}
+                  value={absensiForm.jumlahHadir}
+                  onChange={(e) => setAbsensiForm({ ...absensiForm, jumlahHadir: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder={`Max: ${selectedKelas.totalSiswa} siswa`}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Total siswa di kelas: {selectedKelas.totalSiswa}
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAbsensiModal(false)}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 px-4 py-2.5 bg-[#1B263A] text-white rounded-xl hover:bg-[#24314d] transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <ClipboardCheck className="w-5 h-5" />}
+                  Buat Absensi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detail Kelas */}
+      {selectedKelas && !showAbsensiModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Detail Kelas {selectedKelas.nama}</h3>
-                <p className="text-sm text-gray-600 mt-1">{selectedKelas.waliKelas || 'Wali Kelas: -'}</p>
-              </div>
               <button onClick={() => setSelectedKelas(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -733,8 +866,13 @@ const DataKelas = () => {
                   <p className="text-xs text-blue-700">Total Siswa</p>
                 </div>
                 <div className="bg-green-50 rounded-xl p-4 border border-green-100">
-                  <UserCheck className="w-6 h-6 text-green-600 mb-2" />
-                  <p className="text-2xl font-bold text-green-900">{selectedKelas.hadirHariIni || 0}</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <UserCheck className="w-6 h-6 text-green-600" />
+                    {loadingAbsensi && <Loader2 className="w-4 h-4 text-green-600 animate-spin" />}
+                  </div>
+                  <p className="text-2xl font-bold text-green-900">
+                    {loadingAbsensi ? '...' : (selectedKelas.hadirHariIni || 0)}
+                  </p>
                   <p className="text-xs text-green-700">Hadir Hari Ini</p>
                 </div>
               </div>
@@ -842,6 +980,13 @@ const DataKelas = () => {
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setShowAbsensiModal(true)}
+                  className="flex-1 px-5 py-3 bg-green-100 text-green-700 rounded-xl hover:bg-green-200 transition-all font-bold flex items-center justify-center gap-2"
+                >
+                  <ClipboardCheck className="w-5 h-5" />
+                  Buat Absensi
+                </button>
                 <button
                   onClick={() => handleDeleteKelas(selectedKelas.id || selectedKelas._id)}
                   disabled={submitting}

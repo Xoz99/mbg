@@ -1,10 +1,9 @@
-'use client';
+"use client"
 
-import { useState, useEffect, useMemo, memo, useCallback, useRef } from 'react';
-import SekolahLayout from '@/components/layout/SekolahLayout';
-import { 
-  Users, 
-  BarChart3,
+import { useState, useEffect, memo, useCallback, useRef } from "react"
+import SekolahLayout from "@/components/layout/SekolahLayout"
+import {
+  Users,
   TrendingUp,
   CheckCircle,
   ChevronRight,
@@ -14,41 +13,64 @@ import {
   Clock,
   Truck,
   UtensilsCrossed,
-  Activity
-} from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+  Heart,
+  AlertTriangle,
+  BookOpen,
+  Plus,
+} from "lucide-react"
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://demombgv1.xyz';
-
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz"
 
 const SkeletonStatCard = () => (
-  <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 animate-pulse">
-    <div className="h-10 w-10 bg-gray-200 rounded-lg mb-3"></div>
-    <div className="h-3 w-24 bg-gray-200 rounded mb-2"></div>
-    <div className="h-8 w-16 bg-gray-300 rounded mb-2"></div>
-    <div className="h-3 w-20 bg-gray-200 rounded"></div>
+  <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 shadow-sm border border-slate-200 animate-pulse">
+    <div className="h-10 w-10 bg-slate-300 rounded-xl mb-3"></div>
+    <div className="h-3 w-24 bg-slate-300 rounded mb-2"></div>
+    <div className="h-8 w-16 bg-slate-400 rounded mb-2"></div>
+    <div className="h-3 w-20 bg-slate-300 rounded"></div>
   </div>
-);
+)
 
 const SkeletonChartContainer = () => (
-  <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 animate-pulse">
-    <div className="h-6 w-32 bg-gray-200 rounded mb-4"></div>
-    <div className="w-full h-64 bg-gray-100 rounded-lg"></div>
+  <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 animate-pulse">
+    <div className="h-7 w-32 bg-slate-300 rounded-lg mb-4"></div>
+    <div className="w-full h-64 bg-slate-200 rounded-xl"></div>
   </div>
-);
+)
 
 const SkeletonTableRow = () => (
-  <tr className="border-b border-gray-100 hover:bg-gray-50">
-    <td className="py-4 px-4"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div></td>
-    <td className="py-4 px-4"><div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div></td>
-    <td className="py-4 px-4"><div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div></td>
-    <td className="py-4 px-4"><div className="h-4 w-12 bg-gray-200 rounded animate-pulse"></div></td>
+  <tr className="border-b border-slate-200">
+    <td className="py-4 px-4">
+      <div className="h-4 w-20 bg-slate-300 rounded animate-pulse"></div>
+    </td>
+    <td className="py-4 px-4">
+      <div className="h-4 w-24 bg-slate-300 rounded animate-pulse"></div>
+    </td>
+    <td className="py-4 px-4">
+      <div className="h-4 w-16 bg-slate-300 rounded animate-pulse"></div>
+    </td>
+    <td className="py-4 px-4">
+      <div className="h-4 w-12 bg-slate-300 rounded animate-pulse"></div>
+    </td>
   </tr>
-);
-
+)
 
 const GiziDistributionChart = memo(({ data }: { data: any[] }) => (
-  <ResponsiveContainer width="100%" height={250}>
+  <ResponsiveContainer width="100%" height={280}>
     <PieChart>
       <Pie
         data={data}
@@ -56,7 +78,7 @@ const GiziDistributionChart = memo(({ data }: { data: any[] }) => (
         cy="50%"
         labelLine={false}
         label={(entry) => `${entry.name}: ${entry.value}`}
-        outerRadius={80}
+        outerRadius={90}
         fill="#8884d8"
         dataKey="value"
       >
@@ -65,183 +87,307 @@ const GiziDistributionChart = memo(({ data }: { data: any[] }) => (
         <Cell fill="#ef4444" />
         <Cell fill="#8b5cf6" />
       </Pie>
-      <Tooltip />
+      <Tooltip formatter={(value) => value} />
     </PieChart>
   </ResponsiveContainer>
-));
+))
 
-GiziDistributionChart.displayName = 'GiziDistributionChart';
+GiziDistributionChart.displayName = "GiziDistributionChart"
 
 const AttendanceChart = memo(({ data }: { data: any[] }) => (
-  <ResponsiveContainer width="100%" height={250}>
-    <BarChart data={data}>
-      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-      <XAxis dataKey="hari" stroke="#94a3b8" />
-      <YAxis stroke="#94a3b8" />
-      <Tooltip />
+  <ResponsiveContainer width="100%" height={280}>
+    <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+      <defs>
+        <linearGradient id="colorHadir" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="5%" stopColor="#10b981" stopOpacity={0.9} />
+          <stop offset="95%" stopColor="#059669" stopOpacity={0.7} />
+        </linearGradient>
+        <linearGradient id="colorTidak" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.9} />
+          <stop offset="95%" stopColor="#dc2626" stopOpacity={0.7} />
+        </linearGradient>
+      </defs>
+      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+      <XAxis dataKey="hari" stroke="#64748b" style={{ fontSize: "12px" }} />
+      <YAxis stroke="#64748b" style={{ fontSize: "12px" }} />
+      <Tooltip
+        contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "8px", color: "#fff" }}
+        cursor={{ fill: "rgba(15, 23, 42, 0.05)" }}
+      />
       <Legend />
-      <Bar dataKey="hadir" fill="#10b981" name="Hadir" />
-      <Bar dataKey="tidakHadir" fill="#ef4444" name="Tidak Hadir" />
+      <Bar dataKey="hadir" fill="url(#colorHadir)" name="Hadir" radius={[8, 8, 0, 0]} />
+      <Bar dataKey="tidakHadir" fill="url(#colorTidak)" name="Tidak Hadir" radius={[8, 8, 0, 0]} />
     </BarChart>
   </ResponsiveContainer>
-));
+))
 
-AttendanceChart.displayName = 'AttendanceChart';
+AttendanceChart.displayName = "AttendanceChart"
 
 const ConsumptionChart = memo(({ data }: { data: any[] }) => (
-  <ResponsiveContainer width="100%" height={250}>
-    <LineChart data={data}>
-      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-      <XAxis dataKey="hari" stroke="#94a3b8" />
-      <YAxis stroke="#94a3b8" />
-      <Tooltip />
-      <Line type="monotone" dataKey="porsi" stroke="#1B263A" strokeWidth={3} dot={{ fill: '#D0B064', r: 5 }} />
+  <ResponsiveContainer width="100%" height={280}>
+    <LineChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+      <defs>
+        <linearGradient id="colorPorsi" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="5%" stopColor="#1B263A" stopOpacity={0.3} />
+          <stop offset="95%" stopColor="#1B263A" stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+      <XAxis dataKey="hari" stroke="#64748b" style={{ fontSize: "12px" }} />
+      <YAxis stroke="#64748b" style={{ fontSize: "12px" }} />
+      <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "8px", color: "#fff" }} />
+      <Line
+        type="monotone"
+        dataKey="porsi"
+        stroke="#D0B064"
+        strokeWidth={3}
+        dot={{ fill: "#D0B064", r: 6, strokeWidth: 2, stroke: "#1B263A" }}
+        activeDot={{ r: 8 }}
+        isAnimationActive={true}
+      />
     </LineChart>
   </ResponsiveContainer>
-));
+))
 
-ConsumptionChart.displayName = 'ConsumptionChart';
+ConsumptionChart.displayName = "ConsumptionChart"
 
-
-
-const StatCard = ({ title, value, subtitle, icon: Icon, color, trend }: any) => (
-  <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+const StatCard = memo(({ title, value, subtitle, icon: Icon, color, trend }: any) => (
+  <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-5 shadow-sm border border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all duration-300 group">
     <div className="flex items-start justify-between mb-3">
-      <div className={`p-3 rounded-lg ${color}`}>
+      <div className={`p-3 rounded-xl ${color} group-hover:scale-110 transition-transform duration-300`}>
         <Icon className="w-6 h-6 text-white" />
       </div>
       {trend && (
-        <div className={`flex items-center gap-1 text-sm font-semibold ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
-          <TrendingUp className="w-4 h-4" />
+        <div
+          className={`flex items-center gap-1 text-sm font-semibold px-2.5 py-1 rounded-lg ${trend > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+        >
+          <TrendingUp className="w-3.5 h-3.5" />
           {Math.abs(trend)}%
         </div>
       )}
     </div>
-    <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
-    <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
-    <p className="text-sm text-gray-500">{subtitle}</p>
+    <p className="text-sm font-medium text-slate-600 mb-1">{title}</p>
+    <p className="text-3xl font-bold text-slate-900 mb-2">{value}</p>
+    <p className="text-xs text-slate-500">{subtitle}</p>
   </div>
-);
-
+))
 
 const KalenderReminder = ({ reminder }: { reminder: any }) => {
-  const [mounted, setMounted] = useState(false);
-  const [formattedDate, setFormattedDate] = useState('');
+  const [mounted, setMounted] = useState(false)
+  const [formattedDate, setFormattedDate] = useState("")
   const [daysStatus, setDaysStatus] = useState({
     daysUntil: 0,
-    bgColor: 'from-green-50 to-green-100',
-    borderColor: 'border-green-200',
-    iconBg: 'bg-green-500',
-    textColor: 'text-green-900',
-    statusText: 'Sedang Berlangsung'
-  });
+    bgColor: "from-green-50 to-green-100",
+    borderColor: "border-green-200",
+    iconBg: "bg-green-500",
+    textColor: "text-green-900",
+    statusText: "Sedang Berlangsung",
+  })
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
-    if (!mounted || !reminder?.tanggalMulai && !reminder?.tanggal) return;
+    if (!mounted || (!reminder?.tanggalMulai && !reminder?.tanggal)) return
 
-    const today = new Date();
-    const dateToUse = reminder?.tanggalMulai || reminder?.tanggal;
-    const eventDate = new Date(dateToUse);
-    const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const today = new Date()
+    const dateToUse = reminder?.tanggalMulai || reminder?.tanggal
+    const eventDate = new Date(dateToUse)
+    const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
-    let bgColor = 'from-green-50 to-green-100';
-    let borderColor = 'border-green-200';
-    let iconBg = 'bg-green-500';
-    let textColor = 'text-green-900';
-    let statusText = 'Sedang Berlangsung';
+    let bgColor = "from-green-50 to-green-100"
+    let borderColor = "border-green-200"
+    let iconBg = "bg-green-500"
+    let textColor = "text-green-900"
+    let statusText = "Sedang Berlangsung"
 
     if (daysUntil > 0 && daysUntil <= 7) {
-      bgColor = 'from-yellow-50 to-yellow-100';
-      borderColor = 'border-yellow-200';
-      iconBg = 'bg-yellow-500';
-      textColor = 'text-yellow-900';
-      statusText = `${daysUntil} hari lagi`;
+      bgColor = "from-yellow-50 to-yellow-100"
+      borderColor = "border-yellow-200"
+      iconBg = "bg-yellow-500"
+      textColor = "text-yellow-900"
+      statusText = `${daysUntil} hari lagi`
     } else if (daysUntil > 7) {
-      bgColor = 'from-purple-50 to-purple-100';
-      borderColor = 'border-purple-200';
-      iconBg = 'bg-purple-500';
-      textColor = 'text-purple-900';
-      statusText = `${Math.ceil(daysUntil / 7)} minggu lagi`;
+      bgColor = "from-blue-50 to-blue-100"
+      borderColor = "border-blue-200"
+      iconBg = "bg-blue-500"
+      textColor = "text-blue-900"
+      statusText = `${Math.ceil(daysUntil / 7)} minggu lagi`
     } else if (daysUntil < 0) {
-      bgColor = 'from-gray-50 to-gray-100';
-      borderColor = 'border-gray-200';
-      iconBg = 'bg-gray-500';
-      textColor = 'text-gray-900';
-      statusText = 'Sudah Berlalu';
+      bgColor = "from-slate-50 to-slate-100"
+      borderColor = "border-slate-200"
+      iconBg = "bg-slate-500"
+      textColor = "text-slate-900"
+      statusText = "Sudah Berlalu"
     }
 
-    const dateToFormat = reminder?.tanggalMulai || reminder?.tanggal;
-    const formatted = new Date(dateToFormat).toLocaleDateString('id-ID', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const dateToFormat = reminder?.tanggalMulai || reminder?.tanggal
+    const formatted = new Date(dateToFormat).toLocaleDateString("id-ID", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
 
-    setFormattedDate(formatted);
+    setFormattedDate(formatted)
     setDaysStatus({
       daysUntil,
       bgColor,
       borderColor,
       iconBg,
       textColor,
-      statusText
-    });
-  }, [reminder, mounted]);
+      statusText,
+    })
+  }, [reminder, mounted])
+
+  const MiniCalendar = () => {
+    const today = new Date()
+    const currentMonth = today.getMonth()
+    const currentYear = today.getFullYear()
+
+    const firstDay = new Date(currentYear, currentMonth, 1)
+    const lastDay = new Date(currentYear, currentMonth + 1, 0)
+    const daysInMonth = lastDay.getDate()
+    const startingDayOfWeek = firstDay.getDay()
+
+    const days = []
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null)
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(i)
+    }
+
+    const weeks = []
+    for (let i = 0; i < days.length; i += 7) {
+      weeks.push(days.slice(i, i + 7))
+    }
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    const dayNames = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"]
+
+    return (
+      <div className="mt-6 pt-6 border-t border-white border-opacity-20">
+        <p className="text-sm font-bold mb-4 text-[#D0B064]">
+          {monthNames[currentMonth]} {currentYear}
+        </p>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-7 gap-2 mb-2">
+            {dayNames.map((day) => (
+              <div key={day} className="text-center text-xs font-bold text-[#D0B064] opacity-80">
+                {day}
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            {weeks.map((week, weekIdx) => (
+              <div key={weekIdx} className="grid grid-cols-7 gap-2">
+                {week.map((day, dayIdx) => (
+                  <div
+                    key={dayIdx}
+                    className={`
+                      text-center text-xs p-2 rounded-lg font-semibold transition-all
+                      ${day ? "cursor-pointer hover:bg-[#D0B064] hover:bg-opacity-30" : ""}
+                      ${
+                        day === today.getDate() && currentMonth === today.getMonth()
+                          ? "bg-[#D0B064] text-[#1B263A] font-bold shadow-md"
+                          : day
+                            ? "bg-[#D0B064] bg-opacity-30 text-white"
+                            : "transparent"
+                      }
+                    `}
+                  >
+                    {day}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!mounted || !reminder) {
     return (
-      <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 flex items-start gap-4">
-        <div className="p-3 bg-blue-500 rounded-lg flex-shrink-0">
-          <Calendar className="w-6 h-6 text-white" />
+      <div className={`rounded-2xl p-6 shadow-lg bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-300`}>
+        <div className="flex items-start gap-4 mb-4">
+          <div className="p-3 rounded-xl flex-shrink-0 bg-slate-400">
+            <Calendar className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold mb-4 text-slate-700">Jadwal Pengiriman</h3>
+            <div className="space-y-3 text-sm text-slate-600">
+              <p>📅 Tanggal: -</p>
+              <p>⏱️ Status: Menunggu data</p>
+              <p>📍 Lokasi: -</p>
+            </div>
+          </div>
         </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-blue-900 mb-1">Jadwal Pengiriman Belum Tersedia</h3>
-          <p className="text-sm text-blue-700">Periksa kembali nanti untuk informasi jadwal pengiriman makanan sekolah.</p>
-        </div>
+        <MiniCalendar />
       </div>
-    );
+    )
   }
 
   return (
-    <div className={`bg-gradient-to-r ${daysStatus.bgColor} border ${daysStatus.borderColor} rounded-xl p-6 flex items-start gap-4`}>
-      <div className={`p-3 ${daysStatus.iconBg} rounded-lg flex-shrink-0`}>
-        {daysStatus.daysUntil <= 7 && daysStatus.daysUntil > 0 ? (
-          <Bell className="w-6 h-6 text-white" />
-        ) : (
-          <Calendar className="w-6 h-6 text-white" />
-        )}
-      </div>
-      <div className="flex-1">
-        <h3 className={`font-semibold ${daysStatus.textColor} mb-1`}>{reminder.deskripsi || reminder.namaSekolah || 'Jadwal Pengiriman'}</h3>
-        <div className="flex items-center gap-2 text-sm">
-          <Clock className="w-4 h-4" />
-          <span className={daysStatus.textColor}>
-            {formattedDate}
-          </span>
+    <div
+      className={`bg-gradient-to-r ${daysStatus.bgColor} border ${daysStatus.borderColor} rounded-2xl p-6 shadow-lg`}
+    >
+      <div className="flex items-start gap-4 mb-4">
+        <div className={`p-3 ${daysStatus.iconBg} rounded-xl flex-shrink-0`}>
+          {daysStatus.daysUntil <= 7 && daysStatus.daysUntil > 0 ? (
+            <Bell className="w-6 h-6 text-white" />
+          ) : (
+            <Calendar className="w-6 h-6 text-white" />
+          )}
         </div>
-        <p className={`text-sm mt-2 ${daysStatus.textColor}`}>
-          <span className="font-semibold">{daysStatus.statusText}</span>
-        </p>
-      </div>
-    </div>
-  );
-};
+        <div className="flex-1">
+          <h3 className={`font-bold text-2xl ${daysStatus.textColor} mb-4`}>
+            {reminder.deskripsi || reminder.namaSekolah || "Jadwal Pengiriman"}
+          </h3>
 
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              <span className={`${daysStatus.textColor}`}>{formattedDate}</span>
+            </div>
+
+            <div className={`font-bold text-lg ${daysStatus.textColor}`}>{daysStatus.statusText}</div>
+
+            {reminder.status && (
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                <span className={daysStatus.textColor}>Status: {reminder.status}</span>
+              </div>
+            )}
+
+            {reminder.alamat && (
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span className={daysStatus.textColor}>{reminder.alamat}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <MiniCalendar />
+    </div>
+  )
+}
 
 const DashboardSekolah = () => {
-  // ✅ FIX: Gunakan useRef untuk track initialization
-  const hasInitialized = useRef(false);
-  const fetchInProgress = useRef(false);
+  const hasInitialized = useRef(false)
+  const fetchInProgress = useRef(false)
+  const lastFetchTime = useRef(0)
+  const FETCH_COOLDOWN = 5000 // 5 second cooldown between fetches
 
-  const [loading, setLoading] = useState(true);
-  const [authToken, setAuthToken] = useState<string | null>(null);
-  const [sekolahId, setSekolahId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true)
+  const [authToken, setAuthToken] = useState<string | null>(null)
+  const [sekolahId, setSekolahId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState({
     totalSiswa: 0,
     normalGizi: 0,
@@ -252,511 +398,519 @@ const DashboardSekolah = () => {
     totalPengiriman: 0,
     sudahMakan: 0,
     totalKelas: 0,
-    rataGizi: 0
-  });
-  const [siswaList, setSiswaList] = useState([]);
-  const [kelasList, setKelasList] = useState([]);
-  const [kalenderReminder, setKalenderReminder] = useState(null);
+    rataGizi: 0,
+  })
+  const [siswaList, setSiswaList] = useState([])
+  const [kelasList, setKelasList] = useState([])
+  const [kalenderReminder, setKalenderReminder] = useState(null)
+  const [kalenderList, setKalenderList] = useState([])
   const [siswaDiagram, setSiswaDiagram] = useState([
-    { name: 'Normal', value: 0 },
-    { name: 'Kurang', value: 0 },
-    { name: 'Risiko Stunting', value: 0 },
-    { name: 'Berlebih', value: 0 }
-  ]);
+    { name: "Normal", value: 0 },
+    { name: "Kurang", value: 0 },
+    { name: "Risiko Stunting", value: 0 },
+    { name: "Berlebih", value: 0 },
+  ])
   const [absensiChart, setAbsensiChart] = useState([
-    { hari: 'Senin', hadir: 0, tidakHadir: 0 },
-    { hari: 'Selasa', hadir: 0, tidakHadir: 0 },
-    { hari: 'Rabu', hadir: 0, tidakHadir: 0 },
-    { hari: 'Kamis', hadir: 0, tidakHadir: 0 },
-    { hari: 'Jumat', hadir: 0, tidakHadir: 0 }
-  ]);
+    { hari: "Senin", hadir: 0, tidakHadir: 0 },
+    { hari: "Selasa", hadir: 0, tidakHadir: 0 },
+    { hari: "Rabu", hadir: 0, tidakHadir: 0 },
+    { hari: "Kamis", hadir: 0, tidakHadir: 0 },
+    { hari: "Jumat", hadir: 0, tidakHadir: 0 },
+  ])
   const [konsumsiHarian, setKonsumsiHarian] = useState([
-    { hari: 'Senin', porsi: 0 },
-    { hari: 'Selasa', porsi: 0 },
-    { hari: 'Rabu', porsi: 0 },
-    { hari: 'Kamis', porsi: 0 },
-    { hari: 'Jumat', porsi: 0 }
-  ]);
+    { hari: "Senin", porsi: 0 },
+    { hari: "Selasa", porsi: 0 },
+    { hari: "Rabu", porsi: 0 },
+    { hari: "Kamis", porsi: 0 },
+    { hari: "Jumat", porsi: 0 },
+  ])
+  const [menuHariIni, setMenuHariIni] = useState<any>(null)
 
-  // ✅ FIX #1: Effect untuk initialize - HANYA SEKALI
   useEffect(() => {
-    if (hasInitialized.current) return; // ✅ Prevent re-run
-    if (typeof window === 'undefined') return;
+    if (hasInitialized.current) return
+    if (typeof window === "undefined") return
 
-    hasInitialized.current = true;
+    hasInitialized.current = true
 
-    const token = localStorage.getItem('authToken');
-    const schoolId = localStorage.getItem('sekolahId');
+    const token = localStorage.getItem("authToken")
+    const schoolId = localStorage.getItem("sekolahId")
 
     if (!token) {
-      setError('Token tidak ditemukan. Silakan login terlebih dahulu.');
-      setLoading(false);
-      return;
+      setError("Token tidak ditemukan. Silakan login terlebih dahulu.")
+      setLoading(false)
+      return
     }
 
-    setAuthToken(token);
-    setSekolahId(schoolId);
-  }, []); // ✅ Empty dependency array - hanya run sekali
+    setAuthToken(token)
+    setSekolahId(schoolId)
+    setLoading(false)
+  }, [])
 
-
-  // ✅ FIX #2: Effect untuk fetch data - memiliki guard untuk prevent duplicate
-  useEffect(() => {
-    if (!authToken || !sekolahId) return;
-    if (fetchInProgress.current) return; // ✅ Prevent duplicate fetch
-    if (error && error.includes('Token tidak ditemukan')) return;
-
-    const fetchData = async () => {
-      if (fetchInProgress.current) return; // ✅ Double check
-      
-      try {
-        fetchInProgress.current = true;
-        setLoading(true);
-
-        // ✅ Fetch semua data secara parallel
-        await Promise.all([
-          fetchSiswaData(sekolahId, authToken),
-          fetchKelasData(sekolahId, authToken),
-          fetchAbsensiData(sekolahId, authToken),
-          fetchPengirimanData(sekolahId, authToken),
-          fetchKalenderAkademik(authToken)
-        ]);
-
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError(err instanceof Error ? err.message : 'Gagal memuat data');
-        setLoading(false);
-      } finally {
-        fetchInProgress.current = false;
-      }
-    };
-
-    fetchData();
-  }, [authToken, sekolahId, error]); // ✅ Dependencies yang tepat
-
-
-  // ✅ FIX #3: ENDPOINT SISWA - Gunakan /api/sekolah/:sekolahId/siswa
-  const fetchSiswaData = async (schoolId: string, token: string) => {
+  const fetchSiswaData = useCallback(async (schoolId: string, token: string) => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/sekolah/${schoolId}/siswa?page=1&limit=100`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/siswa?page=1&limit=100`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn('Endpoint siswa tidak ditemukan (404)');
-          setSiswaList([]);
-          return;
+          setSiswaList([])
+          return
         }
-        throw new Error(`HTTP ${response.status}: Gagal fetch siswa`);
+        throw new Error(`HTTP ${response.status}: Gagal fetch siswa`)
       }
 
-      const data = await response.json();
-      
-      // Handle response format - sama seperti DataSiswa.tsx
-      let siswaData = Array.isArray(data.data?.data)
-        ? data.data.data
-        : Array.isArray(data.data)
-        ? data.data
-        : [];
-      
-      setSiswaList(siswaData);
+      const data = await response.json()
 
-      // Update stats - gunakan statusGizi langsung dari API
-      const totalSiswa = siswaData.length || 0;
-      const normalGizi = siswaData.filter((s: any) => s.statusGizi === 'NORMAL').length || 0;
-      const giziKurang = siswaData.filter((s: any) => s.statusGizi === 'GIZI_KURANG').length || 0;
-      const giziBuruk = siswaData.filter((s: any) => s.statusGizi === 'GIZI_BURUK').length || 0;
-      const obesitas = siswaData.filter((s: any) => s.statusGizi === 'OBESITAS').length || 0;
-      const berlebih = obesitas;
+      const siswaData = Array.isArray(data.data?.data) ? data.data.data : Array.isArray(data.data) ? data.data : []
 
-      setStats(prev => ({
+      setSiswaList(siswaData)
+
+      const totalSiswa = siswaData.length || 0
+      const normalGizi = siswaData.filter((s: any) => s.statusGizi === "NORMAL").length || 0
+      const giziKurang = siswaData.filter((s: any) => s.statusGizi === "GIZI_KURANG").length || 0
+      const giziBuruk = siswaData.filter((s: any) => s.statusGizi === "GIZI_BURUK").length || 0
+      const obesitas = siswaData.filter((s: any) => s.statusGizi === "OBESITAS").length || 0
+
+      setStats((prev) => ({
         ...prev,
         totalSiswa,
         normalGizi,
         giziKurang,
         stuntingRisiko: giziBuruk,
-        rataGizi: totalSiswa > 0 ? Math.round((normalGizi / totalSiswa) * 100) : 0
-      }));
+        rataGizi: totalSiswa > 0 ? Math.round((normalGizi / totalSiswa) * 100) : 0,
+      }))
 
-      // Update diagram gizi
       setSiswaDiagram([
-        { name: 'Normal', value: normalGizi },
-        { name: 'Kurang', value: giziKurang },
-        { name: 'Risiko Stunting', value: giziBuruk },
-        { name: 'Berlebih', value: berlebih }
-      ]);
+        { name: "Normal", value: normalGizi },
+        { name: "Kurang", value: giziKurang },
+        { name: "Risiko Stunting", value: giziBuruk },
+        { name: "Berlebih", value: obesitas },
+      ])
     } catch (err) {
-      console.error('Error fetching siswa:', err);
-      setSiswaList([]);
+      console.error("Error fetching siswa:", err)
+      setSiswaList([])
     }
-  };
+  }, [])
 
-  const fetchKelasData = async (schoolId: string, token: string) => {
+  const fetchKelasData = useCallback(async (schoolId: string, token: string) => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/sekolah/${schoolId}/kelas?page=1&limit=100`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/kelas?page=1&limit=100`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn('Endpoint kelas tidak ditemukan (404)');
-          setKelasList([]);
-          return;
+          setKelasList([])
+          return
         }
-        throw new Error(`HTTP ${response.status}: Gagal fetch kelas`);
+        throw new Error(`HTTP ${response.status}: Gagal fetch kelas`)
       }
 
-      const data = await response.json();
-      
-      // Handle response format - sama seperti DataKelas.tsx
-      let kelasData = [];
+      const data = await response.json()
+
+      let kelasData = []
       if (Array.isArray(data.data?.data)) {
-        kelasData = data.data.data;
+        kelasData = data.data.data
       } else if (Array.isArray(data.data)) {
-        kelasData = data.data;
+        kelasData = data.data
       } else if (Array.isArray(data)) {
-        kelasData = data;
+        kelasData = data
       }
 
-      // Fetch siswa untuk mendapatkan count per kelas
-      let siswaArray: any[] = [];
+      let siswaArray: any[] = []
       try {
-        const siswaRes = await fetch(
-          `${API_BASE_URL}/api/sekolah/${schoolId}/siswa?page=1&limit=100`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        const siswaRes = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/siswa?page=1&limit=100`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
         if (siswaRes.ok) {
-          const siswaData = await siswaRes.json();
-          siswaArray = Array.isArray(siswaData.data?.data) 
-            ? siswaData.data.data 
-            : Array.isArray(siswaData.data) 
-            ? siswaData.data 
-            : [];
+          const siswaData = await siswaRes.json()
+          siswaArray = Array.isArray(siswaData.data?.data)
+            ? siswaData.data.data
+            : Array.isArray(siswaData.data)
+              ? siswaData.data
+              : []
         }
       } catch (err) {
-        console.error('Siswa fetch error:', err);
+        console.error("Siswa fetch error:", err)
       }
 
-      // Calculate siswa per kelas
-      const siswaPerKelas: { [key: string]: { laki: number; perempuan: number; alergi: number } } = {};
-      
+      const siswaPerKelas: { [key: string]: { laki: number; perempuan: number; alergi: number } } = {}
+
       siswaArray.forEach((siswa: any) => {
-        const kelasId = siswa.kelasId?.id || siswa.kelasId;
+        const kelasId = siswa.kelasId?.id || siswa.kelasId
         if (!siswaPerKelas[kelasId]) {
-          siswaPerKelas[kelasId] = { laki: 0, perempuan: 0, alergi: 0 };
+          siswaPerKelas[kelasId] = { laki: 0, perempuan: 0, alergi: 0 }
         }
-        if (siswa.jenisKelamin === 'LAKI_LAKI') {
-          siswaPerKelas[kelasId].laki++;
+        if (siswa.jenisKelamin === "LAKI_LAKI") {
+          siswaPerKelas[kelasId].laki++
         } else {
-          siswaPerKelas[kelasId].perempuan++;
+          siswaPerKelas[kelasId].perempuan++
         }
-        
-        // Count alergi
+
         if (siswa.alergi) {
           if (Array.isArray(siswa.alergi) && siswa.alergi.length > 0) {
-            siswaPerKelas[kelasId].alergi++;
-          } else if (typeof siswa.alergi === 'string' && siswa.alergi.trim() !== '') {
-            siswaPerKelas[kelasId].alergi++;
+            siswaPerKelas[kelasId].alergi++
+          } else if (typeof siswa.alergi === "string" && siswa.alergi.trim() !== "") {
+            siswaPerKelas[kelasId].alergi++
           }
         }
-      });
+      })
 
-      // Update kelas dengan siswa count
       kelasData = kelasData.map((kelas: any) => ({
         ...kelas,
-        totalSiswa: (siswaPerKelas[kelas.id]?.laki || 0) + (siswaPerKelas[kelas.id]?.perempuan || 0) || kelas.totalSiswa || 0,
+        totalSiswa:
+          (siswaPerKelas[kelas.id]?.laki || 0) + (siswaPerKelas[kelas.id]?.perempuan || 0) || kelas.totalSiswa || 0,
         lakiLaki: siswaPerKelas[kelas.id]?.laki || kelas.lakiLaki || 0,
         perempuan: siswaPerKelas[kelas.id]?.perempuan || kelas.perempuan || 0,
-        alergiCount: siswaPerKelas[kelas.id]?.alergi || kelas.alergiCount || 0
-      }));
+        alergiCount: siswaPerKelas[kelas.id]?.alergi || kelas.alergiCount || 0,
+      }))
 
-      setKelasList(kelasData);
+      setKelasList(kelasData)
 
-      setStats(prev => ({
+      setStats((prev) => ({
         ...prev,
-        totalKelas: kelasData.length
-      }));
+        totalKelas: kelasData.length,
+      }))
     } catch (err) {
-      console.error('Error fetching kelas:', err);
-      setKelasList([]);
+      console.error("Error fetching kelas:", err)
+      setKelasList([])
     }
-  };
+  }, [])
 
-
-  const fetchAbsensiData = async (schoolId: string, token: string) => {
+  const fetchAbsensiData = useCallback(async (schoolId: string, token: string) => {
     try {
       const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      }
 
-      // ✅ STEP 1: Hitung range minggu ini (Senin-Jumat)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
 
-      const dayOfWeek = today.getDay();
-      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const dayOfWeek = today.getDay()
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
 
-      const mondayDate = new Date(today);
-      mondayDate.setDate(today.getDate() - daysToMonday);
-      mondayDate.setHours(0, 0, 0, 0);
+      const mondayDate = new Date(today)
+      mondayDate.setDate(today.getDate() - daysToMonday)
+      mondayDate.setHours(0, 0, 0, 0)
 
-      const fridayDate = new Date(mondayDate);
-      fridayDate.setDate(mondayDate.getDate() + 4);
-      fridayDate.setHours(23, 59, 59, 999);
+      const fridayDate = new Date(mondayDate)
+      fridayDate.setDate(mondayDate.getDate() + 4)
+      fridayDate.setHours(23, 59, 59, 999)
 
-      const mondayString = mondayDate.toISOString().split('T')[0];
-      const fridayString = fridayDate.toISOString().split('T')[0];
-      const todayString = today.toISOString().split('T')[0];
+      const mondayString = mondayDate.toISOString().split("T")[0]
+      const fridayString = fridayDate.toISOString().split("T")[0]
+      const todayString = today.toISOString().split("T")[0]
 
-      console.log(`[ABSENSI] Range minggu ini: ${mondayString} - ${fridayString}`);
-
-      // ✅ STEP 2: Get all kelas
-      const kelasRes = await fetch(
-        `${API_BASE_URL}/api/sekolah/${schoolId}/kelas?page=1&limit=100`,
-        { headers }
-      );
+      const kelasRes = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/kelas?page=1&limit=100`, { headers })
 
       if (!kelasRes.ok) {
-        console.warn('[ABSENSI] Failed to fetch kelas');
-        setStats(prev => ({
+        setStats((prev) => ({
           ...prev,
           hadirHariIni: 0,
           pengirimanSelesai: 0,
-          sudahMakan: 0
-        }));
-        return;
+          sudahMakan: 0,
+        }))
+        return
       }
 
-      const kelasData = await kelasRes.json();
-      let kelasList = Array.isArray(kelasData.data?.data)
+      const kelasData = await kelasRes.json()
+      const kelasList = Array.isArray(kelasData.data?.data)
         ? kelasData.data.data
         : Array.isArray(kelasData.data)
-        ? kelasData.data
-        : [];
+          ? kelasData.data
+          : []
 
-      // ✅ STEP 3: Initialize chart data
-      const daysOfWeek = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-      const chartDataByDate: { [key: string]: { hari: string; hadir: number; tidakHadir: number } } = {};
+      const daysOfWeek = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]
+      const chartDataByDate: { [key: string]: { hari: string; hadir: number; tidakHadir: number } } = {}
 
       for (let i = 0; i < 5; i++) {
-        const dateForDay = new Date(mondayDate);
-        dateForDay.setDate(mondayDate.getDate() + i);
-        const dateString = dateForDay.toISOString().split('T')[0];
+        const dateForDay = new Date(mondayDate)
+        dateForDay.setDate(mondayDate.getDate() + i)
+        const dateString = dateForDay.toISOString().split("T")[0]
         chartDataByDate[dateString] = {
           hari: daysOfWeek[i],
           hadir: 0,
-          tidakHadir: 0
-        };
+          tidakHadir: 0,
+        }
       }
 
-      let totalHadirHariIni = 0;
+      let totalHadirHariIni = 0
 
-      // ✅ STEP 4: Fetch absensi untuk setiap kelas
       const absensiPromises = kelasList.map(async (kelas: any) => {
         try {
-          const absenRes = await fetch(
-            `${API_BASE_URL}/api/kelas/${kelas.id}/absensi`,
-            { headers }
-          );
+          const absenRes = await fetch(`${API_BASE_URL}/api/kelas/${kelas.id}/absensi`, { headers })
 
           if (!absenRes.ok) {
-            console.warn(`[ABSENSI] Failed to fetch absensi for kelas ${kelas.nama}`);
-            return 0;
+            return 0
           }
 
-          const absenData = await absenRes.json();
-          let absensiList = Array.isArray(absenData.data?.data)
+          const absenData = await absenRes.json()
+          const absensiList = Array.isArray(absenData.data?.data)
             ? absenData.data.data
             : Array.isArray(absenData.data)
-            ? absenData.data
-            : [];
+              ? absenData.data
+              : []
 
-          let hadirToday = 0;
+          let hadirToday = 0
 
-          // ✅ STEP 5: Filter & aggregate hanya untuk minggu ini
           for (const a of absensiList) {
-            if (!a.tanggal) continue;
+            if (!a.tanggal) continue
 
             try {
-              const eventDate = new Date(a.tanggal);
-              eventDate.setHours(0, 0, 0, 0);
-              const absenDateString = eventDate.toISOString().split('T')[0];
+              const eventDate = new Date(a.tanggal)
+              eventDate.setHours(0, 0, 0, 0)
+              const absenDateString = eventDate.toISOString().split("T")[0]
 
               if (absenDateString < mondayString || absenDateString > fridayString) {
-                continue;
+                continue
               }
 
               if (chartDataByDate[absenDateString]) {
                 if (a.jumlahHadir !== undefined && a.jumlahHadir !== null) {
-                  chartDataByDate[absenDateString].hadir += a.jumlahHadir;
-                } else if (a.status === 'hadir' || a.status === 'Hadir' || a.status === 'HADIR') {
-                  chartDataByDate[absenDateString].hadir += 1;
+                  chartDataByDate[absenDateString].hadir += a.jumlahHadir
+                } else if (a.status === "hadir" || a.status === "Hadir" || a.status === "HADIR") {
+                  chartDataByDate[absenDateString].hadir += 1
                 }
 
                 if (a.jumlahTidakHadir !== undefined && a.jumlahTidakHadir !== null) {
-                  chartDataByDate[absenDateString].tidakHadir += a.jumlahTidakHadir;
-                } else if (a.status === 'tidak_hadir' || a.status === 'Tidak Hadir' || a.status === 'TIDAK_HADIR') {
-                  chartDataByDate[absenDateString].tidakHadir += 1;
+                  chartDataByDate[absenDateString].tidakHadir += a.jumlahTidakHadir
+                } else if (a.status === "tidak_hadir" || a.status === "Tidak Hadir" || a.status === "TIDAK_HADIR") {
+                  chartDataByDate[absenDateString].tidakHadir += 1
                 }
               }
 
               if (absenDateString === todayString) {
                 if (a.jumlahHadir !== undefined && a.jumlahHadir !== null) {
-                  hadirToday += a.jumlahHadir;
-                } else if (a.status === 'hadir' || a.status === 'Hadir' || a.status === 'HADIR') {
-                  hadirToday += 1;
+                  hadirToday += a.jumlahHadir
+                } else if (a.status === "hadir" || a.status === "Hadir" || a.status === "HADIR") {
+                  hadirToday += 1
                 }
               }
             } catch (e) {
-              console.warn('[ABSENSI] Error parsing date:', e);
-              continue;
+              continue
             }
           }
 
-          return hadirToday;
+          return hadirToday
         } catch (err) {
-          console.warn(`[ABSENSI] Error fetching for kelas ${kelas.id}:`, err);
-          return 0;
+          return 0
         }
-      });
+      })
 
-      const hadirPerKelas = await Promise.all(absensiPromises);
-      totalHadirHariIni = hadirPerKelas.reduce((sum, count) => sum + count, 0);
+      const hadirPerKelas = await Promise.all(absensiPromises)
+      totalHadirHariIni = hadirPerKelas.reduce((sum, count) => sum + count, 0)
 
-      // ✅ STEP 6: Convert ke chart format
       const chartData = Object.keys(chartDataByDate)
         .sort()
-        .map(dateKey => chartDataByDate[dateKey]);
+        .map((dateKey) => chartDataByDate[dateKey])
 
-      // ✅ STEP 7: Update states
-      setAbsensiChart(chartData);
-      setStats(prev => ({
+      setAbsensiChart(chartData)
+      setStats((prev) => ({
         ...prev,
         hadirHariIni: totalHadirHariIni,
         pengirimanSelesai: Math.floor(totalHadirHariIni * 0.8),
-        sudahMakan: totalHadirHariIni
-      }));
+        sudahMakan: totalHadirHariIni,
+      }))
     } catch (err) {
-      console.error('[ABSENSI] Error aggregating:', err);
-      setStats(prev => ({
+      console.error("[ABSENSI] Error aggregating:", err)
+      setStats((prev) => ({
         ...prev,
         hadirHariIni: 0,
         pengirimanSelesai: 0,
-        sudahMakan: 0
-      }));
+        sudahMakan: 0,
+      }))
     }
-  };
+  }, [])
 
-  // ✅ FIX #3: FETCH PENGIRIMAN
-  const fetchPengirimanData = async (schoolId: string, token: string) => {
+  const fetchPengirimanData = useCallback(async (schoolId: string, token: string) => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/sekolah/${schoolId}/pengiriman`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/pengiriman`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
 
       if (!response.ok) {
-        console.warn('Endpoint pengiriman tidak ditemukan atau error');
-        return;
+        return
       }
 
-      const data = await response.json();
-      
+      const data = await response.json()
+
       if (Array.isArray(data.data) && data.data.length > 0) {
-        const latestPengiriman = data.data[0];
+        const latestPengiriman = data.data[0]
         setKalenderReminder({
           tanggalMulai: latestPengiriman.tanggal || latestPengiriman.createdAt,
-          deskripsi: `Pengiriman ke ${latestPengiriman.namaSekolah || 'Sekolah'}`,
-          status: latestPengiriman.status
-        });
+          deskripsi: `Pengiriman ke ${latestPengiriman.namaSekolah || "Sekolah"}`,
+          status: latestPengiriman.status,
+        })
       }
     } catch (err) {
-      console.error('Error fetching pengiriman:', err);
-      setKalenderReminder(null);
+      console.error("Error fetching pengiriman:", err)
+      setKalenderReminder(null)
     }
-  };
+  }, [])
 
-  // ✅ FETCH KALENDER AKADEMIK
-  const fetchKalenderAkademik = async (token: string) => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/kalender-akademik`,
-        {
+  const fetchKalenderAkademik = useCallback(
+    async (token: string) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/kalender-akademik`, {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (!response.ok) {
+          setKalenderList([])
+          return
+        }
+
+        const data = await response.json()
+
+        let kalenders = []
+        if (data.data?.kalenders && Array.isArray(data.data.kalenders)) {
+          kalenders = data.data.kalenders
+        } else if (data.kalenders && Array.isArray(data.kalenders)) {
+          kalenders = data.kalenders
+        } else if (Array.isArray(data.data)) {
+          kalenders = data.data
+        } else if (Array.isArray(data)) {
+          kalenders = data
+        }
+
+        const sortedKalenders = kalenders.sort((a: any, b: any) => {
+          const dateA = new Date(a.tanggalMulai).getTime()
+          const dateB = new Date(b.tanggalMulai).getTime()
+          return dateA - dateB
+        })
+
+        setKalenderList(sortedKalenders)
+
+        if (sortedKalenders.length > 0) {
+          const upcomingEvent =
+            sortedKalenders.find((k: any) => {
+              const eventDate = new Date(k.tanggalMulai)
+              return eventDate >= new Date()
+            }) || sortedKalenders[0]
+
+          if (upcomingEvent && !kalenderReminder) {
+            setKalenderReminder({
+              tanggalMulai: upcomingEvent.tanggalMulai,
+              deskripsi: upcomingEvent.deskripsi || "Kegiatan akademik",
+              status: "scheduled",
+            })
           }
         }
-      );
+      } catch (err) {
+        console.error("Error fetching kalender akademik:", err)
+        setKalenderList([])
+      }
+    },
+    [kalenderReminder],
+  )
+
+  const fetchMenuHariIni = useCallback(async (token: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/menu-harian/today`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
 
       if (!response.ok) {
-        console.warn('Endpoint kalender akademik tidak ditemukan');
-        return;
+        setMenuHariIni(null)
+        return
       }
 
-      const data = await response.json();
-      
-      let kalenders = [];
-      if (data.data?.kalenders && Array.isArray(data.data.kalenders)) {
-        kalenders = data.data.kalenders;
-      } else if (data.kalenders && Array.isArray(data.kalenders)) {
-        kalenders = data.kalenders;
-      } else if (Array.isArray(data.data)) {
-        kalenders = data.data;
-      } else if (Array.isArray(data)) {
-        kalenders = data;
-      }
+      const data = await response.json()
 
-      if (kalenders.length > 0) {
-        const upcomingEvent = kalenders.find((k: any) => {
-          const eventDate = new Date(k.tanggalMulai);
-          return eventDate >= new Date();
-        }) || kalenders[0];
+      let menu = null
 
-        if (upcomingEvent && !kalenderReminder) {
-          setKalenderReminder({
-            tanggalMulai: upcomingEvent.tanggalMulai,
-            deskripsi: upcomingEvent.deskripsi || 'Kegiatan akademik',
-            status: 'scheduled'
-          });
+      if (data.data) {
+        if (Array.isArray(data.data)) {
+          menu = data.data[0]
+        } else if (typeof data.data === "object") {
+          menu = data.data
         }
+      } else if (Array.isArray(data)) {
+        menu = data[0]
+      } else if (typeof data === "object" && data !== null) {
+        menu = data
+      }
+
+      if (menu) {
+        setMenuHariIni(menu)
+      } else {
+        setMenuHariIni(null)
       }
     } catch (err) {
-      console.error('Error fetching kalender akademik:', err);
+      console.error("Error fetching menu harian:", err)
+      setMenuHariIni(null)
     }
-  };
+  }, [])
+
+  useEffect(() => {
+    if (!authToken || !sekolahId) return
+    if (fetchInProgress.current) return
+
+    const now = Date.now()
+    if (now - lastFetchTime.current < FETCH_COOLDOWN) return
+
+    const fetchAllData = async () => {
+      if (fetchInProgress.current) return
+
+      try {
+        fetchInProgress.current = true
+        lastFetchTime.current = Date.now()
+
+        await Promise.all([
+          fetchSiswaData(sekolahId, authToken),
+          fetchKelasData(sekolahId, authToken),
+          fetchAbsensiData(sekolahId, authToken),
+          fetchPengirimanData(sekolahId, authToken),
+          fetchKalenderAkademik(authToken),
+          fetchMenuHariIni(authToken),
+        ])
+      } catch (err) {
+        console.error("Error fetching data:", err)
+        setError(err instanceof Error ? err.message : "Gagal memuat data")
+      } finally {
+        fetchInProgress.current = false
+      }
+    }
+
+    fetchAllData()
+  }, [
+    authToken,
+    sekolahId,
+    fetchSiswaData,
+    fetchKelasData,
+    fetchAbsensiData,
+    fetchPengirimanData,
+    fetchKalenderAkademik,
+    fetchMenuHariIni,
+  ])
 
   if (loading) {
     return (
       <SekolahLayout currentPage="dashboard">
-        <div className="space-y-6 p-6">
+        <div className="space-y-6 p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
           <div>
-            <div className="h-8 w-64 bg-gray-200 rounded animate-pulse mb-2"></div>
-            <div className="h-4 w-96 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-8 w-64 bg-slate-300 rounded-lg animate-pulse mb-2"></div>
+            <div className="h-4 w-96 bg-slate-300 rounded-lg animate-pulse"></div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -772,8 +926,8 @@ const DashboardSekolah = () => {
 
           <SkeletonChartContainer />
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <div className="h-6 w-32 bg-gray-200 rounded mb-4 animate-pulse"></div>
+          <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200">
+            <div className="h-6 w-32 bg-slate-300 rounded-lg mb-4 animate-pulse"></div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <tbody>
@@ -786,132 +940,222 @@ const DashboardSekolah = () => {
           </div>
         </div>
       </SekolahLayout>
-    );
+    )
   }
 
-  // Error state
   if (error && !authToken) {
     return (
       <SekolahLayout currentPage="dashboard">
-        <div className="p-6 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600" />
+        <div className="p-6 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 m-6">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
           <div>
             <p className="font-semibold text-red-900">{error}</p>
             <p className="text-sm text-red-700">Silakan login terlebih dahulu</p>
           </div>
         </div>
       </SekolahLayout>
-    );
+    )
   }
 
   return (
     <SekolahLayout currentPage="dashboard">
-      <div className="space-y-6 p-6">
+      <div className="space-y-6 p-8 bg-gradient-to-br from-slate-50 to-white min-h-screen">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Dashboard PIC Sekolah</h1>
-          <p className="text-gray-600">Monitoring Distribusi Makanan Bergizi & Status Gizi Siswa</p>
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-slate-900 mb-2 tracking-tight">Dashboard PIC Sekolah</h1>
+          <p className="text-slate-600 text-lg">Monitoring Distribusi Makanan Bergizi & Status Gizi Siswa</p>
         </div>
 
-        {/* Kalender Reminder */}
-        <KalenderReminder reminder={kalenderReminder} />
+        {/* Menu Harian & Kalender Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Menu + Stats */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Menu Harian Card */}
+            {menuHariIni && (
+              <div className="bg-gradient-to-r from-[#1B263A] to-[#243B55] rounded-2xl p-6 text-white shadow-lg h-fit">
+              <div className="mb-8">
+                  <p className="text-xs font-semibold opacity-90 tracking-widest uppercase">Menu Hari Ini</p>
+                  <h2 className="text-4xl font-bold mb-2 mt-2">{menuHariIni.namaMenu || "-"}</h2>
+                  <p className="text-sm opacity-90">{menuHariIni.menuPlanning?.sekolah?.nama || "Sekolah"}</p>
+                </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard 
-            title="Total Siswa" 
-            value={stats.totalSiswa} 
-            subtitle="Siswa terdaftar" 
-            icon={Users} 
-            color="bg-blue-500"
-            trend={2.5}
-          />
-          <StatCard 
-            title="Gizi Normal" 
-            value={stats.normalGizi} 
-            subtitle={`${stats.rataGizi}% dari total`} 
-            icon={CheckCircle} 
-            color="bg-green-500"
-            trend={5.2}
-          />
-          <StatCard 
-            title="Hadir Hari Ini" 
-            value={stats.hadirHariIni} 
-            subtitle={`${stats.totalSiswa > 0 ? ((stats.hadirHariIni / stats.totalSiswa) * 100).toFixed(1) : 0}% kehadiran`} 
-            icon={Activity} 
-            color="bg-purple-500"
-            trend={1.8}
-          />
-          <StatCard 
-            title="Pengiriman Selesai" 
-            value={stats.pengirimanSelesai} 
-            subtitle={`${stats.totalPengiriman} total hari ini`} 
-            icon={Truck} 
-            color="bg-orange-500"
-            trend={3.1}
-          />
-        </div>
+                <div className="grid grid-cols-2 gap-8 mb-8">
+                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4 backdrop-blur-sm">
+                <p className="text-sm opacity-90 mb-2">Kalori</p>
+                    <p className="text-3xl font-bold">{menuHariIni.kalori || 0}</p>
+                    <p className="text-xs opacity-75 mt-1">kcal</p>
+                  </div>
+                  <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4 backdrop-blur-sm">
+                  <p className="text-sm opacity-90 mb-2">Protein</p>
+                    <p className="text-3xl font-bold">{menuHariIni.protein || 0}</p>
+                    <p className="text-xs opacity-75 mt-1">g</p>
+                  </div>
+                </div>
 
-        {/* Additional Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard 
-            title="Gizi Kurang" 
-            value={stats.giziKurang} 
-            subtitle="Perlu perhatian" 
-            icon={AlertCircle} 
-            color="bg-yellow-500"
-          />
-          <StatCard 
-            title="Berisiko Stunting" 
-            value={stats.stuntingRisiko} 
-            subtitle="Memerlukan intervensi" 
-            icon={TrendingUp} 
-            color="bg-red-500"
-          />
-          <StatCard 
-            title="Total Kelas" 
-            value={stats.totalKelas} 
-            subtitle="Kelas aktif" 
-            icon={BarChart3} 
-            color="bg-indigo-500"
-          />
-        </div>
+                <div className="border-t border-white border-opacity-30 my-6"></div>
 
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Gizi Distribution */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Distribusi Status Gizi</h3>
-              <CheckCircle className="w-5 h-5 text-gray-400" />
+                <div className="grid grid-cols-2 gap-8">
+                  <div>
+                    <p className="text-sm opacity-90 mb-2">Biaya per Tray</p>
+                    <p className="text-2xl font-bold">Rp {menuHariIni.biayaPerTray?.toLocaleString("id-ID") || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm opacity-90 mb-2">Waktu Masak</p>
+                    <p className="text-2xl font-bold">
+                      {menuHariIni.jamMulaiMasak} - {menuHariIni.jamSelesaiMasak}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STAT CARDS GRID */}
+            <div className="grid grid-cols-2 gap-4">
+              <StatCard
+                title="Total Siswa"
+                value={stats.totalSiswa}
+                subtitle="Semua siswa aktif"
+                icon={Users}
+                color="bg-blue-500"
+              />
+              <StatCard
+                title="Gizi Normal"
+                value={stats.normalGizi}
+                subtitle="Status optimal"
+                icon={Heart}
+                color="bg-green-500"
+              />
+              <StatCard
+                title="Hadir Hari Ini"
+                value={stats.hadirHariIni}
+                subtitle="Siswa hadir"
+                icon={CheckCircle}
+                color="bg-emerald-500"
+              />
+              <StatCard
+                title="Pengiriman Selesai"
+                value={stats.pengirimanSelesai}
+                subtitle="Porsi dikirim"
+                icon={Truck}
+                color="bg-orange-500"
+              />
+              <StatCard
+                title="Gizi Kurang"
+                value={stats.giziKurang}
+                subtitle="Perlu intervensi"
+                icon={AlertCircle}
+                color="bg-yellow-500"
+              />
+              <StatCard
+                title="Risiko Stunting"
+                value={stats.stuntingRisiko}
+                subtitle="Monitoring ketat"
+                icon={AlertTriangle}
+                color="bg-red-500"
+              />
+              <StatCard
+                title="Total Kelas"
+                value={stats.totalKelas}
+                subtitle="Kelas aktif"
+                icon={BookOpen}
+                color="bg-purple-500"
+              />
+              <StatCard
+                title="Sudah Makan"
+                value={stats.sudahMakan}
+                subtitle="Siswa terlayani"
+                icon={UtensilsCrossed}
+                color="bg-cyan-500"
+              />
             </div>
-            <GiziDistributionChart data={siswaDiagram} />
           </div>
 
-          {/* Absensi Chart */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Absensi Mingguan</h3>
-              <Activity className="w-5 h-5 text-gray-400" />
+          {/* Right Column - Kalender + List Acara */}
+          <div className="space-y-6">
+            {/* Kalender Reminder */}
+            <KalenderReminder reminder={kalenderReminder} />
+
+            {/* List Acara Kalender */}
+            <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-bold text-slate-900">Daftar Acara</h3>
+                <a
+                  href="/sekolah/kalender-akademik"
+                  className="text-sm text-slate-600 hover:text-orange-600 font-semibold flex items-center gap-1 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </a>
+              </div>
+
+              {kalenderList.length > 0 ? (
+                <div className="space-y-2">
+                  {kalenderList.slice(0, 4).map((acara: any, idx: number) => {
+                    const tanggalMulai = new Date(acara.tanggalMulai)
+                    const tanggalFormat = tanggalMulai.toLocaleDateString("id-ID", {
+                      day: "2-digit",
+                      month: "short",
+                    })
+
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-all duration-200 group cursor-pointer"
+                      >
+                        <div className="flex-shrink-0 mt-1">
+                          <div className="flex items-center justify-center w-9 h-9 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                            <Calendar className="w-4 h-4 text-blue-600" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-slate-900 truncate text-sm">{acara.deskripsi}</p>
+                          <p className="text-xs text-slate-500 mt-1">{tanggalFormat}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="p-4 bg-slate-50 rounded-xl text-center">
+                  <p className="text-sm text-slate-600 mb-3">Belum ada acara</p>
+                  <a
+                    href="/sekolah/kalender-akademik"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all text-sm font-medium"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Buat Acara
+                  </a>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Absensi Chart */}
+          <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
+            <h3 className="text-lg font-bold text-slate-900 mb-6">📊 Absensi Minggu Ini</h3>
             <AttendanceChart data={absensiChart} />
           </div>
+
+          {/* Distribusi Gizi Chart */}
+          <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
+            <h3 className="text-lg font-bold text-slate-900 mb-6">🍎 Distribusi Status Gizi</h3>
+            <GiziDistributionChart data={siswaDiagram} />
+          </div>
         </div>
 
-        {/* Consumption Chart */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Konsumsi Mingguan</h3>
-            <UtensilsCrossed className="w-5 h-5 text-gray-400" />
-          </div>
+        {/* Konsumsi Harian Chart */}
+        <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
+          <h3 className="text-lg font-bold text-slate-900 mb-6">🍽️ Konsumsi Harian</h3>
           <ConsumptionChart data={konsumsiHarian} />
         </div>
 
         {/* Kelas Table */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Data Kelas</h3>
-            <button className="text-sm text-[#1B263A] hover:text-[#D0B064] font-medium flex items-center gap-1 transition-colors">
+            <h3 className="text-lg font-bold text-slate-900">📚 Data Kelas</h3>
+            <button className="text-sm text-slate-600 hover:text-slate-900 font-medium flex items-center gap-1 transition-colors">
               Lihat Semua
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -920,29 +1164,32 @@ const DashboardSekolah = () => {
           {kelasList.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
                   <tr>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Kelas</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Total Siswa</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Laki-laki</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Perempuan</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Alergi</th>
+                    <th className="text-left py-4 px-4 text-sm font-bold text-slate-700">Kelas</th>
+                    <th className="text-left py-4 px-4 text-sm font-bold text-slate-700">Total Siswa</th>
+                    <th className="text-left py-4 px-4 text-sm font-bold text-slate-700">Laki-laki</th>
+                    <th className="text-left py-4 px-4 text-sm font-bold text-slate-700">Perempuan</th>
+                    <th className="text-left py-4 px-4 text-sm font-bold text-slate-700">Alergi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {kelasList.slice(0, 10).map((kelas: any, idx: number) => (
-                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="py-4 px-4 font-semibold text-gray-900">{kelas.nama}</td>
-                      <td className="py-4 px-4 text-gray-600">{kelas.totalSiswa || 0}</td>
-                      <td className="py-4 px-4 text-gray-600">{kelas.lakiLaki || 0}</td>
-                      <td className="py-4 px-4 text-gray-600">{kelas.perempuan || 0}</td>
+                    <tr
+                      key={idx}
+                      className="border-b border-slate-200 hover:bg-slate-50 transition-colors duration-150"
+                    >
+                      <td className="py-4 px-4 font-semibold text-slate-900">{kelas.nama}</td>
+                      <td className="py-4 px-4 text-slate-700 font-medium">{kelas.totalSiswa || 0}</td>
+                      <td className="py-4 px-4 text-slate-600">{kelas.lakiLaki || 0}</td>
+                      <td className="py-4 px-4 text-slate-600">{kelas.perempuan || 0}</td>
                       <td className="py-4 px-4">
                         {kelas.alergiCount > 0 ? (
-                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                          <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 inline-block">
                             {kelas.alergiCount} siswa
                           </span>
                         ) : (
-                          <span className="text-gray-400">-</span>
+                          <span className="text-slate-400">-</span>
                         )}
                       </td>
                     </tr>
@@ -951,29 +1198,14 @@ const DashboardSekolah = () => {
               </table>
             </div>
           ) : (
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
-              <p className="text-yellow-800">Data kelas tidak tersedia</p>
+            <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-xl text-center">
+              <p className="text-yellow-800 font-medium">Data kelas tidak tersedia</p>
             </div>
           )}
         </div>
-
-        {/* Additional Info Box */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-blue-900 mb-2">Pengiriman Hari Ini</h3>
-            <p className="text-3xl font-bold text-blue-600 mb-2">{stats.sudahMakan}/{stats.totalPengiriman || stats.totalSiswa}</p>
-            <p className="text-sm text-blue-700">Pengiriman telah diterima sekolah</p>
-          </div>
-
-          <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-green-900 mb-2">Status Kehadiran</h3>
-            <p className="text-3xl font-bold text-green-600 mb-2">{stats.hadirHariIni}/{stats.totalSiswa}</p>
-            <p className="text-sm text-green-700">Siswa hadir hingga saat ini</p>
-          </div>
-        </div>
       </div>
     </SekolahLayout>
-  );
-};
+  )
+}
 
-export default DashboardSekolah;
+export default DashboardSekolah

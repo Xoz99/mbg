@@ -411,6 +411,9 @@ const AdminTickets = () => {
               >
                 <option value="">Semua Role</option>
                 <option value="PIC_SEKOLAH">PIC Sekolah</option>
+                <option value="PIC_DAPUR">PIC Dapur</option>
+                <option value="KEMENTRIAN">Kementrian</option>
+                <option value="PEMPROV">Pemerintah Provinsi</option>
                 <option value="SUPERADMIN">Super Admin</option>
                 <option value="ADMIN">Admin</option>
               </select>

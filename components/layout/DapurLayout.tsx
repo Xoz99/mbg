@@ -20,6 +20,7 @@ import {
   CheckCircle,
   Loader2,
   CarIcon,
+  ChevronDown,
 } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
@@ -81,7 +82,6 @@ const BubbleReport = ({
       setJudul('');
       setDeskripsi('');
 
-      // Auto close after 3 seconds
       setTimeout(() => {
         setIsOpen(false);
         setStatus('idle');
@@ -107,7 +107,6 @@ const BubbleReport = ({
 
   return (
     <>
-      {/* Bubble Button */}
       <button
         onClick={() => setIsOpen(true)}
         className="fixed bottom-8 right-8 w-16 h-16 bg-gradient-to-br from-[#D0B064] to-[#C9A355] text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40"
@@ -116,7 +115,6 @@ const BubbleReport = ({
         <MessageCircle className="w-8 h-8" />
       </button>
 
-      {/* Modal Overlay */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-50 transition-opacity"
@@ -124,7 +122,6 @@ const BubbleReport = ({
         />
       )}
 
-      {/* Report Modal */}
       <div
         className={`fixed bottom-24 right-8 w-96 bg-white rounded-2xl shadow-2xl z-50 transition-all transform ${
           isOpen 
@@ -132,7 +129,6 @@ const BubbleReport = ({
             : 'opacity-0 scale-75 pointer-events-none'
         }`}
       >
-        {/* Header */}
         <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4 rounded-t-2xl flex items-center justify-between">
           <h3 className="text-white font-bold text-lg">Laporkan Masalah</h3>
           <button
@@ -143,10 +139,8 @@ const BubbleReport = ({
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6">
           {status === 'success' ? (
-            // Success Message
             <div className="flex flex-col items-center justify-center py-8">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                 <CheckCircle className="w-8 h-8 text-green-600" />
@@ -157,9 +151,7 @@ const BubbleReport = ({
               </p>
             </div>
           ) : (
-            // Form
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Judul Input */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Judul Laporan
@@ -174,7 +166,6 @@ const BubbleReport = ({
                 />
               </div>
 
-              {/* Deskripsi Input */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Deskripsi Detail
@@ -189,7 +180,6 @@ const BubbleReport = ({
                 />
               </div>
 
-              {/* Error Message */}
               {errorMessage && (
                 <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -197,7 +187,6 @@ const BubbleReport = ({
                 </div>
               )}
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={status === 'loading' || !judul.trim() || !deskripsi.trim()}
@@ -216,7 +205,6 @@ const BubbleReport = ({
                 )}
               </button>
 
-              {/* Info Text */}
               <p className="text-xs text-gray-500 text-center">
                 Laporan Anda akan ditinjau oleh tim support kami
               </p>
@@ -236,6 +224,7 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState("");
+  const [expandedMenu, setExpandedMenu] = useState<string | null>('operasional');
   
   const [dapurInfo, setDapurInfo] = useState({
     nama: '',
@@ -263,7 +252,6 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
       console.log('User data:', user);
       console.log('Dapur ID from storage:', dapurId);
       
-      // Set user info immediately
       setDapurInfo(prev => ({
         ...prev,
         pic: user.name || '-',
@@ -271,11 +259,9 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
         phone: user.phone || '',
       }));
 
-      // Fetch dapur detail from API if dapurId exists
       if (dapurId) {
         fetchDapurDetail(dapurId, token);
       } else {
-        // Jika tidak ada dapurId, cari dapur berdasarkan PIC user
         findDapurByPIC(user.id, user.name, token);
       }
     } catch (error) {
@@ -285,13 +271,11 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
     }
   }, [router]);
 
-  // Fungsi untuk mencari dapur berdasarkan PIC ID atau nama
   const findDapurByPIC = async (picId: string, picName: string, token: string) => {
     try {
       setLoading(true);
       console.log('Searching for dapur with PIC ID:', picId);
       
-      // Fetch list dapur
       const response = await fetch(
         `${API_BASE_URL}/api/dapur?page=1&limit=100`,
         {
@@ -312,7 +296,6 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
       const result = await response.json();
       console.log('Dapur list response:', result);
       
-      // Parse response - bisa berbagai struktur
       let dapurList = [];
       if (Array.isArray(result.data?.data)) {
         dapurList = result.data.data;
@@ -324,7 +307,6 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
 
       console.log('Parsed dapur list:', dapurList);
 
-      // Cari dapur yang memiliki PIC dengan ID atau nama yang match
       let foundDapur = null;
       
       for (const dapur of dapurList) {
@@ -342,11 +324,8 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
       }
 
       if (foundDapur) {
-        // Simpan dapurId ke localStorage untuk digunakan lagi
         localStorage.setItem('userDapurId', foundDapur.id);
         console.log('Dapur ID saved:', foundDapur.id);
-        
-        // Update dapurInfo dengan data yang ditemukan
         updateDapurInfo(foundDapur);
       } else {
         console.warn('No dapur found for this PIC');
@@ -387,7 +366,6 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
       const result = await response.json();
       console.log('Dapur data:', result);
       
-      // Handle different response structures
       const dapur = result.data || result;
 
       updateDapurInfo(dapur);
@@ -400,7 +378,6 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
   };
 
   const updateDapurInfo = (dapur: any) => {
-    // Ambil PIC dari picDapur array
     const picData = dapur.picDapur && Array.isArray(dapur.picDapur) && dapur.picDapur.length > 0 ? dapur.picDapur[0] : null;
 
     setDapurInfo({
@@ -425,16 +402,59 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
     return '';
   };
 
+  // ===== NAVIGATION STRUCTURE YANG DIKELOMPOKKAN =====
   const navigation = [
     { id: 'dashboard', name: 'Dashboard', icon: Home, path: '/dapur/dashboard' },
-    { id: 'produksi', name: 'Produksi Harian', icon: ChefHat, path: '/dapur/produksi' },
-    { id: 'menu', name: 'Menu Planning', icon: ClipboardList, path: '/dapur/menu' },
-    { id: 'bahan', name: 'Stok Bahan Baku', icon: Package, path: '/dapur/bahan' },
-    { id: 'sekolah', name: 'Sekolah Terdekat', icon: MapPin, path: '/dapur/sekolah-terdekat' },
-    { id: 'daftardriver', name: 'Daftar Driver', icon: CarIcon, path: '/dapur/assign-driver' },
-    { id: 'scan', name: 'Check Point', icon: QrCode, path: '/dapur/scan' },
-    { id: 'karyawan', name: 'Data Karyawan', icon: Users, path: '/dapur/karyawan' },
-    { id: 'laporan', name: 'Laporan Produksi', icon: BarChart3, path: '/dapur/laporan' },
+    
+    // KATEGORI: OPERASIONAL
+    { 
+      id: 'operasional', 
+      name: 'Operasional', 
+      icon: ChefHat, 
+      hasSubmenu: true,
+      submenu: [
+        { id: 'produksi', name: 'Produksi Harian', path: '/dapur/produksi' },
+        { id: 'menu', name: 'Menu Planning', path: '/dapur/menu' },
+        { id: 'sekolah', name: 'Sekolah Terdekat', path: '/dapur/sekolah-terdekat' },
+      ]
+    },
+
+    // KATEGORI: INVENTORY
+    { 
+      id: 'inventory', 
+      name: 'Inventory', 
+      icon: Package, 
+      hasSubmenu: true,
+      submenu: [
+        { id: 'bahan', name: 'Stok Bahan Baku', path: '/dapur/bahan' },
+      ]
+    },
+
+    // KATEGORI: DISTRIBUSI & DRIVER
+    { 
+      id: 'distribusi', 
+      name: 'Distribusi', 
+      icon: CarIcon, 
+      hasSubmenu: true,
+      submenu: [
+        { id: 'daftardriver', name: 'Daftar Driver', path: '/dapur/assign-driver' },
+        { id: 'scan', name: 'Check Point', path: '/dapur/scan' },
+        { id: 'monitoringdriver', name: 'Monitoring Driver', path: '/dapur/monitoringdriver' },
+
+      ]
+    },
+
+    // KATEGORI: MANAJEMEN
+    { 
+      id: 'manajemen', 
+      name: 'Manajemen', 
+      icon: BarChart3, 
+      hasSubmenu: true,
+      submenu: [
+        { id: 'karyawan', name: 'Data Karyawan', path: '/dapur/karyawan' },
+        { id: 'laporan', name: 'Laporan Produksi', path: '/dapur/laporan' },
+      ]
+    },
   ];
 
   const handleNavigation = (path: string) => {
@@ -451,6 +471,10 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
       document.cookie = 'mbg_token=; path=/; max-age=0';
     }
     router.push('/auth/login');
+  };
+
+  const toggleMenu = (menuId: string) => {
+    setExpandedMenu(expandedMenu === menuId ? null : menuId);
   };
 
   return (
@@ -491,7 +515,7 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
           )}
         </div>
 
-        {/* Dapur Info Card - Only when sidebar open */}
+        {/* Dapur Info Card */}
         {sidebarOpen && (
           <div className="mx-3 mt-4 mb-2 bg-white/5 rounded-lg p-3 border border-white/10">
             {loading ? (
@@ -531,22 +555,75 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
+          {navigation.map((item: any) => {
             const Icon = item.icon;
             const isActive = currentPage === item.id;
+            const isSubmenuOpen = expandedMenu === item.id;
+
             return (
-              <button
-                key={item.id}
-                onClick={() => handleNavigation(item.path)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                  isActive
-                    ? 'bg-[#D0B064] text-white shadow-lg'
-                    : 'text-gray-300 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                {sidebarOpen && <span className="font-medium text-sm">{item.name}</span>}
-              </button>
+              <div key={item.id}>
+                <button
+                  onClick={() => {
+                    if (item.hasSubmenu) {
+                      toggleMenu(item.id);
+                    } else {
+                      handleNavigation(item.path);
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                    isActive
+                      ? 'bg-[#D0B064] text-white shadow-lg'
+                      : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  {sidebarOpen && (
+                    <>
+                      <span className="font-medium text-sm flex-1 text-left">{item.name}</span>
+                      {item.hasSubmenu && (
+                        <ChevronDown 
+                          className={`w-4 h-4 transition-transform ${
+                            isSubmenuOpen ? 'rotate-180' : ''
+                          }`}
+                        />
+                      )}
+                    </>
+                  )}
+                </button>
+
+                {/* Submenu dengan Animasi */}
+                {item.hasSubmenu && sidebarOpen && (
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                      isSubmenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                    }`}
+                  >
+                    <div className="ml-4 mt-1 space-y-1 border-l border-white/10 pl-0">
+                      {item.submenu.map((subitem: any, index: number) => (
+                        <button
+                          key={subitem.id}
+                          onClick={() => handleNavigation(subitem.path)}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm transform ${
+                            isSubmenuOpen
+                              ? 'translate-x-0 opacity-100'
+                              : '-translate-x-2 opacity-0'
+                          } ${
+                            currentPage === subitem.id
+                              ? 'bg-[#D0B064]/30 text-[#D0B064] font-medium'
+                              : 'text-gray-400 hover:text-white hover:bg-white/5'
+                          }`}
+                          style={{
+                            transitionDelay: isSubmenuOpen ? `${index * 50}ms` : '0ms',
+                          }}
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                          <span className="text-left">{subitem.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>

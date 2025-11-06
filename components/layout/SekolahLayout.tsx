@@ -18,7 +18,8 @@ import {
   BookOpen,
   MessageCircle,
   Send,
-  CheckCircle
+  CheckCircle,
+  ChevronDown
 } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
@@ -37,7 +38,7 @@ interface BubbleReportProps {
 }
 
 const BubbleReport = ({ 
-  apiBaseUrl = "http://72.60.79.126:3000",
+  apiBaseUrl = "https://demombgv1.xyz",
   authToken = ""
 }: BubbleReportProps) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -231,7 +232,6 @@ const BubbleReport = ({
 const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutProps) => {
   const router = useRouter();
   
-  // ✅ FIX: useRef untuk track initialization
   const hasInitialized = useRef(false);
   const fetchInProgress = useRef(false);
 
@@ -241,6 +241,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
   const [error, setError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState("");
   const [sekolahId, setSekolahId] = useState("");
+  const [expandedMenu, setExpandedMenu] = useState<string | null>('data');
   
   const [sekolahInfo, setSekolahInfo] = useState({
     nama: '',
@@ -254,27 +255,44 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
     longitude: 0
   });
 
-  const navigation = [
-    { id: 'dashboard', name: 'Dashboard', icon: Home, path: '/sekolah/dashboard' },
-    { id: 'siswa', name: 'Data Siswa', icon: Users, path: '/sekolah/siswa' },
-    { id: 'tracking', name: 'Tracking MBG', icon: MapPin, path: '/sekolah/tracking' },
-    { id: 'kelas', name: 'Data Kelas', icon: GraduationCap, path: '/sekolah/kelas' },
-    { id: 'absensi', name: 'Absensi Penerima', icon: ClipboardCheck, path: '/sekolah/absensi' },
-    { id: 'kalender-akademik', name: 'Kalender Akademik', icon: Calendar, path: '/sekolah/kalender-akademik' }
-  ];
+  const getNavigation = () => {
+    return [
+      { id: 'dashboard', name: 'Dashboard', icon: Home, path: '/sekolah/dashboard' },
+      
+      // KATEGORI: DATA
+      {
+        id: 'data',
+        name: 'Data',
+        icon: GraduationCap,
+        hasSubmenu: true,
+        submenu: [
+          { id: 'siswa', name: 'Data Siswa', path: '/sekolah/siswa' },
+          { id: 'kelas', name: 'Data Kelas', path: '/sekolah/kelas' },
+          { id: 'kalender-akademik', name: 'Kalender Akademik', path: '/sekolah/kalender-akademik' }
+        ]
+      },
 
-  const topTabs = [
-    { id: 'dashboard', name: 'Dashboard' },
-    { id: 'sekolah', name: 'Sekolah' },
-    { id: 'daerah', name: 'Daerah' }
-  ];
+      // KATEGORI: OPERASIONAL
+      {
+        id: 'operasional',
+        name: 'Operasional',
+        icon: ClipboardCheck,
+        hasSubmenu: true,
+        submenu: [
+          { id: 'absensi', name: 'Absensi Penerima', path: '/sekolah/absensi' },
+          { id: 'tracking', name: 'Tracking MBG', path: '/sekolah/tracking' },
+        ]
+      },
+    ];
+  };
 
-  // ✅ FIX #1: Initialization effect dengan guard
+  const navigation = getNavigation();
+
   useEffect(() => {
-    if (hasInitialized.current) return;  // ← GUARD BARU
+    if (hasInitialized.current) return;
     if (typeof window === 'undefined') return;
 
-    hasInitialized.current = true;  // ← SET FLAG
+    hasInitialized.current = true;
 
     const userData = localStorage.getItem('mbg_user');
     const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
@@ -289,13 +307,11 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
       const user = JSON.parse(userData);
       setAuthToken(token);
       
-      // Set sekolahId - bisa dari localStorage atau kosong (akan fetch nanti)
       if (storedSekolahId) {
         setSekolahId(storedSekolahId);
         console.log("[SEKOLAH LAYOUT] Sekolah ID dari localStorage:", storedSekolahId);
       } else {
-        // Trigger findSekolahByPIC dengan set empty sekolahId
-        setSekolahId('');  // ← Akan trigger effect #2 untuk cari PIC
+        setSekolahId('');
       }
     } catch (err) {
       console.error('Error parsing user data:', err);
@@ -303,19 +319,17 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
     }
   }, [router]);
 
-  // ✅ FIX #2: Fetch sekolah detail dengan guard
   useEffect(() => {
-    if (!sekolahId && !authToken) return;  // ← Guard #1
-    if (fetchInProgress.current) return;  // ← Guard #2: Prevent duplicate fetch
+    if (!sekolahId && !authToken) return;
+    if (fetchInProgress.current) return;
 
     const fetchData = async () => {
-      if (fetchInProgress.current) return;  // ← Double check
+      if (fetchInProgress.current) return;
       
       try {
-        fetchInProgress.current = true;  // ← SET FLAG
+        fetchInProgress.current = true;
         setLoading(true);
 
-        // Jika sekolahId kosong, cari berdasarkan PIC
         if (!sekolahId) {
           const userData = localStorage.getItem('mbg_user');
           if (userData && authToken) {
@@ -323,7 +337,6 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
             await findSekolahByPIC(user.id, authToken);
           }
         } else {
-          // Fetch detail sekolah yang sudah ada
           await fetchSekolahDetail(sekolahId, authToken);
         }
 
@@ -332,7 +345,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
         console.error('[SEKOLAH LAYOUT] Error in fetch:', err);
         setLoading(false);
       } finally {
-        fetchInProgress.current = false;  // ← RESET FLAG
+        fetchInProgress.current = false;
       }
     };
 
@@ -369,7 +382,6 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
         sekolahList = result;
       }
 
-      // Cari sekolah yang memiliki PIC dengan ID yang match
       let foundSekolah = null;
 
       for (const sekolah of sekolahList) {
@@ -388,8 +400,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
 
       if (foundSekolah) {
         localStorage.setItem('sekolahId', foundSekolah.id);
-        setSekolahId(foundSekolah.id);  // ← Ini akan trigger effect #2 untuk fetch detail
-        // ❌ JANGAN panggil updateSekolahInfo di sini
+        setSekolahId(foundSekolah.id);
       } else {
         console.warn("[SEKOLAH LAYOUT] Sekolah tidak ditemukan untuk PIC ini");
         setError('Sekolah tidak ditemukan untuk PIC ini');
@@ -421,10 +432,8 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
       const result = await response.json();
       console.log("[SEKOLAH LAYOUT] Sekolah detail:", result);
 
-      // Extract sekolah dari result.data atau result langsung
       let sekolah = result.data || result;
       
-      // Jika result.data adalah object dengan data di dalamnya
       if (sekolah && typeof sekolah === 'object' && !sekolah.nama && sekolah.data) {
         sekolah = sekolah.data;
       }
@@ -437,11 +446,9 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
     }
   };
 
-  // ✅ FIX #3: updateSekolahInfo dengan guard
   const updateSekolahInfo = (sekolah: any) => {
-    if (!sekolah) return;  // ← GUARD: Jangan update jika sekolah null
+    if (!sekolah) return;
 
-    // Ambil PIC dari picSekolah array
     const picData = sekolah.picSekolah && Array.isArray(sekolah.picSekolah) && sekolah.picSekolah.length > 0 
       ? sekolah.picSekolah[0] 
       : null;
@@ -462,7 +469,6 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
     });
 
     setError(null);
-    // ❌ JANGAN ubah loading state di sini, biarkan effect handle
   };
 
   const extractKota = (alamat: string): string => {
@@ -494,6 +500,10 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
       document.cookie = 'mbg_token=; path=/; max-age=0';
     }
     router.push('/auth/login');
+  };
+
+  const toggleMenu = (menuId: string) => {
+    setExpandedMenu(expandedMenu === menuId ? null : menuId);
   };
 
   return (
@@ -539,7 +549,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
           )}
         </div>
 
-        {/* Sekolah Info Card - Only when sidebar open */}
+        {/* Sekolah Info Card */}
         {sidebarOpen && (
           <div className="mx-3 mt-4 mb-2 bg-white/5 rounded-lg p-3 border border-white/10">
             {loading ? (
@@ -579,22 +589,75 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
+          {navigation.map((item: any) => {
             const Icon = item.icon;
             const isActive = currentPage === item.id;
+            const isSubmenuOpen = expandedMenu === item.id;
+
             return (
-              <button
-                key={item.id}
-                onClick={() => handleNavigation(item.path)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                  isActive 
-                    ? 'bg-[#D0B064] text-white shadow-lg' 
-                    : 'text-gray-300 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                {sidebarOpen && <span className="font-medium text-sm">{item.name}</span>}
-              </button>
+              <div key={item.id}>
+                <button
+                  onClick={() => {
+                    if (item.hasSubmenu) {
+                      toggleMenu(item.id);
+                    } else {
+                      handleNavigation(item.path);
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                    isActive 
+                      ? 'bg-[#D0B064] text-white shadow-lg' 
+                      : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  {sidebarOpen && (
+                    <>
+                      <span className="font-medium text-sm flex-1 text-left">{item.name}</span>
+                      {item.hasSubmenu && (
+                        <ChevronDown 
+                          className={`w-4 h-4 transition-transform ${
+                            isSubmenuOpen ? 'rotate-180' : ''
+                          }`}
+                        />
+                      )}
+                    </>
+                  )}
+                </button>
+
+                {/* Submenu dengan Animasi */}
+                {item.hasSubmenu && sidebarOpen && (
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                      isSubmenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                    }`}
+                  >
+                    <div className="ml-4 mt-1 space-y-1 border-l border-white/10 pl-0">
+                      {item.submenu.map((subitem: any, index: number) => (
+                        <button
+                          key={subitem.id}
+                          onClick={() => handleNavigation(subitem.path)}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm transform ${
+                            isSubmenuOpen
+                              ? 'translate-x-0 opacity-100'
+                              : '-translate-x-2 opacity-0'
+                          } ${
+                            currentPage === subitem.id
+                              ? 'bg-[#D0B064]/30 text-[#D0B064] font-medium'
+                              : 'text-gray-400 hover:text-white hover:bg-white/5'
+                          }`}
+                          style={{
+                            transitionDelay: isSubmenuOpen ? `${index * 50}ms` : '0ms',
+                          }}
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                          <span className="text-left">{subitem.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>

@@ -306,16 +306,6 @@ export default function ProduksiHarianPage() {
             <h1 className="text-3xl font-bold text-gray-900">Produksi Harian</h1>
             <p className="text-gray-600 mt-1">Monitor delivery batch dan tracking checkpoint</p>
           </div>
-          <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-[#D0B064] text-[#D0B064] rounded-xl hover:bg-[#D0B064] hover:text-white transition-colors font-semibold shadow-sm">
-              <QrCode className="w-5 h-5" />
-              Scan Checkpoint
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-[#D0B064] text-white rounded-xl hover:bg-[#C9A355] transition-colors font-semibold shadow-sm">
-              <Plus className="w-5 h-5" />
-              Batch Baru
-            </button>
-          </div>
         </div>
 
         {batches.length === 0 ? (
@@ -330,9 +320,7 @@ export default function ProduksiHarianPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <StatCard title="TOTAL TARGET" value={stats.total.toLocaleString()} subtitle="trays hari ini" icon={Utensils} color="bg-blue-600" />
-              <StatCard title="SUDAH PACKING" value={stats.packed.toLocaleString()} subtitle={`${stats.progress}% target`} icon={CheckCircle} color="bg-green-600" trend={stats.progress} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <StatCard title="SEDANG PROSES" value={stats.inProgress} subtitle="batch" icon={Flame} color="bg-orange-600" />
               <StatCard title="SELESAI" value={stats.completed} subtitle="batch" icon={Package} color="bg-purple-600" />
               <StatCard title="CHECKPOINTS" value={stats.totalCheckpoints} subtitle="QR scans" icon={QrCode} color="bg-indigo-600" />
@@ -399,14 +387,6 @@ export default function ProduksiHarianPage() {
                       </button>
                     ))}
                   </div>
-                </div>
-                <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
-                  <button onClick={() => setViewMode('grid')} className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'text-gray-600'}`}>
-                    Grid
-                  </button>
-                  <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-600'}`}>
-                    List
-                  </button>
                 </div>
               </div>
             </div>

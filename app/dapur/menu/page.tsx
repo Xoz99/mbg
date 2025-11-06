@@ -26,6 +26,7 @@ interface MenuHarian {
   kalori: number
   protein: number
   lemak: number
+  targetTray: number
   karbohidrat: number
   isBooked?: boolean
 }
@@ -739,6 +740,17 @@ function ModalCreateMenuHarian({
                 />
               </div>
               <div>
+                <label className="block text-xs font-semibold mb-2 text-gray-600">Target Tray (biji) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.targetTray}
+                  onChange={(e) => setFormData({ ...formData, targetTray: e.target.value })}
+                  placeholder="8"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
+                />
+              </div>
+              <div>
                 <label className="block text-xs font-semibold mb-2 text-gray-600">Karbohidrat (g) *</label>
                 <input
                   type="number"
@@ -810,6 +822,7 @@ export default function MenuPlanningPage() {
     kalori: "",
     protein: "",
     karbohidrat: "",
+    targetTray: "",
     lemak: "",
   })
 
@@ -1062,6 +1075,7 @@ export default function MenuPlanningPage() {
           kalori: parseFloat(menuFormData.kalori) || 0,
           protein: parseFloat(menuFormData.protein) || 0,
           lemak: parseFloat(menuFormData.lemak) || 0,
+          targetTray: parseFloat(menuFormData.targetTray) || 0,
           karbohidrat: parseFloat(menuFormData.karbohidrat) || 0,
         }),
       })
@@ -1076,6 +1090,7 @@ export default function MenuPlanningPage() {
         kalori: "",
         protein: "",
         karbohidrat: "",
+        targetTray: "",
         lemak: "",
       })
       if (selectedPlanningId) {
@@ -1101,6 +1116,23 @@ export default function MenuPlanningPage() {
       setMenuHarianList(menuHarianList.filter(m => m.id !== menuId))
     } catch (err) {
       alert(err instanceof Error ? err.message : "Gagal menghapus menu")
+    }
+  }
+
+  // 🎯 ✅ TAMBAH FUNGSI DELETE MENU PLANNING INI
+  const handleDeleteMenuPlanning = async (planningId: string) => {
+    if (!confirm("Apakah kamu yakin ingin menghapus menu planning ini? Data menu harian akan ikut terhapus.")) return
+
+    try {
+      await apiCall(`/api/menu-planning/${planningId}`, {
+        method: "DELETE",
+      })
+      alert("Menu planning berhasil dihapus")
+      setMenuPlannings(menuPlannings.filter(p => p.id !== planningId))
+      setSelectedPlanningId("")
+      setMenuHarianList([])
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Gagal menghapus menu planning")
     }
   }
 
@@ -1296,21 +1328,31 @@ export default function MenuPlanningPage() {
                   ))}
                 </>
               ) : (
+                // 🎯 ✅ GANTI BAGIAN INI DENGAN CODE DI BAWAH
                 filteredMenuPlannings.map((planning) => (
-                  <button
-                    key={planning.id}
-                    onClick={() => {
-                      setSelectedPlanningId(planning.id)
-                      setDisplayMonth(new Date(planning.tanggalMulai))
-                    }}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                      planning.id === selectedPlanningId
-                        ? "bg-[#D0B064] text-white shadow-lg"
-                        : "bg-white/20 text-white hover:bg-white/30"
-                    }`}
-                  >
-                    Minggu {planning.mingguanKe}
-                  </button>
+                  <div key={planning.id} className="group relative">
+                    <button
+                      onClick={() => {
+                        setSelectedPlanningId(planning.id)
+                        setDisplayMonth(new Date(planning.tanggalMulai))
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                        planning.id === selectedPlanningId
+                          ? "bg-[#D0B064] text-white shadow-lg"
+                          : "bg-white/20 text-white hover:bg-white/30"
+                      }`}
+                    >
+                      Minggu {planning.mingguanKe}
+                    </button>
+                    {/* 🗑️ DELETE BUTTON */}
+                    <button
+                      onClick={() => handleDeleteMenuPlanning(planning.id)}
+                      className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg"
+                      title="Hapus menu planning"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 ))
               )}
             </div>
@@ -1426,6 +1468,10 @@ export default function MenuPlanningPage() {
                       <div className="flex justify-between">
                         <span className="text-gray-600">Lemak:</span>
                         <span className="font-semibold">{menu.lemak}g</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Target Tray:</span>
+                        <span className="font-semibold">{menu.targetTray}biji</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Karbohidrat:</span>
