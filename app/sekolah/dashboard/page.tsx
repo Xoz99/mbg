@@ -384,6 +384,7 @@ const DashboardSekolah = () => {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [readyToFetch, setReadyToFetch] = useState(false)
   const [stats, setStats] = useState({
     totalSiswa: 0,
     normalGizi: 0,
@@ -422,10 +423,8 @@ const DashboardSekolah = () => {
   ])
   const [menuHariIni, setMenuHariIni] = useState<any>(null)
 
-  // ✅ REFACTORED: Return data instead of setState
   const fetchSiswaDataReturn = useCallback(async (schoolId: string, token: string) => {
     try {
-      console.time("fetchSiswa")
       const response = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/siswa?page=1&limit=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -439,14 +438,17 @@ const DashboardSekolah = () => {
       }
 
       const data = await response.json()
-      const siswaData = Array.isArray(data.data?.data) ? data.data.data : Array.isArray(data.data) ? data.data : []
+      const siswaData = Array.isArray(data.data?.data)
+        ? data.data.data
+        : Array.isArray(data.data)
+          ? data.data
+          : []
 
       const normalGizi = siswaData.filter((s: any) => s.statusGizi === "NORMAL").length || 0
       const giziKurang = siswaData.filter((s: any) => s.statusGizi === "GIZI_KURANG").length || 0
       const giziBuruk = siswaData.filter((s: any) => s.statusGizi === "GIZI_BURUK").length || 0
       const obesitas = siswaData.filter((s: any) => s.statusGizi === "OBESITAS").length || 0
 
-      console.timeEnd("fetchSiswa")
       return {
         siswa: siswaData,
         gizi: { normal: normalGizi, kurang: giziKurang, buruk: giziBuruk, obesitas },
@@ -457,10 +459,8 @@ const DashboardSekolah = () => {
     }
   }, [])
 
-  // ✅ REFACTORED: Return data instead of setState
   const fetchKelasDataReturn = useCallback(async (schoolId: string, token: string) => {
     try {
-      console.time("fetchKelas")
       const response = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/kelas?page=1&limit=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -500,7 +500,7 @@ const DashboardSekolah = () => {
               : []
         }
       } catch (err) {
-        console.error("Siswa fetch error:", err)
+        // Handle siswa fetch error silently
       }
 
       const siswaPerKelas: { [key: string]: { laki: number; perempuan: number; alergi: number } } = {}
@@ -534,7 +534,6 @@ const DashboardSekolah = () => {
         alergiCount: siswaPerKelas[kelas.id]?.alergi || kelas.alergiCount || 0,
       }))
 
-      console.timeEnd("fetchKelas")
       return kelasData
     } catch (err) {
       console.error("Error fetching kelas:", err)
@@ -542,10 +541,8 @@ const DashboardSekolah = () => {
     }
   }, [])
 
-  // ✅ REFACTORED: Return data instead of setState
   const fetchAbsensiDataReturn = useCallback(async (schoolId: string, token: string) => {
     try {
-      console.time("fetchAbsensi")
       const headers = {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -676,10 +673,9 @@ const DashboardSekolah = () => {
         .sort()
         .map((dateKey) => chartDataByDate[dateKey])
 
-      console.timeEnd("fetchAbsensi")
       return { chart: chartData, hadirHariIni: totalHadirHariIni }
     } catch (err) {
-      console.error("[ABSENSI] Error aggregating:", err)
+      console.error("Error aggregating absensi:", err)
       return {
         chart: [
           { hari: "Senin", hadir: 0, tidakHadir: 0 },
@@ -693,10 +689,8 @@ const DashboardSekolah = () => {
     }
   }, [])
 
-  // ✅ REFACTORED: Return data instead of setState
   const fetchPengirimanDataReturn = useCallback(async (schoolId: string, token: string) => {
     try {
-      console.time("fetchPengiriman")
       const response = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/pengiriman`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -710,7 +704,6 @@ const DashboardSekolah = () => {
 
       if (Array.isArray(data.data) && data.data.length > 0) {
         const latestPengiriman = data.data[0]
-        console.timeEnd("fetchPengiriman")
         return {
           tanggalMulai: latestPengiriman.tanggal || latestPengiriman.createdAt,
           deskripsi: `Pengiriman ke ${latestPengiriman.namaSekolah || "Sekolah"}`,
@@ -718,7 +711,6 @@ const DashboardSekolah = () => {
         }
       }
 
-      console.timeEnd("fetchPengiriman")
       return null
     } catch (err) {
       console.error("Error fetching pengiriman:", err)
@@ -726,10 +718,8 @@ const DashboardSekolah = () => {
     }
   }, [])
 
-  // ✅ REFACTORED: Return data instead of setState
   const fetchKalenderAkademikReturn = useCallback(async (token: string) => {
     try {
-      console.time("fetchKalender")
       const response = await fetch(`${API_BASE_URL}/api/kalender-akademik`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -775,7 +765,6 @@ const DashboardSekolah = () => {
         }
       }
 
-      console.timeEnd("fetchKalender")
       return { list: sortedKalenders, reminder }
     } catch (err) {
       console.error("Error fetching kalender akademik:", err)
@@ -783,10 +772,8 @@ const DashboardSekolah = () => {
     }
   }, [])
 
-  // ✅ REFACTORED: Return data instead of setState
   const fetchMenuHariIniReturn = useCallback(async (token: string) => {
     try {
-      console.time("fetchMenu")
       const response = await fetch(`${API_BASE_URL}/api/menu-harian/today`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -795,7 +782,6 @@ const DashboardSekolah = () => {
       })
 
       if (!response.ok) {
-        console.timeEnd("fetchMenu")
         return null
       }
 
@@ -815,7 +801,6 @@ const DashboardSekolah = () => {
         menu = data
       }
 
-      console.timeEnd("fetchMenu")
       return menu || null
     } catch (err) {
       console.error("Error fetching menu harian:", err)
@@ -823,32 +808,126 @@ const DashboardSekolah = () => {
     }
   }, [])
 
-  // ✅ MAIN EFFECT: Collect all data, then batch setState ONCE!
+  const fetchKonsumsiDataReturn = useCallback(async (schoolId: string, token: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/konsumsi?page=1&limit=100`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        return [
+          { hari: "Senin", porsi: 0 },
+          { hari: "Selasa", porsi: 0 },
+          { hari: "Rabu", porsi: 0 },
+          { hari: "Kamis", porsi: 0 },
+          { hari: "Jumat", porsi: 0 },
+        ]
+      }
+
+      const data = await response.json()
+      let konsumsiData = []
+
+      if (Array.isArray(data.data?.data)) {
+        konsumsiData = data.data.data
+      } else if (Array.isArray(data.data)) {
+        konsumsiData = data.data
+      } else if (Array.isArray(data)) {
+        konsumsiData = data
+      }
+
+      const daysOfWeek = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]
+      const konsumsiMap: { [key: string]: number } = {}
+
+      konsumsiData.forEach((item: any) => {
+        if (item.hari) {
+          const normalizedDay = daysOfWeek.find(day =>
+            item.hari.toLowerCase().includes(day.toLowerCase())
+          )
+          if (normalizedDay) {
+            konsumsiMap[normalizedDay] = (konsumsiMap[normalizedDay] || 0) + (item.porsi || 0)
+          }
+        }
+      })
+
+      const chartData = daysOfWeek.map(day => ({
+        hari: day,
+        porsi: konsumsiMap[day] || 0,
+      }))
+
+      return chartData
+    } catch (err) {
+      console.error("Error fetching konsumsi:", err)
+      return [
+        { hari: "Senin", porsi: 0 },
+        { hari: "Selasa", porsi: 0 },
+        { hari: "Rabu", porsi: 0 },
+        { hari: "Kamis", porsi: 0 },
+        { hari: "Jumat", porsi: 0 },
+      ]
+    }
+  }, [])
+
+  // Monitor localStorage changes and set ready flag with polling
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    let pollInterval: NodeJS.Timeout | null = null
+
+    const checkLocalStorage = () => {
+      const token = localStorage.getItem("authToken")
+      const schoolId = localStorage.getItem("sekolahId")
+      const isReady = !!(token && schoolId)
+
+      setReadyToFetch(isReady)
+
+      // Stop polling once ready
+      if (isReady && pollInterval) {
+        clearInterval(pollInterval)
+        pollInterval = null
+      }
+    }
+
+    // Check immediately
+    checkLocalStorage()
+
+    // Poll every 500ms for schoolId (layout may be setting it)
+    pollInterval = setInterval(checkLocalStorage, 500)
+
+    // Also listen to storage changes
+    window.addEventListener("storage", checkLocalStorage)
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval)
+      window.removeEventListener("storage", checkLocalStorage)
+    }
+  }, [])
+
+  // Collect all data, then batch setState once
   useEffect(() => {
     if (hasInitialized.current) return
     if (typeof window === "undefined") return
-
-    hasInitialized.current = true
+    if (!readyToFetch) return
 
     const token = localStorage.getItem("authToken")
     const schoolId = localStorage.getItem("sekolahId")
 
     if (!token || !schoolId) {
-      setError("Token tidak ditemukan. Silakan login terlebih dahulu.")
-      setLoading(false)
       return
     }
+
+    hasInitialized.current = true
 
     const fetchAllData = async () => {
       if (fetchInProgress.current) return
 
       try {
         fetchInProgress.current = true
-        console.log("🔄 [FETCH] Starting all data fetch...")
-        console.time("Total Fetch Time")
 
-        // ✅ COLLECT all data first (no setState yet!)
-        const [siswaResult, kelasResult, absensiResult, pengirimanResult, kalenderResult, menuResult] =
+        // Collect all data first before setState
+        const [siswaResult, kelasResult, absensiResult, pengirimanResult, kalenderResult, menuResult, konsumsiResult] =
           await Promise.all([
             fetchSiswaDataReturn(schoolId, token),
             fetchKelasDataReturn(schoolId, token),
@@ -856,10 +935,8 @@ const DashboardSekolah = () => {
             fetchPengirimanDataReturn(schoolId, token),
             fetchKalenderAkademikReturn(token),
             fetchMenuHariIniReturn(token),
+            fetchKonsumsiDataReturn(schoolId, token),
           ])
-
-        // ✅ BATCH UPDATE: setState ONCE with all collected data!
-        console.log("✅ [FETCH] All data collected, updating state...")
 
         // Update stats from siswa data
         const totalSiswa = siswaResult.siswa.length
@@ -881,6 +958,7 @@ const DashboardSekolah = () => {
         setSiswaList(siswaResult.siswa)
         setKelasList(kelasResult)
         setAbsensiChart(absensiResult.chart)
+        setKonsumsiHarian(konsumsiResult)
         setSiswaDiagram([
           { name: "Normal", value: siswaResult.gizi.normal },
           { name: "Kurang", value: siswaResult.gizi.kurang },
@@ -901,10 +979,9 @@ const DashboardSekolah = () => {
           setMenuHariIni(menuResult)
         }
 
-        console.timeEnd("Total Fetch Time")
-        console.log("✅ [FETCH] All state updated!")
+        setError(null)
       } catch (err) {
-        console.error("❌ [FETCH] Error:", err)
+        console.error("Error loading dashboard data:", err)
         setError(err instanceof Error ? err.message : "Gagal memuat data")
       } finally {
         fetchInProgress.current = false
@@ -913,14 +990,7 @@ const DashboardSekolah = () => {
     }
 
     fetchAllData()
-  }, [
-    fetchSiswaDataReturn,
-    fetchKelasDataReturn,
-    fetchAbsensiDataReturn,
-    fetchPengirimanDataReturn,
-    fetchKalenderAkademikReturn,
-    fetchMenuHariIniReturn,
-  ])
+  }, [readyToFetch])
 
   if (loading) {
     return (
