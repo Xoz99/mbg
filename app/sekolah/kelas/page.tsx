@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo, memo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, memo, useEffect, useRef, useCallback } from 'react';
 import SekolahLayout from '@/components/layout/SekolahLayout';
+import { useSekolahDataCache } from '@/lib/hooks/useSekolahDataCache';
 import { 
   Users, 
   GraduationCap,
@@ -71,20 +72,27 @@ const KelasChart = memo(({ data }: { data: any[] }) => (
 KelasChart.displayName = 'KelasChart';
 
 const DataKelas = () => {
+  const hasInitialized = useRef(false)
+  const [kelasData, setKelasData] = useState<any[]>([]);
+  const [siswaData, setSiswaData] = useState<any[]>([]);
+  const [absensiData, setAbsensiData] = useState<any[]>([]);
+
+  // ✅ Callback ketika unified cache ter-update dari page lain (instant sync!)
+  const handleCacheUpdate = useCallback((cachedData: any) => {
+    console.log("🔄 [KELAS] Received cache update from siswa page - updating state instantly!")
+    setKelasData(cachedData.kelasData || [])
+    setSiswaData(cachedData.siswaData || [])
+    setAbsensiData(cachedData.absensiData || [])
+  }, [])
+
+  const { loading, error, loadData, updateCache } = useSekolahDataCache(handleCacheUpdate)
+
+  const [credentialsReady, setCredentialsReady] = useState(false)
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedKelas, setSelectedKelas] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 9;
-
-  // API State
-  const [kelasData, setKelasData] = useState<any[]>([]);
-  const [siswaData, setSiswaData] = useState<any[]>([]);
-  const [absensiData, setAbsensiData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingAbsensi, setLoadingAbsensi] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [authToken, setAuthToken] = useState("");
-  const [sekolahId, setSekolahId] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAbsensiModal, setShowAbsensiModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -109,201 +117,121 @@ const DataKelas = () => {
     keterangan: "",
   });
 
-  const isFetchingRef = useRef(false);
-
-  // Initialize auth & sekolahId
+  // ✅ EFFECT 1: Wait for sekolahId to be available
   useEffect(() => {
-    const storedToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
-    const storedSekolahId = localStorage.getItem("sekolahId");
+    if (typeof window === "undefined") return
+    if (credentialsReady) return // Skip if already ready
 
-    if (storedToken) setAuthToken(storedToken);
-    if (storedSekolahId) setSekolahId(storedSekolahId);
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    const schoolId = localStorage.getItem("sekolahId")
 
-    if (!storedToken || !storedSekolahId) {
-      setLoading(false);
-      setError("Token atau Sekolah ID tidak ditemukan");
-    }
-  }, []);
+    console.log("[KELAS] Check credentials - token:", token ? "EXISTS" : "MISSING", "schoolId:", schoolId ? "EXISTS" : "MISSING")
 
-  // Fetch kelas data dengan perbaikan siswa
-  const fetchKelas = useCallback(async () => {
-    if (!sekolahId || !authToken || isFetchingRef.current) {
-      return;
+    if (!token) {
+      console.error("[KELAS] ❌ Token not found")
+      return
     }
 
-    try {
-      isFetchingRef.current = true;
-      setLoading(true);
-      setError(null);
+    if (schoolId) {
+      // Both credentials are ready!
+      console.log("[KELAS] ✅ Both credentials ready, setting flag")
+      setCredentialsReady(true)
+      return
+    }
 
-      const headers = {
-        Authorization: `Bearer ${authToken}`,
-        "Content-Type": "application/json",
-      };
-
-      const url = `${API_BASE_URL}/api/sekolah/${sekolahId}/kelas?page=1&limit=100`;
-      console.log("[FETCH KELAS] URL:", url);
-
-      const response = await fetch(url, { headers });
-
-      console.log("[FETCH KELAS] Response status:", response.status);
-
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
+    // sekolahId not ready, set up polling
+    console.log("[KELAS] sekolahId not ready, waiting for SekolahLayout...")
+    const pollInterval = setInterval(() => {
+      const newSchoolId = localStorage.getItem("sekolahId")
+      if (newSchoolId) {
+        console.log("[KELAS] ✅ sekolahId detected:", newSchoolId)
+        clearInterval(pollInterval)
+        setCredentialsReady(true) // This will trigger EFFECT 2
       }
+    }, 1000)
 
-      const data = await response.json();
-      console.log("[FETCH KELAS] Response data:", data);
+    const timeout = setTimeout(() => {
+      clearInterval(pollInterval)
+      console.error("[KELAS] ❌ sekolahId timeout after 10s")
+    }, 10000)
 
-      let kelasList = [];
-      if (Array.isArray(data.data?.data)) {
-        kelasList = data.data.data;
-      } else if (Array.isArray(data.data)) {
-        kelasList = data.data;
-      } else if (Array.isArray(data)) {
-        kelasList = data;
-      }
+    return () => {
+      clearInterval(pollInterval)
+      clearTimeout(timeout)
+    }
+  }, [credentialsReady])
 
-      // Debug: Log semua kelas dengan ID nya
-      console.log("[DEBUG KELAS] Daftar kelas dengan ID:");
-      kelasList.forEach((kelas: any) => {
-        console.log(`  - Kelas: ${kelas.nama}, ID: ${kelas.id || kelas._id}`);
-      });
+  // ✅ EFFECT 2: Fetch data when credentials are ready
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!credentialsReady) {
+      console.log("[KELAS EFFECT 2] Waiting for credentialsReady flag...")
+      return
+    }
 
-      // Fetch siswa untuk mendapatkan data lengkap
-      let siswaArray: any[] = [];
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    const schoolId = localStorage.getItem("sekolahId")
+
+    // Double-check both are available
+    if (!token || !schoolId) {
+      console.error("[KELAS EFFECT 2] ❌ Missing credentials even though flag is true!")
+      return
+    }
+
+    if (hasInitialized.current) {
+      console.log("[KELAS EFFECT 2] Already initialized, skipping")
+      return
+    }
+
+    const fetchAllData = async () => {
       try {
-        const siswaRes = await fetch(`${API_BASE_URL}/api/sekolah/${sekolahId}/siswa`, { headers });
-        if (siswaRes.ok) {
-          const siswaData = await siswaRes.json();
-          siswaArray = Array.isArray(siswaData.data?.data) 
-            ? siswaData.data.data 
-            : Array.isArray(siswaData.data) 
-            ? siswaData.data 
-            : [];
+        hasInitialized.current = true
+        const cachedData = await loadData(schoolId, token)
+
+        if (cachedData) {
+          setKelasData(cachedData.kelasData || [])
+          setSiswaData(cachedData.siswaData || [])
+          setAbsensiData(cachedData.absensiData || [])
+          console.log("✅ [KELAS] Data loaded successfully")
         }
       } catch (err) {
-        console.error('Siswa fetch error:', err);
+        console.error("❌ [KELAS] Error loading data:", err)
       }
-
-      setSiswaData(siswaArray);
-
-      // Fetch absensi untuk mendapatkan data kehadiran hari ini
-      console.log("[FETCH ABSENSI] Mulai fetch absensi hari ini...");
-      setLoadingAbsensi(true);
-      
-      const absensiPerKelas: { [key: string]: number } = {};
-      const today = new Date().toISOString().split('T')[0];
-      
-      try {
-        // Fetch absensi untuk semua kelas
-        const absensiPromises = kelasList.map(async (kelas: any) => {
-          try {
-            const absensiUrl = `${API_BASE_URL}/api/kelas/${kelas.id}/absensi?tanggal=${today}`;
-            console.log(`[FETCH ABSENSI] Fetching for kelas ${kelas.nama}:`, absensiUrl);
-            
-            const absensiRes = await fetch(absensiUrl, { headers });
-            
-            console.log(`[FETCH ABSENSI] Response status for ${kelas.nama}:`, absensiRes.status);
-            
-            if (absensiRes.ok) {
-              const absensiData = await absensiRes.json();
-              console.log(`[FETCH ABSENSI] Response data for ${kelas.nama}:`, absensiData);
-              
-              // Handle berbagai format response
-              let absensiList = [];
-              if (Array.isArray(absensiData.data?.data)) {
-                absensiList = absensiData.data.data;
-              } else if (Array.isArray(absensiData.data)) {
-                absensiList = absensiData.data;
-              } else if (Array.isArray(absensiData)) {
-                absensiList = absensiData;
-              } else if (absensiData.data && typeof absensiData.data === 'object') {
-                // Jika data adalah object tunggal (bukan array)
-                absensiList = [absensiData.data];
-              }
-              
-              console.log(`[FETCH ABSENSI] Absensi list for ${kelas.nama}:`, absensiList);
-              
-              // Ambil jumlahHadir dari data absensi hari ini
-              if (absensiList.length > 0) {
-                const todayAbsensi = absensiList.find((a: any) => {
-                  const absensiDate = new Date(a.tanggal).toISOString().split('T')[0];
-                  return absensiDate === today;
-                });
-                
-                if (todayAbsensi && todayAbsensi.jumlahHadir !== undefined) {
-                  absensiPerKelas[kelas.id] = todayAbsensi.jumlahHadir;
-                  console.log(`[FETCH ABSENSI] Kelas ${kelas.nama} - Hadir: ${todayAbsensi.jumlahHadir}`);
-                }
-              }
-              
-              return {
-                kelasId: kelas.id,
-                data: absensiList
-              };
-            }
-          } catch (err) {
-            console.error(`[FETCH ABSENSI] Error for kelas ${kelas.id}:`, err);
-          }
-          return { kelasId: kelas.id, data: [] };
-        });
-
-        const absensiResults = await Promise.all(absensiPromises);
-        const allAbsensi = absensiResults.flatMap(r => r.data);
-        setAbsensiData(allAbsensi);
-        
-        console.log("[FETCH ABSENSI] Kehadiran per kelas:", absensiPerKelas);
-      } catch (err) {
-        console.error('[FETCH ABSENSI] Global error:', err);
-      } finally {
-        setLoadingAbsensi(false);
-      }
-
-      // Calculate siswa per kelas dan alergi
-      const siswaPerKelas: { [key: string]: { laki: number; perempuan: number; alergi: number } } = {};
-      
-      siswaArray.forEach((siswa: any) => {
-        const kelasId = siswa.kelasId?.id || siswa.kelasId;
-        if (!siswaPerKelas[kelasId]) {
-          siswaPerKelas[kelasId] = { laki: 0, perempuan: 0, alergi: 0 };
-        }
-        if (siswa.jenisKelamin === 'LAKI_LAKI') {
-          siswaPerKelas[kelasId].laki++;
-        } else {
-          siswaPerKelas[kelasId].perempuan++;
-        }
-        
-        // Count alergi
-        if (siswa.alergi) {
-          if (Array.isArray(siswa.alergi) && siswa.alergi.length > 0) {
-            siswaPerKelas[kelasId].alergi++;
-          } else if (typeof siswa.alergi === 'string' && siswa.alergi.trim() !== '') {
-            siswaPerKelas[kelasId].alergi++;
-          }
-        }
-      });
-
-      // Update kelas dengan siswa count dan kehadiran dari absensiPerKelas
-      kelasList = kelasList.map((kelas: any) => ({
-        ...kelas,
-        totalSiswa: (siswaPerKelas[kelas.id]?.laki || 0) + (siswaPerKelas[kelas.id]?.perempuan || 0) || kelas.totalSiswa || 0,
-        lakiLaki: siswaPerKelas[kelas.id]?.laki || kelas.lakiLaki || 0,
-        perempuan: siswaPerKelas[kelas.id]?.perempuan || kelas.perempuan || 0,
-        alergiCount: siswaPerKelas[kelas.id]?.alergi || kelas.alergiCount || 0,
-        hadirHariIni: absensiPerKelas[kelas.id] || 0
-      }));
-
-      console.log("[FETCH KELAS] Total kelas:", kelasList.length);
-      setKelasData(kelasList);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal mengambil data kelas");
-      console.error("[FETCH KELAS] Error:", err);
-    } finally {
-      setLoading(false);
-      isFetchingRef.current = false;
     }
-  }, [sekolahId, authToken]);
+
+    fetchAllData()
+  }, [credentialsReady, loadData]) // Re-run when credentialsReady changes
+
+  // ✅ EFFECT 3: Setup listener untuk auto-reload dari unified cache (other tabs/windows)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!credentialsReady) return
+
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    const schoolId = localStorage.getItem("sekolahId")
+
+    if (!token || !schoolId) return
+
+    // Listen untuk cache updates dari unified hook (other tabs/windows)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "sekolah_unified_cache" && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue)
+          // Update state dengan unified cache terbaru
+          setKelasData(data.kelasData || [])
+          setSiswaData(data.siswaData || [])
+          setAbsensiData(data.absensiData || [])
+          console.log("✅ [UNIFIED SYNC] Auto-synced from another tab/window")
+        } catch (err) {
+          console.error("Error parsing unified cache:", err)
+        }
+      }
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+    return () => window.removeEventListener("storage", handleStorageChange)
+  }, [credentialsReady])
+
 
   // Create kelas
   const handleCreateKelas = async (e: React.FormEvent) => {
@@ -316,6 +244,14 @@ const DataKelas = () => {
 
     try {
       setSubmitting(true);
+      const authToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
+      const sekolahId = localStorage.getItem("sekolahId");
+
+      if (!authToken || !sekolahId) {
+        alert("Token atau Sekolah ID tidak ditemukan");
+        return;
+      }
+
       const payload = {
         nama: formData.nama,
         tingkat: formData.tingkat,
@@ -351,7 +287,32 @@ const DataKelas = () => {
 
       setFormData({ nama: "", tingkat: 10, jurusan: "IPA", waliKelas: "", totalSiswa: 0, lakiLaki: 0, perempuan: 0, alergiCount: 0, alergiList: "" });
       setShowAddModal(false);
-      await fetchKelas();
+
+      // ✅ Optimistic update: Add new kelas to local state immediately
+      const newKelas = {
+        ...data.data,
+        totalSiswa: 0,
+        lakiLaki: 0,
+        perempuan: 0,
+        alergiCount: 0,
+        hadirHariIni: 0,
+      }
+
+      setKelasData([...kelasData, newKelas])
+
+      // 🔄 Update unified cache (auto-sync to all pages - no broadcast needed!)
+      updateCache(sekolahId, authToken, {
+        kelasData: [...kelasData, newKelas],
+        siswaData: siswaData,
+        absensiData: absensiData,
+      }, (freshData) => {
+        // Update state dengan data fresh dari API
+        setKelasData(freshData.kelasData || [])
+        setSiswaData(freshData.siswaData || [])
+        setAbsensiData(freshData.absensiData || [])
+        console.log("✅ [KELAS] State synced with fresh API data + auto-synced to siswa page!")
+      })
+
       alert("Kelas berhasil ditambahkan!");
     } catch (err) {
       alert(`Gagal: ${err instanceof Error ? err.message : "Unknown error"}`);
@@ -387,8 +348,16 @@ const DataKelas = () => {
 
     try {
       setSubmitting(true);
+      const authToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
+      const sekolahId = localStorage.getItem("sekolahId");
+
+      if (!authToken || !sekolahId) {
+        alert("Token atau Sekolah ID tidak ditemukan");
+        return;
+      }
+
       const kelasId = selectedKelas.id || selectedKelas._id;
-      
+
       const payload = {
         tanggal: absensiForm.tanggal,
         jumlahHadir: parseInt(absensiForm.jumlahHadir.toString()),
@@ -426,10 +395,33 @@ const DataKelas = () => {
         keterangan: "",
       });
       setShowAbsensiModal(false);
-      
-      // Refresh data untuk update hadirHariIni
-      await fetchKelas();
-      
+
+      // ✅ Optimistic update: Update kelas hadirHariIni count
+      const updatedKelasData = kelasData.map((k) => {
+        if (k.id === kelasId) {
+          return {
+            ...k,
+            hadirHariIni: absensiForm.jumlahHadir,
+          }
+        }
+        return k
+      })
+
+      setKelasData(updatedKelasData)
+
+      // 🔄 Update unified cache (auto-sync to all pages - no broadcast needed!)
+      updateCache(sekolahId, authToken, {
+        kelasData: updatedKelasData,
+        siswaData: siswaData,
+        absensiData: absensiData,
+      }, (freshData) => {
+        // Update state dengan data fresh dari API
+        setKelasData(freshData.kelasData || [])
+        setSiswaData(freshData.siswaData || [])
+        setAbsensiData(freshData.absensiData || [])
+        console.log("✅ [KELAS] State synced with fresh API data + auto-synced to siswa page!")
+      })
+
       alert("Absensi berhasil dibuat!");
     } catch (err) {
       alert(`Gagal membuat absensi: ${err instanceof Error ? err.message : "Unknown error"}`);
@@ -449,6 +441,14 @@ const DataKelas = () => {
 
     try {
       setSubmitting(true);
+      const authToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
+      const sekolahId = localStorage.getItem("sekolahId");
+
+      if (!authToken || !sekolahId) {
+        alert("Token atau Sekolah ID tidak ditemukan");
+        return;
+      }
+
       const url = `${API_BASE_URL}/api/kelas/${kelasId}`;
       console.log("[DELETE KELAS] URL:", url);
 
@@ -469,7 +469,24 @@ const DataKelas = () => {
 
       console.log("[DELETE KELAS] Success");
       setSelectedKelas(null);
-      await fetchKelas();
+
+      // ✅ Optimistic update: Remove kelas from local state immediately
+      const updatedKelasData = kelasData.filter((k) => k.id !== kelasId)
+      setKelasData(updatedKelasData)
+
+      // 🔄 Update unified cache (auto-sync to all pages - no broadcast needed!)
+      updateCache(sekolahId, authToken, {
+        kelasData: updatedKelasData,
+        siswaData: siswaData,
+        absensiData: absensiData,
+      }, (freshData) => {
+        // Update state dengan data fresh dari API
+        setKelasData(freshData.kelasData || [])
+        setSiswaData(freshData.siswaData || [])
+        setAbsensiData(freshData.absensiData || [])
+        console.log("✅ [KELAS] State synced with fresh API data + auto-synced to siswa page!")
+      })
+
       alert("Kelas berhasil dihapus!");
     } catch (err) {
       alert(`Gagal: ${err instanceof Error ? err.message : "Unknown error"}`);
@@ -478,13 +495,6 @@ const DataKelas = () => {
       setSubmitting(false);
     }
   };
-
-  // Fetch saat component mount
-  useEffect(() => {
-    if (sekolahId && authToken) {
-      fetchKelas();
-    }
-  }, [sekolahId, authToken, fetchKelas]);
 
   // Filter data
   const filteredData = useMemo(() => {
@@ -573,8 +583,13 @@ const DataKelas = () => {
             <p className="text-red-600 mb-4">{error}</p>
             <button
               onClick={() => {
-                setError(null);
-                if (sekolahId && authToken) fetchKelas();
+                const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
+                const schoolId = localStorage.getItem("sekolahId");
+                if (schoolId && token) {
+                  hasInitialized.current = false
+                  setCredentialsReady(false)
+                  setCredentialsReady(true)
+                }
               }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
@@ -868,10 +883,10 @@ const DataKelas = () => {
                 <div className="bg-green-50 rounded-xl p-4 border border-green-100">
                   <div className="flex items-center justify-between mb-2">
                     <UserCheck className="w-6 h-6 text-green-600" />
-                    {loadingAbsensi && <Loader2 className="w-4 h-4 text-green-600 animate-spin" />}
+                    {loading && <Loader2 className="w-4 h-4 text-green-600 animate-spin" />}
                   </div>
                   <p className="text-2xl font-bold text-green-900">
-                    {loadingAbsensi ? '...' : (selectedKelas.hadirHariIni || 0)}
+                    {loading ? '...' : (selectedKelas.hadirHariIni || 0)}
                   </p>
                   <p className="text-xs text-green-700">Hadir Hari Ini</p>
                 </div>

@@ -4,8 +4,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/layout/AdminLayout';
 import {
-  Building2, Users, MapPin, Phone, Mail, Plus, Search, AlertCircle,
-  Loader2, X, Navigation, Edit, Trash2, MapPinIcon
+  Building2, Users, Phone, Mail, Plus, Search, AlertCircle,
+  Loader2, X, Navigation, Edit, Trash2, MapPinIcon, Maximize2, Minimize2
 } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 
@@ -17,6 +17,7 @@ interface Sekolah {
   alamat: string;
   latitude?: number;
   longitude?: number;
+  province?: string | null;
   pic?: { id: string; name: string; phone?: string; email?: string };
   picSekolah?: any[];
   kelas?: any[];
@@ -31,6 +32,7 @@ const SekolahManagement = () => {
   const router = useRouter();
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const selectedProvinceLayerRef = useRef<any>(null);
   const [sekolah, setSekolah] = useState<Sekolah[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,10 +49,103 @@ const SekolahManagement = () => {
   const [formData, setFormData] = useState({ nama: "", alamat: "", picName: "", latitude: "", longitude: "" });
   const [submitting, setSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
+  const [hoveredProvince, setHoveredProvince] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Standard province names mapping for better matching
+  // Maps from various formats (GeoJSON uppercase, API formats) to standard proper case
+  const provinceNameMap: { [key: string]: string } = {
+    // Standard proper case (from BE)
+    'aceh': 'Aceh',
+    'bali': 'Bali',
+    'banten': 'Banten',
+    'bengkulu': 'Bengkulu',
+    'daerah istimewa yogyakarta': 'Daerah Istimewa Yogyakarta',
+    'dki jakarta': 'DKI Jakarta',
+    'gorontalo': 'Gorontalo',
+    'jambi': 'Jambi',
+    'jawa barat': 'Jawa Barat',
+    'jawa tengah': 'Jawa Tengah',
+    'jawa timur': 'Jawa Timur',
+    'kalimantan barat': 'Kalimantan Barat',
+    'kalimantan selatan': 'Kalimantan Selatan',
+    'kalimantan tengah': 'Kalimantan Tengah',
+    'kalimantan timur': 'Kalimantan Timur',
+    'kalimantan utara': 'Kalimantan Utara',
+    'kepulauan bangka belitung': 'Kepulauan Bangka Belitung',
+    'kepulauan riau': 'Kepulauan Riau',
+    'lampung': 'Lampung',
+    'maluku': 'Maluku',
+    'maluku utara': 'Maluku Utara',
+    'nusa tenggara barat': 'Nusa Tenggara Barat',
+    'nusa tenggara timur': 'Nusa Tenggara Timur',
+    'papua': 'Papua',
+    'papua barat': 'Papua Barat',
+    'papua barat daya': 'Papua Barat Daya',
+    'papua pegunungan': 'Papua Pegunungan',
+    'riau': 'Riau',
+    'sulawesi barat': 'Sulawesi Barat',
+    'sulawesi selatan': 'Sulawesi Selatan',
+    'sulawesi tengah': 'Sulawesi Tengah',
+    'sulawesi tenggara': 'Sulawesi Tenggara',
+    'sulawesi utara': 'Sulawesi Utara',
+    'sumatera barat': 'Sumatera Barat',
+    'sumatera selatan': 'Sumatera Selatan',
+    'sumatera utara': 'Sumatera Utara',
+    // GeoJSON UPPERCASE formats
+    'di. aceh': 'Aceh',
+    'probanten': 'Banten',
+    'bangka belitung': 'Kepulauan Bangka Belitung',
+    'nusatenggara barat': 'Nusa Tenggara Barat',
+    'irian jaya barat': 'Papua Barat',
+    'irian jaya tengah': 'Papua',
+    'irian jaya timur': 'Papua Pegunungan',
+    // Aliases and variations
+    'jakarta': 'DKI Jakarta',
+    'yogyakarta': 'Daerah Istimewa Yogyakarta',
+    'di yogyakarta': 'Daerah Istimewa Yogyakarta',
+    'west sulawesi': 'Sulawesi Barat',
+  };
+
+  const normalizeProvinceName = (name: string | null | undefined): string | null => {
+    if (!name) return null;
+    const normalized = provinceNameMap[name.toLowerCase().trim()];
+    return normalized || name;
+  };
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text });
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const toggleFullscreen = async () => {
+    try {
+      const mapContainer = document.getElementById('map-container');
+      if (!mapContainer) return;
+
+      if (!isFullscreen) {
+        if (mapContainer.requestFullscreen) {
+          await mapContainer.requestFullscreen();
+          setIsFullscreen(true);
+        }
+      } else {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+          setIsFullscreen(false);
+        }
+      }
+
+      // Trigger map resize setelah fullscreen berubah
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      }, 300);
+    } catch (err) {
+      console.error('Fullscreen error:', err);
+      showToast('error', 'Gagal mengaktifkan fullscreen');
+    }
   };
 
   const getCurrentLocation = useCallback(async () => {
@@ -114,6 +209,7 @@ const SekolahManagement = () => {
 
         mapRef.current = map;
         setIsMapReady(true);
+        loadProvinceBoundaries(map);
       } catch (err) {
         console.error("Map initialization error:", err);
       }
@@ -243,6 +339,108 @@ const SekolahManagement = () => {
     }
   }, [router]);
 
+  // Function to load province boundaries
+  const loadProvinceBoundaries = useCallback(async (map: any) => {
+    try {
+      const response = await fetch('/indonesia-provinces.geojson');
+      const geoJsonData = await response.json();
+
+      const L = await import('leaflet');
+
+      // Store all layers untuk bisa reset semua sekaligus
+      const allLayers: any[] = [];
+
+      L.geoJSON(geoJsonData, {
+        style: () => ({
+          stroke: true,
+          color: '#810FCB',
+          weight: 2,
+          opacity: 1,
+          fill: true,
+          fillColor: '#810FCB',
+          fillOpacity: 0.08,
+        }),
+        onEachFeature: (feature: any, layer: any) => {
+          const provinceName = feature.properties.name;
+          allLayers.push({ layer, name: provinceName });
+
+          layer.on('click', (e: any) => {
+            e.originalEvent.stopPropagation();
+
+            // Reset ALL layers ke default
+            allLayers.forEach(({ layer: lyr }) => {
+              lyr.setStyle({
+                stroke: true,
+                color: '#810FCB',
+                weight: 2,
+                opacity: 1,
+                fill: true,
+                fillColor: '#810FCB',
+                fillOpacity: 0.08,
+              });
+            });
+
+            // Apply selected style
+            layer.setStyle({
+              stroke: true,
+              color: '#810FCB',
+              weight: 3,
+              opacity: 1,
+              fill: true,
+              fillColor: '#810FCB',
+              fillOpacity: 0.18,
+            });
+
+            selectedProvinceLayerRef.current = layer;
+            const normalizedName = normalizeProvinceName(provinceName);
+            setSelectedProvince(normalizedName);
+            showToast('success', `Province selected: ${normalizedName}`);
+          });
+
+          layer.on('mouseover', (e: any) => {
+            e.originalEvent.stopPropagation();
+
+            if (selectedProvinceLayerRef.current !== layer) {
+              setHoveredProvince(provinceName);
+              layer.setStyle({
+                stroke: true,
+                color: '#810FCB',
+                weight: 3,
+                opacity: 1,
+                fill: true,
+                fillColor: '#810FCB',
+                fillOpacity: 0.12,
+              });
+            }
+          });
+
+          layer.on('mouseout', (e: any) => {
+            e.originalEvent.stopPropagation();
+
+            if (selectedProvinceLayerRef.current !== layer) {
+              setHoveredProvince(null);
+              layer.setStyle({
+                stroke: true,
+                color: '#810FCB',
+                weight: 2,
+                opacity: 1,
+                fill: true,
+                fillColor: '#810FCB',
+                fillOpacity: 0.08,
+              });
+            } else {
+              setHoveredProvince(null);
+            }
+          });
+
+          layer.bindPopup(`<div class="font-semibold text-center">${provinceName}</div>`);
+        },
+      }).addTo(map);
+    } catch (err) {
+      console.error('Error loading province boundaries:', err);
+    }
+  }, []);
+
   const fetchSekolah = useCallback(async () => {
     if (!authToken) return;
 
@@ -277,6 +475,7 @@ const SekolahManagement = () => {
         pic: s.picSekolah && s.picSekolah.length > 0 ? s.picSekolah[0] : undefined,
         kelas: s._count?.kelas || 0,
         siswa: s._count?.siswa || 0,
+        province: s.provinces || s.province,
       }));
 
       setSekolah(mappedSekolahList);
@@ -452,13 +651,40 @@ const SekolahManagement = () => {
   }, [authToken, fetchSekolah]);
 
   const filteredSekolah = useMemo(() => {
-    if (!searchQuery) return sekolah;
-    return sekolah.filter(s =>
-      s.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.alamat.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.pic?.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [sekolah, searchQuery]);
+    let filtered = sekolah;
+
+    // Filter by selected province
+    if (selectedProvince) {
+      filtered = filtered.filter((s: any) => {
+        // Get province value, handling different data types
+        let provinceStr = '';
+
+        if (typeof s.province === 'object' && s.province !== null) {
+          provinceStr = (s.province as any).name || (s.province as any).nama || JSON.stringify(s.province);
+        } else {
+          provinceStr = String(s.province || '');
+        }
+
+        // Normalize both sides for comparison
+        provinceStr = provinceStr.trim();
+        const normalizedProvince = normalizeProvinceName(provinceStr);
+        const normalizedSelected = normalizeProvinceName(selectedProvince);
+
+        return normalizedProvince === normalizedSelected;
+      });
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      filtered = filtered.filter(s =>
+        s.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.alamat.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.pic?.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    return filtered;
+  }, [sekolah, searchQuery, selectedProvince]);
 
   const stats = useMemo(() => {
     return {
@@ -631,7 +857,67 @@ const SekolahManagement = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[600px] relative z-0">
           <div className="lg:col-span-2 bg-transparent border-0 overflow-hidden relative z-0 rounded-lg">
-            <div id="map-container" className="w-full h-full" style={{ minHeight: '600px', position: 'relative', zIndex: 0 }}></div>
+            <div className="relative w-full h-full">
+              <div id="map-container" className="w-full h-full" style={{ minHeight: '600px', position: 'relative', zIndex: 0 }}></div>
+
+              {/* Fullscreen Button */}
+              <button
+                onClick={toggleFullscreen}
+                className="absolute top-4 right-4 z-40 p-2.5 bg-white text-gray-700 rounded-lg hover:bg-gray-50 shadow-lg transition-colors border border-gray-200"
+                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="w-5 h-5" />
+                ) : (
+                  <Maximize2 className="w-5 h-5" />
+                )}
+              </button>
+
+              {selectedProvince && (
+                <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-4 max-w-xs z-40">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900">Selected Province</h4>
+                    <button
+                      onClick={() => {
+                        setSelectedProvince(null);
+                        if (selectedProvinceLayerRef.current) {
+                          selectedProvinceLayerRef.current.setStyle({
+                            stroke: true,
+                            color: '#810FCB',
+                            weight: 2,
+                            opacity: 1,
+                            fill: true,
+                            fillColor: '#810FCB',
+                            fillOpacity: 0.08,
+                          });
+                          selectedProvinceLayerRef.current = null;
+                        }
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-base font-bold text-gray-900 mb-2">{selectedProvince}</p>
+                  <div className="space-y-2 border-t border-gray-200 pt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">Sekolah di Province:</span>
+                      <span className="text-sm font-semibold text-green-600">{filteredSekolah.length}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">Total di Sistem:</span>
+                      <span className="text-sm font-semibold text-gray-700">{sekolah.length}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {hoveredProvince && !selectedProvince && (
+                <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 max-w-xs z-40">
+                  <p className="text-sm font-semibold text-gray-900">{hoveredProvince}</p>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden flex flex-col">

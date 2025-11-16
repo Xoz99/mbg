@@ -2,8 +2,9 @@
 
 import type React from "react"
 
-import { useState, useMemo, memo, useEffect, useCallback, useRef } from "react"
+import { useState, useMemo, memo, useEffect, useRef, useCallback } from "react"
 import SekolahLayout from "@/components/layout/SekolahLayout"
+import { useSekolahDataCache } from "@/lib/hooks/useSekolahDataCache"
 import {
   Search,
   Eye,
@@ -133,10 +134,11 @@ const StatCard = ({ title, value, subtitle, color, icon: Icon }: any) => (
   </div>
 )
 
-const calculateIMT = (tinggiBadan: number, beratBadan: number) => {
+const calculateIMT = (tinggiBadan: number, beratBadan: number): number => {
   if (!tinggiBadan || !beratBadan || tinggiBadan === 0) return 0
   const tinggiMeter = tinggiBadan / 100
-  return (beratBadan / (tinggiMeter * tinggiMeter)).toFixed(2)
+  const imt = beratBadan / (tinggiMeter * tinggiMeter)
+  return Number(imt.toFixed(2)) // Return as number, not string!
 }
 
 const getStatusColor = (status: string) => {
@@ -169,14 +171,32 @@ const displayStatusText = (status: string) => {
 }
 
 const DataSiswa = () => {
+  const hasInitialized = useRef(false)
   const [siswaData, setSiswaData] = useState<any[]>([])
   const [kelasData, setKelasData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [authToken, setAuthToken] = useState("")
-  const [sekolahId, setSekolahId] = useState("")
+
+  // ✅ Callback ketika unified cache ter-update dari page lain (instant sync!)
+  const handleCacheUpdate = useCallback((cachedData: any) => {
+    console.log("🔄 [SISWA] Received cache update from kelas page - updating state instantly!")
+    setSiswaData(cachedData.siswaData || [])
+    setKelasData(cachedData.kelasData || [])
+  }, [])
+
+  const { loading, error, loadData, updateCache } = useSekolahDataCache(handleCacheUpdate)
+
+  const [credentialsReady, setCredentialsReady] = useState(false)
+
+  // ✅ Update selectedSiswa saat siswaData berubah (keep it fresh!)
+  useEffect(() => {
+    if (selectedSiswa && siswaData.length > 0) {
+      const updatedSelected = siswaData.find((s: any) => s.id === selectedSiswa.id)
+      if (updatedSelected) {
+        setSelectedSiswa(updatedSelected)
+        console.log("✅ [SISWA] Updated selectedSiswa dengan data terbaru dari siswaData")
+      }
+    }
+  }, [siswaData])
   const [submitting, setSubmitting] = useState(false)
-  const isFetchingRef = useRef(false)
 
   const [searchTerm, setSearchTerm] = useState("")
   const [filterKelas, setFilterKelas] = useState("semua")
@@ -205,18 +225,118 @@ const DataSiswa = () => {
   const [photoPreview, setPhotoPreview] = useState<string>("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // ✅ EFFECT 1: Wait for sekolahId to be available
   useEffect(() => {
-    const storedToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
-    const storedSekolahId = localStorage.getItem("sekolahId")
+    if (typeof window === "undefined") return
+    if (credentialsReady) return // Skip if already ready
 
-    if (storedToken) setAuthToken(storedToken)
-    if (storedSekolahId) setSekolahId(storedSekolahId)
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    const schoolId = localStorage.getItem("sekolahId")
 
-    if (!storedToken || !storedSekolahId) {
-      setLoading(false)
-      setError("Token atau Sekolah ID tidak ditemukan")
+    console.log("[SISWA] Check credentials - token:", token ? "EXISTS" : "MISSING", "schoolId:", schoolId ? "EXISTS" : "MISSING")
+
+    if (!token) {
+      console.error("[SISWA] ❌ Token not found")
+      return
     }
-  }, [])
+
+    if (schoolId) {
+      // Both credentials are ready!
+      console.log("[SISWA] ✅ Both credentials ready, setting flag")
+      setCredentialsReady(true)
+      return
+    }
+
+    // sekolahId not ready, set up polling
+    console.log("[SISWA] sekolahId not ready, waiting for SekolahLayout...")
+    const pollInterval = setInterval(() => {
+      const newSchoolId = localStorage.getItem("sekolahId")
+      if (newSchoolId) {
+        console.log("[SISWA] ✅ sekolahId detected:", newSchoolId)
+        clearInterval(pollInterval)
+        setCredentialsReady(true) // This will trigger EFFECT 2
+      }
+    }, 1000)
+
+    const timeout = setTimeout(() => {
+      clearInterval(pollInterval)
+      console.error("[SISWA] ❌ sekolahId timeout after 10s")
+    }, 10000)
+
+    return () => {
+      clearInterval(pollInterval)
+      clearTimeout(timeout)
+    }
+  }, [credentialsReady])
+
+  // ✅ EFFECT 2: Fetch data when credentials are ready
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!credentialsReady) {
+      console.log("[SISWA EFFECT 2] Waiting for credentialsReady flag...")
+      return
+    }
+
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    const schoolId = localStorage.getItem("sekolahId")
+
+    // Double-check both are available
+    if (!token || !schoolId) {
+      console.error("[SISWA EFFECT 2] ❌ Missing credentials even though flag is true!")
+      return
+    }
+
+    if (hasInitialized.current) {
+      console.log("[SISWA EFFECT 2] Already initialized, skipping")
+      return
+    }
+
+    const fetchAllData = async () => {
+      try {
+        hasInitialized.current = true
+        const cachedData = await loadData(schoolId, token)
+
+        if (cachedData) {
+          setSiswaData(cachedData.siswaData || [])
+          setKelasData(cachedData.kelasData || [])
+          console.log("✅ [SISWA] Data loaded successfully")
+        }
+      } catch (err) {
+        console.error("❌ [SISWA] Error loading data:", err)
+      }
+    }
+
+    fetchAllData()
+  }, [credentialsReady, loadData]) // Re-run when credentialsReady changes
+
+  // ✅ EFFECT 3: Setup listener untuk auto-reload dari unified cache (other tabs/windows)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!credentialsReady) return
+
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    const schoolId = localStorage.getItem("sekolahId")
+
+    if (!token || !schoolId) return
+
+    // Listen untuk cache updates dari unified hook (other tabs/windows)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "sekolah_unified_cache" && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue)
+          // Update state dengan unified cache terbaru
+          setSiswaData(data.siswaData || [])
+          setKelasData(data.kelasData || [])
+          console.log("✅ [UNIFIED SYNC] Auto-synced from another tab/window")
+        } catch (err) {
+          console.error("Error parsing unified cache:", err)
+        }
+      }
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+    return () => window.removeEventListener("storage", handleStorageChange)
+  }, [credentialsReady])
 
   const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -301,102 +421,6 @@ const DataSiswa = () => {
     fileInputRef.current?.click()
   }
 
-  const fetchSiswa = useCallback(async () => {
-    if (!sekolahId || !authToken || isFetchingRef.current) return
-
-    try {
-      isFetchingRef.current = true
-      setLoading(true)
-
-      const response = await fetch(`${API_BASE_URL}/api/sekolah/${sekolahId}/siswa?page=1&limit=100`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) throw new Error(`API Error: ${response.status}`)
-
-      const data = await response.json()
-      const siswaList = Array.isArray(data.data?.data) ? data.data.data : Array.isArray(data.data) ? data.data : data
-
-      const normalizedList = siswaList.map((siswa: any) => {
-        let kelasNama = ""
-        if (typeof siswa.kelas === "string") {
-          kelasNama = siswa.kelas
-        } else if (siswa.kelas?.nama) {
-          kelasNama = String(siswa.kelas.nama)
-        } else if (siswa.kelasId?.nama) {
-          kelasNama = String(siswa.kelasId.nama)
-        }
-
-        let alergiArray: string[] = []
-        if (siswa.alergi) {
-          if (Array.isArray(siswa.alergi)) {
-            alergiArray = siswa.alergi
-              .map((a: any) => String(a.namaAlergi || a.nama || a))
-              .filter((a: string) => a.trim())
-          } else if (typeof siswa.alergi === "string") {
-            alergiArray = siswa.alergi
-              .split(",")
-              .map((a: string) => a.trim())
-              .filter((a: string) => a)
-          }
-        }
-
-        const imt = calculateIMT(siswa.tinggiBadan || 0, siswa.beratBadan || 0)
-
-        return {
-          ...siswa,
-          id: String(siswa.id || siswa._id || ""),
-          nama: String(siswa.nama || ""),
-          nis: String(siswa.nis || ""),
-          kelas: kelasNama,
-          kelasId: String(siswa.kelasId?.id || siswa.kelas?.id || ""),
-          jenisKelamin: String(siswa.jenisKelamin || "LAKI_LAKI"),
-          umur: Number(siswa.umur || 0),
-          tinggiBadan: Number(siswa.tinggiBadan || 0),
-          beratBadan: Number(siswa.beratBadan || 0),
-          imt: Number(imt) || 0,
-          statusGizi: String(siswa.statusGizi || "NORMAL"),
-          statusStunting: String(siswa.statusStunting || "NORMAL"),
-          alergi: alergiArray,
-          fotoUrl: siswa.fotoUrl || "",
-          riwayatPengukuran: Array.isArray(siswa.riwayatPengukuran) ? siswa.riwayatPengukuran : [],
-        }
-      })
-
-      setSiswaData(normalizedList)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal mengambil data siswa")
-    } finally {
-      setLoading(false)
-      isFetchingRef.current = false
-    }
-  }, [sekolahId, authToken])
-
-  const fetchKelas = useCallback(async () => {
-    if (!sekolahId || !authToken) return
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/sekolah/${sekolahId}/kelas?page=1&limit=100`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) throw new Error(`API Error: ${response.status}`)
-
-      const data = await response.json()
-      const kelasList = Array.isArray(data.data?.data) ? data.data.data : Array.isArray(data.data) ? data.data : data
-
-      setKelasData(kelasList)
-    } catch (err) {
-      console.error("[FETCH KELAS] Error:", err)
-    }
-  }, [sekolahId, authToken])
 
   const handleCreateSiswa = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -408,6 +432,13 @@ const DataSiswa = () => {
 
     try {
       setSubmitting(true)
+      const authToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+      const sekolahId = localStorage.getItem("sekolahId")
+
+      if (!authToken || !sekolahId) {
+        alert("Token atau Sekolah ID tidak ditemukan")
+        return
+      }
 
       const formDataToSend = new FormData()
       formDataToSend.append("nama", formData.nama)
@@ -478,7 +509,28 @@ const DataSiswa = () => {
       setPhotoPreview("")
 
       setShowAddModal(false)
-      await fetchSiswa()
+
+      // ✅ Optimistic update: Add new siswa to local state immediately
+      const newSiswa = {
+        ...data.data,
+        kelas: kelasData.find((k: any) => k.id === formData.kelasId)?.nama || "",
+        imt: calculateIMT(formData.tinggiBadan, formData.beratBadan),
+      }
+
+      setSiswaData([...siswaData, newSiswa])
+
+      // 🔄 Update unified cache (auto-sync to all pages - no broadcast needed!)
+      updateCache(sekolahId, authToken, {
+        siswaData: [...siswaData, newSiswa],
+        kelasData: kelasData,
+        absensiData: [],
+      }, (freshData) => {
+        // Update state dengan data fresh dari API
+        setSiswaData(freshData.siswaData || [])
+        setKelasData(freshData.kelasData || [])
+        console.log("✅ [SISWA] State synced with fresh API data + auto-synced to kelas page!")
+      })
+
       alert("Siswa berhasil ditambahkan!")
     } catch (err) {
       alert(`Gagal: ${err instanceof Error ? err.message : "Unknown error"}`)
@@ -494,6 +546,14 @@ const DataSiswa = () => {
 
     try {
       setSubmitting(true)
+      const authToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+      const sekolahId = localStorage.getItem("sekolahId")
+
+      if (!authToken || !sekolahId) {
+        alert("Token atau Sekolah ID tidak ditemukan")
+        return
+      }
+
       const formDataToSend = new FormData()
       formDataToSend.append("nama", formData.nama)
       formDataToSend.append("jenisKelamin", formData.jenisKelamin)
@@ -633,7 +693,30 @@ const DataSiswa = () => {
 
       setShowEditModal(false)
       setSelectedSiswa(null)
-      await fetchSiswa()
+
+      // ✅ Optimistic update: Update siswa in local state immediately
+      const updatedSiswa = {
+        ...selectedSiswa,
+        ...formData,
+        kelas: kelasData.find((k: any) => k.id === formData.kelasId)?.nama || selectedSiswa.kelas,
+        imt: calculateIMT(formData.tinggiBadan, formData.beratBadan),
+      }
+
+      const updatedSiswaData = siswaData.map((s) => (s.id === selectedSiswa.id ? updatedSiswa : s))
+      setSiswaData(updatedSiswaData)
+
+      // 🔄 Update unified cache (auto-sync to all pages - no broadcast needed!)
+      updateCache(sekolahId, authToken, {
+        siswaData: updatedSiswaData,
+        kelasData: kelasData,
+        absensiData: [],
+      }, (freshData) => {
+        // Update state dengan data fresh dari API
+        setSiswaData(freshData.siswaData || [])
+        setKelasData(freshData.kelasData || [])
+        console.log("✅ [SISWA] State synced with fresh API data + auto-synced to kelas page!")
+      })
+
       alert("Data siswa berhasil diupdate!")
     } catch (err) {
       alert(`Gagal: ${err instanceof Error ? err.message : "Unknown error"}`)
@@ -647,6 +730,13 @@ const DataSiswa = () => {
 
     try {
       setSubmitting(true)
+      const authToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+      const sekolahId = localStorage.getItem("sekolahId")
+
+      if (!authToken || !sekolahId) {
+        alert("Token atau Sekolah ID tidak ditemukan")
+        return
+      }
 
       const response = await fetch(`${API_BASE_URL}/api/siswa/${siswaId}`, {
         method: "DELETE",
@@ -660,7 +750,23 @@ const DataSiswa = () => {
 
       setShowDetailModal(false)
       setSelectedSiswa(null)
-      await fetchSiswa()
+
+      // ✅ Optimistic update: Remove siswa from local state immediately
+      const updatedSiswaData = siswaData.filter((s) => s.id !== siswaId)
+      setSiswaData(updatedSiswaData)
+
+      // 🔄 Update unified cache (auto-sync to all pages - no broadcast needed!)
+      updateCache(sekolahId, authToken, {
+        siswaData: updatedSiswaData,
+        kelasData: kelasData,
+        absensiData: [],
+      }, (freshData) => {
+        // Update state dengan data fresh dari API
+        setSiswaData(freshData.siswaData || [])
+        setKelasData(freshData.kelasData || [])
+        console.log("✅ [SISWA] State synced with fresh API data + auto-synced to kelas page!")
+      })
+
       alert("Siswa berhasil dihapus!")
     } catch (err) {
       alert(`Gagal: ${err instanceof Error ? err.message : "Unknown error"}`)
@@ -668,13 +774,6 @@ const DataSiswa = () => {
       setSubmitting(false)
     }
   }
-
-  useEffect(() => {
-    if (sekolahId && authToken) {
-      fetchSiswa()
-      fetchKelas()
-    }
-  }, [sekolahId, authToken, fetchSiswa, fetchKelas])
 
   const filteredData = useMemo(() => {
     return siswaData.filter((siswa) => {
@@ -805,8 +904,13 @@ const DataSiswa = () => {
             <p className="text-red-600 mb-4 font-semibold">{error}</p>
             <button
               onClick={() => {
-                setError(null)
-                if (sekolahId && authToken) fetchSiswa()
+                const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+                const schoolId = localStorage.getItem("sekolahId")
+                if (schoolId && token) {
+                  hasInitialized.current = false
+                  setCredentialsReady(false)
+                  setCredentialsReady(true)
+                }
               }}
               className="px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold"
             >
@@ -1575,7 +1679,9 @@ const DataSiswa = () => {
                     <TrendingUp className="w-5 h-5 text-pink-600" />
                     <p className="text-sm font-bold text-pink-900">IMT</p>
                   </div>
-                  <p className="text-3xl font-bold text-pink-900">{selectedSiswa.imt?.toFixed(1) || 0}</p>
+                  <p className="text-3xl font-bold text-pink-900">
+                    {typeof selectedSiswa.imt === "number" ? selectedSiswa.imt.toFixed(1) : Number(selectedSiswa.imt || 0).toFixed(1)}
+                  </p>
                 </div>
 
                 <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-4 border-2 border-amber-200 shadow-sm">

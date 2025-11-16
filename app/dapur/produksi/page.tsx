@@ -2,57 +2,15 @@
 
 import { useState, useEffect, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useProduksiCache } from '@/lib/hooks/useProduksiCache';
 import DapurLayout from '@/components/layout/DapurLayout';
 import {
-  Activity, AlertCircle, Camera, CheckCircle, Clock, Eye, Flame,
-  ListChecks, Package, Plus, QrCode, ShoppingBag, Truck,
-  TrendingUp, User, Utensils, X, ImageIcon
+  AlertCircle, CheckCircle, Clock, Eye, Flame,
+  ListChecks, Package, QrCode,
+  TrendingUp, Utensils, X
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Link from 'next/link';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
-
-async function getAuthToken() {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("authToken") || "";
-}
-
-async function apiCall<T>(endpoint: string, options: any = {}): Promise<T> {
-  try {
-    const token = await getAuthToken();
-    const url = `${API_BASE_URL}${endpoint}`;
-
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}`);
-    }
-
-    return response.json();
-  } catch (error) {
-    console.error(`[API Error] ${endpoint}:`, error);
-    throw error;
-  }
-}
-
-function extractArray(data: any): any[] {
-  if (Array.isArray(data)) return data;
-  if (data?.data && Array.isArray(data.data)) return data.data;
-  if (typeof data === "object") {
-    const arr = Object.values(data).find((v) => Array.isArray(v));
-    if (arr) return arr as any[];
-  }
-  return [];
-}
 
 const ProductionTimeline = memo(({ batches }: { batches: any[] }) => {
   const chartData = batches.map(b => ({
@@ -77,7 +35,7 @@ const ProductionTimeline = memo(({ batches }: { batches: any[] }) => {
 ProductionTimeline.displayName = 'ProductionTimeline';
 
 const SkeletonCard = () => (
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
+  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-pulse-fast">
     <div className="bg-gray-200 h-20"></div>
     <div className="p-4 space-y-3">
       <div className="h-3 bg-gray-200 rounded w-1/2"></div>
@@ -90,7 +48,7 @@ const SkeletonCard = () => (
 );
 
 const SkeletonStats = () => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 animate-pulse">
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 animate-pulse-fast">
     {[...Array(5)].map((_, i) => (
       <div key={i} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
         <div className="w-10 h-10 bg-gray-200 rounded-lg mb-3"></div>
@@ -103,7 +61,7 @@ const SkeletonStats = () => (
 );
 
 const SkeletonChart = () => (
-  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 animate-pulse">
+  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 animate-pulse-fast">
     <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
     <div className="space-y-2">
       {[...Array(4)].map((_, i) => (
@@ -154,64 +112,77 @@ export default function ProduksiHarianPage() {
     const loadProduction = async () => {
       try {
         setLoading(true);
-        
-        const planningRes = await apiCall<any>("/api/menu-planning");
-        const plannings = extractArray(planningRes?.data || []);
 
-        const today = new Date().toISOString().split('T')[0];
-        const batchesData: any[] = [];
+        // Optimize: Aggressive pagination untuk menu-planning (limit 20)
+        const planningRes = await apiCall<any>("/api/menu-planning?limit=20&page=1");
+        const plannings = extractArray(planningRes.data?.data || []);
 
-        for (const planning of plannings) {
-          try {
-            const menuRes = await apiCall<any>(`/api/menu-planning/${planning.id}/menu-harian`);
-            const menus = extractArray(menuRes?.data || []);
+        // ✅ PERBAIKAN: Get today's date dalam local timezone (UTC+7)
+        // Jangan gunakan UTC langsung karena backend menyimpan dalam UTC
+        const now = new Date();
+        const todayLocalDate = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // +7 jam untuk Indonesia
+        const today = `${todayLocalDate.getUTCFullYear()}-${String(todayLocalDate.getUTCMonth() + 1).padStart(2, '0')}-${String(todayLocalDate.getUTCDate()).padStart(2, '0')}`;
+        console.log(`[PRODUKSI] Today's date (local): ${today}`);
 
-            for (const menu of menus) {
-              const menuDate = new Date(menu.tanggal).toISOString().split('T')[0];
-              if (menuDate === today) {
-                try {
-                  const checkpointRes = await apiCall<any>(`/api/menu-harian/${menu.id}/checkpoint`);
-                  const checkpoints = extractArray(checkpointRes?.data || []);
+        // Parallel fetch menu-harian untuk semua planning (limit 20 per planning)
+        const menuPromises = plannings.map(planning =>
+          apiCall<any>(`/api/menu-planning/${planning.id}/menu-harian?limit=20&page=1&tanggal=${today}`)
+            .then(menuRes => {
+              const menus = extractArray(menuRes.data?.data || []);
+              return { planning, menus };
+            })
+            .catch(err => {
+              console.warn(`Gagal fetch menu untuk planning ${planning.id}:`, err);
+              return { planning, menus: [] };
+            })
+        );
 
-                  // Fetch sekolah untuk mendapat nama
-                  let sekolahName = 'Unknown';
-                  try {
-                    const sekolahRes = await apiCall<any>(`/api/sekolah/${planning.sekolahId}`);
-                    sekolahName = sekolahRes?.nama || sekolahRes?.data?.nama || 'Unknown';
-                  } catch (err) {
-                    console.warn(`Gagal fetch sekolah ${planning.sekolahId}:`, err);
-                  }
+        const menuResults = await Promise.all(menuPromises);
 
-                  // TODO: Fetch dari absensi untuk calculate target
-                  // const absensiRes = await apiCall<any>(`/api/sekolah/:sekolahId/absensi/total/${today}`);
-                  // const targetTrays = absensiRes.data.jumlahHadir;
-                  
-                  const targetTrays = 1200; // Dummy untuk sekarang
-
-                  batchesData.push({
-                    id: `BATCH-${menu.id}`,
-                    dailyMenu: menu,
-                    menuId: menu.id,
-                    sekolahId: planning.sekolahId,
-                    sekolahName: sekolahName,
-                    status: checkpoints.length >= 4 ? 'COMPLETED' : checkpoints.length >= 2 ? 'IN_PROGRESS' : 'PREPARING',
-                    expectedTrays: targetTrays,
-                    packedTrays: checkpoints.length >= 3 ? targetTrays : checkpoints.length >= 2 ? Math.round(targetTrays / 2) : 0,
-                    checkpoints: checkpoints,
-                    createdBy: 'System',
-                    startTime: menu.jamMulaiMasak,
-                    endTime: menu.jamSelesaiMasak
-                  });
-                } catch (err) {
-                  console.warn(`Gagal fetch checkpoints untuk menu ${menu.id}:`, err);
-                }
-              }
+        // Flat all menus dan filter hanya untuk hari ini
+        const todayMenus: any[] = [];
+        menuResults.forEach(({ planning, menus }) => {
+          menus.forEach(menu => {
+            // ✅ PERBAIKAN: Gunakan normalizeDateString untuk handle timezone conversion
+            const menuDate = normalizeDateString(menu.tanggal);
+            console.log(`[PRODUKSI] Menu date: ${menuDate}, Today: ${today}, Match: ${menuDate === today}`);
+            if (menuDate === today) {
+              todayMenus.push({ planning, menu });
             }
-          } catch (err) {
-            console.warn(`Gagal fetch menu untuk planning ${planning.id}:`, err);
-          }
-        }
+          });
+        });
 
+        // Optimize: Skip sekolah API call, use planning.sekolah data yang sudah ada
+        // Parallel fetch checkpoint untuk semua menu hari ini
+        const batchPromises = todayMenus.map(({ planning, menu }) =>
+          apiCall<any>(`/api/menu-harian/${menu.id}/checkpoint?limit=10`).catch(() => ({ data: { data: [] }, isNew: false }))
+            .then((checkpointRes) => {
+              const checkpoints = extractArray(checkpointRes.data?.data || []);
+              const sekolahName = planning.sekolah?.nama || 'Unknown';
+              const targetTrays = menu.targetTray || 1200;
+
+              return {
+                id: `BATCH-${menu.id}`,
+                dailyMenu: menu,
+                menuId: menu.id,
+                sekolahId: planning.sekolahId,
+                sekolahName: sekolahName,
+                status: checkpoints.length >= 4 ? 'COMPLETED' : checkpoints.length >= 2 ? 'IN_PROGRESS' : 'PREPARING',
+                expectedTrays: targetTrays,
+                packedTrays: checkpoints.length >= 3 ? targetTrays : checkpoints.length >= 2 ? Math.round(targetTrays / 2) : 0,
+                checkpoints: checkpoints,
+                createdBy: 'System',
+                startTime: menu.jamMulaiMasak,
+                endTime: menu.jamSelesaiMasak
+              };
+            })
+            .catch(err => {
+              console.warn(`Gagal fetch batch data untuk menu ${menu.id}:`, err);
+              return null;
+            })
+        );
+
+        const batchesData = (await Promise.all(batchPromises)).filter(b => b !== null);
         setBatches(batchesData);
       } catch (err) {
         console.error('Gagal load produksi:', err);
@@ -266,7 +237,7 @@ export default function ProduksiHarianPage() {
           <SkeletonStats />
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 animate-pulse">
+            <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 animate-pulse-fast">
               <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
               <div className="space-y-3">
                 <div className="h-12 bg-gray-100 rounded"></div>
@@ -284,7 +255,7 @@ export default function ProduksiHarianPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 animate-pulse">
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 animate-pulse-fast">
             <div className="h-10 bg-gray-200 rounded"></div>
           </div>
 

@@ -1,20 +1,17 @@
 'use client';
 import { useState, ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDapurData } from '@/lib/hooks/useDapurData';
 import {
   Home,
   ChefHat,
   Package,
-  Truck,
-  ClipboardList,
-  Users,
   BarChart3,
   Menu,
   X,
   LogOut,
   AlertCircle,
   MapPin,
-  QrCode,
   MessageCircle,
   Send,
   CheckCircle,
@@ -220,25 +217,15 @@ const BubbleReport = ({
 const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) => {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState('produksi');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState("");
   const [expandedMenu, setExpandedMenu] = useState<string | null>('operasional');
-  
-  const [dapurInfo, setDapurInfo] = useState({
-    nama: '',
-    alamat: '',
-    kota: '',
-    pic: '',
-    email: '',
-    phone: ''
-  });
+
+  // ✅ Use custom hook untuk dapur data
+  const { loading, error, dapurInfo, clearCache } = useDapurData();
 
   useEffect(() => {
     const userData = localStorage.getItem('mbg_user');
     const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
-    const dapurId = localStorage.getItem('userDapurId');
 
     if (!userData || !token) {
       router.push('/auth/login');
@@ -246,161 +233,13 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
     }
 
     try {
-      const user = JSON.parse(userData);
       setAuthToken(token);
-      
-      console.log('User data:', user);
-      console.log('Dapur ID from storage:', dapurId);
-      
-      setDapurInfo(prev => ({
-        ...prev,
-        pic: user.name || '-',
-        email: user.email || '',
-        phone: user.phone || '',
-      }));
-
-      if (dapurId) {
-        fetchDapurDetail(dapurId, token);
-      } else {
-        findDapurByPIC(user.id, user.name, token);
-      }
+      console.log('DapurLayout initialized with token');
     } catch (error) {
-      console.error('Error parsing user data:', error);
-      setLoading(false);
+      console.error('Error initializing DapurLayout:', error);
       router.push('/auth/login');
     }
   }, [router]);
-
-  const findDapurByPIC = async (picId: string, picName: string, token: string) => {
-    try {
-      setLoading(true);
-      console.log('Searching for dapur with PIC ID:', picId);
-      
-      const response = await fetch(
-        `${API_BASE_URL}/api/dapur?page=1&limit=100`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (!response.ok) {
-        console.warn(`HTTP error! status: ${response.status}`);
-        setError(`Gagal memuat data dapur (${response.status})`);
-        setLoading(false);
-        return;
-      }
-
-      const result = await response.json();
-      console.log('Dapur list response:', result);
-      
-      let dapurList = [];
-      if (Array.isArray(result.data?.data)) {
-        dapurList = result.data.data;
-      } else if (Array.isArray(result.data)) {
-        dapurList = result.data;
-      } else if (Array.isArray(result)) {
-        dapurList = result;
-      }
-
-      console.log('Parsed dapur list:', dapurList);
-
-      let foundDapur = null;
-      
-      for (const dapur of dapurList) {
-        if (dapur.picDapur && Array.isArray(dapur.picDapur)) {
-          const matchingPIC = dapur.picDapur.find(
-            (pic: any) => pic.id === picId || pic.name === picName
-          );
-          
-          if (matchingPIC) {
-            foundDapur = dapur;
-            console.log('Found dapur matching PIC:', foundDapur);
-            break;
-          }
-        }
-      }
-
-      if (foundDapur) {
-        localStorage.setItem('userDapurId', foundDapur.id);
-        console.log('Dapur ID saved:', foundDapur.id);
-        updateDapurInfo(foundDapur);
-      } else {
-        console.warn('No dapur found for this PIC');
-        setError('Dapur tidak ditemukan untuk PIC ini');
-        setLoading(false);
-      }
-    } catch (err) {
-      console.error('Error finding dapur by PIC:', err);
-      setError('Gagal mencari data dapur');
-      setLoading(false);
-    }
-  };
-
-  const fetchDapurDetail = async (dapurId: string, token: string) => {
-    try {
-      setLoading(true);
-      console.log('Fetching dapur detail for ID:', dapurId);
-      
-      const response = await fetch(
-        `${API_BASE_URL}/api/dapur/${dapurId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      console.log('Response status:', response.status);
-
-      if (!response.ok) {
-        console.warn(`HTTP error! status: ${response.status}`);
-        setError(`Gagal memload data dapur (${response.status})`);
-        setLoading(false);
-        return;
-      }
-
-      const result = await response.json();
-      console.log('Dapur data:', result);
-      
-      const dapur = result.data || result;
-
-      updateDapurInfo(dapur);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching dapur detail:', err);
-      setError('Gagal memload data dapur. Menggunakan data default.');
-      setLoading(false);
-    }
-  };
-
-  const updateDapurInfo = (dapur: any) => {
-    const picData = dapur.picDapur && Array.isArray(dapur.picDapur) && dapur.picDapur.length > 0 ? dapur.picDapur[0] : null;
-
-    setDapurInfo({
-      nama: dapur.nama || 'Dapur MBG',
-      alamat: dapur.alamat || '',
-      kota: extractKotaFromAlamat(dapur.alamat) || 'Jakarta',
-      pic: picData?.name || '-',
-      phone: picData?.phone || '',
-      email: picData?.email || '',
-    });
-
-    setError(null);
-    setLoading(false);
-  };
-
-  const extractKotaFromAlamat = (alamat: string): string => {
-    if (!alamat) return '';
-    const parts = alamat.split(',');
-    if (parts.length > 1) {
-      return parts[parts.length - 1].trim();
-    }
-    return '';
-  };
 
   // ===== NAVIGATION STRUCTURE YANG DIKELOMPOKKAN =====
   const navigation = [
@@ -462,6 +301,9 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
   };
 
   const handleLogout = () => {
+    // ✅ Clear dapur data cache
+    clearCache();
+
     if (typeof window !== 'undefined') {
       localStorage.removeItem('mbg_user');
       localStorage.removeItem('mbg_token');
@@ -476,6 +318,60 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
   const toggleMenu = (menuId: string) => {
     setExpandedMenu(expandedMenu === menuId ? null : menuId);
   };
+
+  // Auto-expand submenu based on currentPage
+  useEffect(() => {
+    const navigation = [
+      { id: 'dashboard', name: 'Dashboard', path: '/dapur/dashboard' },
+      {
+        id: 'operasional',
+        name: 'Operasional',
+        submenu: [
+          { id: 'produksi', path: '/dapur/produksi' },
+          { id: 'menu', path: '/dapur/menu' },
+          { id: 'sekolah', path: '/dapur/sekolah-terdekat' },
+        ]
+      },
+      {
+        id: 'inventory',
+        name: 'Inventory',
+        submenu: [
+          { id: 'bahan', path: '/dapur/bahan' },
+        ]
+      },
+      {
+        id: 'distribusi',
+        name: 'Distribusi',
+        submenu: [
+          { id: 'daftardriver', path: '/dapur/assign-driver' },
+          { id: 'scan', path: '/dapur/scan' },
+          { id: 'monitoringdriver', path: '/dapur/monitoringdriver' },
+        ]
+      },
+      {
+        id: 'manajemen',
+        name: 'Manajemen',
+        submenu: [
+          { id: 'karyawan', path: '/dapur/karyawan' },
+          { id: 'laporan', path: '/dapur/laporan' },
+        ]
+      },
+    ];
+
+    // Find which submenu should be expanded based on currentPage
+    for (const item of navigation) {
+      if (item.submenu) {
+        const hasCurrentPage = item.submenu.some(sub => sub.id === currentPage);
+        if (hasCurrentPage) {
+          setExpandedMenu(item.id);
+          return;
+        }
+      }
+    }
+
+    // If no submenu found, close all submenus
+    setExpandedMenu(null);
+  }, [currentPage]);
 
   return (
     <div className="flex h-screen bg-[#1B263A] overflow-hidden">
@@ -544,8 +440,8 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
                 <div className="pt-2 border-t border-white/10">
                   <p className="text-xs text-gray-400">PIC Dapur</p>
                   <p className="text-sm font-medium text-white">{dapurInfo.pic}</p>
-                  {dapurInfo.phone && (
-                    <p className="text-xs text-gray-400 mt-1">{dapurInfo.phone}</p>
+                  {dapurInfo.picPhone && (
+                    <p className="text-xs text-gray-400 mt-1">{dapurInfo.picPhone}</p>
                   )}
                 </div>
               </>
@@ -647,7 +543,7 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
           <div className="flex items-center justify-between w-full">
             <div>
               <h1 className="text-xl font-bold text-white">
-                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                {currentPage.charAt(0).toUpperCase() + currentPage.slice(1)}
               </h1>
               <p className="text-sm text-gray-400">{dapurInfo.nama}</p>
             </div>

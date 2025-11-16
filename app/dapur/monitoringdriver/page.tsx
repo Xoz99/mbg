@@ -3,10 +3,10 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import DapurLayout from '@/components/layout/DapurLayout';
-import { 
-  MapPin, Truck, Navigation, Phone, User, Package, 
-  TrendingUp, MapPinned, AlertCircle, Loader, Clock, 
-  UtensilsCrossed, Activity, Radio
+import {
+  MapPin, Truck, Navigation, Phone, User, Package,
+  TrendingUp, MapPinned, AlertCircle, Loader, Clock,
+  UtensilsCrossed, Activity, Radio, Maximize2, Minimize2, X
 } from 'lucide-react';
 
 import dynamic from 'next/dynamic';
@@ -90,10 +90,12 @@ const MonitoringDriversPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState('');
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const isFetchingRef = useRef(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const mapRef = useRef<any>(null);
+  const fullscreenMapRef = useRef<any>(null);
 
   // Initialize auth
   useEffect(() => {
@@ -196,6 +198,20 @@ const MonitoringDriversPage = () => {
       }
     };
   }, [authToken, fetchActiveDrivers]);
+
+  // Handle keyboard shortcut for fullscreen (ESC to close)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+
+    if (isFullscreen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isFullscreen]);
 
   // Process drivers data
   const processedDrivers = useMemo(() => {
@@ -389,9 +405,18 @@ const MonitoringDriversPage = () => {
                           <p className="text-xs text-white/70">OpenStreetMap - Live Location Tracking</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 bg-green-500/20 px-3 py-1.5 rounded-lg border border-green-400/30">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span className="text-xs md:text-sm font-semibold">Live • {formattedTime}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 bg-green-500/20 px-3 py-1.5 rounded-lg border border-green-400/30">
+                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                          <span className="text-xs md:text-sm font-semibold">Live • {formattedTime}</span>
+                        </div>
+                        <button
+                          onClick={() => setIsFullscreen(true)}
+                          className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                          title="Full Screen (ESC untuk kembali)"
+                        >
+                          <Maximize2 className="w-5 h-5" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -550,7 +575,7 @@ const MonitoringDriversPage = () => {
           .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #1B263A;
           }
-          
+
           @keyframes pulse {
             0%, 100% {
               opacity: 1;
@@ -561,6 +586,97 @@ const MonitoringDriversPage = () => {
           }
         `}</style>
       </div>
+
+      {/* Fullscreen Map Modal - Outside main layout */}
+      {isFullscreen && (
+        <div className="fixed inset-0 bg-black z-[9999] flex flex-col overflow-hidden">
+          {/* Fullscreen Header */}
+          <div className="bg-gradient-to-br from-[#1B263A] to-[#2A3749] p-4 md:p-5 text-white flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <MapPin className="w-6 h-6 flex-shrink-0" />
+              <div className="min-w-0">
+                <h3 className="text-lg md:text-xl font-semibold truncate">Peta Monitoring Driver - Full Screen</h3>
+                <p className="text-xs text-white/70">OpenStreetMap - Live Location Tracking</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2 bg-green-500/20 px-3 py-1.5 rounded-lg border border-green-400/30 whitespace-nowrap">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-xs md:text-sm font-semibold">Live • {formattedTime}</span>
+              </div>
+              <button
+                onClick={() => setIsFullscreen(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
+                title="Exit Full Screen (ESC)"
+              >
+                <Minimize2 className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Fullscreen Map Container */}
+          <div className="flex-1 relative w-full overflow-hidden">
+            {mapReady ? (
+              processedDrivers.length > 0 ? (
+                <MapContainer
+                  center={mapCenter as [number, number]}
+                  zoom={12}
+                  style={{ height: '100%', width: '100%' }}
+                  ref={fullscreenMapRef}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution="&copy; OpenStreetMap"
+                  />
+
+                  {processedDrivers.map((driver) => (
+                    <Marker
+                      key={driver.id}
+                      position={[driver.lat, driver.lng]}
+                      icon={createDriverIcon(driver.isActive, selectedDriver === driver.id)}
+                      eventHandlers={{
+                        click: () => handleDriverClick(driver.id)
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-2 min-w-[200px]">
+                          <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                            <div className={`w-3 h-3 rounded-full ${driver.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                            <p className="font-bold text-sm">{driver.name}</p>
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <p className="text-gray-600">🚗 {driver.vehicleId}</p>
+                            <p className="text-gray-600">📞 {driver.phone}</p>
+                            <p className="text-gray-600">🍳 {driver.dapurNama}</p>
+                            <p className="text-gray-600">🕒 Update: {driver.waktuUpdate}</p>
+                            {driver.minutesSinceUpdate !== null && (
+                              <p className={`text-xs font-medium ${driver.isActive ? 'text-green-600' : 'text-gray-500'}`}>
+                                {driver.minutesSinceUpdate < 1 ? 'Baru saja' : `${driver.minutesSinceUpdate} menit lalu`}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center bg-gray-900">
+                  <div className="text-center">
+                    <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-300 font-semibold">Tidak Ada Driver Aktif</p>
+                    <p className="text-gray-400 text-sm mt-1">Belum ada driver yang sedang online</p>
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="h-full flex items-center justify-center bg-gray-900">
+                <Loader className="w-12 h-12 animate-spin text-blue-400" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </DapurLayout>
   );
 };

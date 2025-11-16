@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { apiCache, generateCacheKey } from "@/lib/utils/cache"
 import DapurLayout from "@/components/layout/DapurLayout"
 import {
   Calendar,
@@ -90,8 +91,51 @@ async function getAuthToken(): Promise<string> {
   return localStorage.getItem("authToken") || ""
 }
 
-async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+// Helper function untuk normalize tanggal dari backend
+// ✅ PERBAIKAN: Handle timezone conversion untuk UTC datetime
+// Backend menyimpan dalam UTC, tapi kita perlu display dalam local timezone
+function normalizeDateString(dateString: string | null | undefined): string | null {
+  if (!dateString) return null
+
+  dateString = dateString.trim()
+
+  // Jika format ISO (YYYY-MM-DDTHH:MM:SS.000Z), convert ke local timezone
+  if (dateString.includes('T')) {
+    try {
+      // Parse sebagai UTC
+      const utcDate = new Date(dateString)
+      // Buat date string dari UTC datetime yang di-adjust dengan local timezone
+      // Jika UTC+7, maka tambah 7 jam ke UTC date untuk mendapatkan local date
+      const localDate = new Date(utcDate.getTime() + (7 * 60 * 60 * 1000)) // +7 jam untuk Indonesia
+      const year = localDate.getUTCFullYear()
+      const month = String(localDate.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(localDate.getUTCDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    } catch (e) {
+      console.warn(`[normalizeDateString] Failed to parse ISO date: ${dateString}`)
+      return dateString.split('T')[0]
+    }
+  }
+
+  // Jika format YYYY-MM-DD, return sebagaimana adanya
+  if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return dateString
+  }
+
+  console.warn(`[normalizeDateString] Unexpected format: ${dateString}`)
+  return dateString
+}
+
+async function apiCall<T>(endpoint: string, options: RequestInit = {}, cacheKey?: string): Promise<T> {
   try {
+    const key = cacheKey || generateCacheKey(endpoint)
+
+    // Check cache first (only for GET requests)
+    if (!options.method || options.method === "GET") {
+      const cached = apiCache.get<T>(key)
+      if (cached) return cached
+    }
+
     const token = await getAuthToken()
     const url = `${API_BASE_URL}${endpoint}`
 
@@ -109,7 +153,14 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       throw new Error(errorData.message || `HTTP ${response.status}`)
     }
 
-    return response.json()
+    const data = await response.json()
+
+    // Cache GET requests for 10 minutes
+    if (!options.method || options.method === "GET") {
+      apiCache.set(key, data, 10 * 60 * 1000)
+    }
+
+    return data
   } catch (error) {
     console.error(`[API Error] ${endpoint}:`, error)
     throw error
@@ -157,6 +208,21 @@ function formatDateShort(dateString: string): string {
   })
 }
 
+// Helper function to parse date string consistently in UTC
+function parseDateAsUTC(dateString: string): Date | null {
+  if (!dateString) return null
+
+  // If date-only format (YYYY-MM-DD), parse as UTC midnight
+  if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [year, month, day] = dateString.split('-').map(Number)
+    return new Date(Date.UTC(year, month - 1, day))
+  }
+
+  // Otherwise use standard Date parsing (works with ISO format)
+  const date = new Date(dateString)
+  return isNaN(date.getTime()) ? null : date
+}
+
 // ✅ OPTIMIZED: Parallel loading + streaming data
 async function aggregateAbsensiForSekolah(sekolahId: string): Promise<AbsensiAggregated[]> {
   try {
@@ -194,7 +260,8 @@ async function aggregateAbsensiForSekolah(sekolahId: string): Promise<AbsensiAgg
 
     for (const { kelas, absensiList, totalSiswaKelas } of validData) {
       for (const absensi of absensiList) {
-        const dateKey = new Date(absensi.tanggal).toISOString().split('T')[0]
+        const dateKey = normalizeDateString(absensi.tanggal)
+        if (!dateKey) continue
 
         if (!allAbsensiByDate[dateKey]) {
           allAbsensiByDate[dateKey] = {
@@ -225,7 +292,7 @@ async function aggregateAbsensiForSekolah(sekolahId: string): Promise<AbsensiAgg
 
 function SkeletonMenuCard() {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm h-48 animate-pulse">
+    <div className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm h-48 animate-pulse-fast">
       <div className="space-y-3">
         <div className="h-4 bg-gray-200 rounded w-3/4"></div>
         <div className="h-4 bg-gray-200 rounded w-1/2"></div>
@@ -238,7 +305,7 @@ function SkeletonMenuCard() {
 
 function SkeletonAlergiCard() {
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 h-32 animate-pulse">
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 h-32 animate-pulse-fast">
       <div className="h-5 bg-blue-200 rounded w-32 mb-4"></div>
       <div className="space-y-2">
         <div className="h-3 bg-blue-200 rounded w-full"></div>
@@ -374,39 +441,26 @@ function ModalCreateMenuHarian({
 
   const isDateInRange = (dateStr: string) => {
     if (!minDate || !maxDate) return false
-    const date = new Date(dateStr)
-    const min = new Date(minDate)
-    const max = new Date(maxDate)
+    const date = parseDateAsUTC(dateStr)
+    const min = parseDateAsUTC(minDate)
+    const max = parseDateAsUTC(maxDate)
+    if (!date || !min || !max) return false
     return date >= min && date <= max
   }
 
   const isHoliday = (dateStr: string) => {
     if (!holidays || holidays.length === 0) return false
     return holidays.some((h: Holiday) => {
-      try {
-        if (!h.tanggal) return false
-        const date = new Date(h.tanggal)
-        if (isNaN(date.getTime())) return false
-        const holidayDate = date.toISOString().split('T')[0]
-        return holidayDate === dateStr
-      } catch (err) {
-        return false
-      }
+      const holidayDate = normalizeDateString(h.tanggal)
+      return holidayDate === dateStr
     })
   }
 
   const getHolidayInfo = (dateStr: string) => {
     if (!holidays || holidays.length === 0) return null
     return holidays.find((h: Holiday) => {
-      try {
-        if (!h.tanggal) return false
-        const date = new Date(h.tanggal)
-        if (isNaN(date.getTime())) return false
-        const holidayDate = date.toISOString().split('T')[0]
-        return holidayDate === dateStr
-      } catch (err) {
-        return false
-      }
+      const holidayDate = normalizeDateString(h.tanggal)
+      return holidayDate === dateStr
     })
   }
 
@@ -551,19 +605,34 @@ function ModalCreateMenuHarian({
               </div>
 
               <div className="grid grid-cols-7 gap-1">
-                {days.map((day, idx) => {
+{days.map((day, idx) => {
                   if (day === null) {
                     return <div key={`empty-${idx}`} className="aspect-square"></div>
                   }
 
+                  // Format tanggal dengan UTC consistent - JANGAN pakai local timezone
                   const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
                   const inRange = isDateInRange(dateStr)
                   const holiday = isHoliday(dateStr)
                   const isSelected = formData.tanggal === dateStr
                   const holidayInfo = getHolidayInfo(dateStr)
+                  // Compare dengan format ISO yang dipakai backend
+                  // dateStr format: YYYY-MM-DD (dari kalender)
+                  // Backend return: YYYY-MM-DDTHH:MM:SS.000Z
+                  // Match: ambil bagian YYYY-MM-DD dari backend data
                   const isBooked = menuHarianList.some((menu: MenuHarian) => {
-                    const menuDate = menu.tanggal ? new Date(menu.tanggal).toISOString().split('T')[0] : null
-                    return menuDate === dateStr
+                    if (!menu.tanggal) return false
+                    // ✅ PERBAIKAN: Gunakan normalizeDateString untuk handle timezone conversion
+                    // Contoh: Backend return "2025-11-13T17:00:00.000Z" (UTC)
+                    // Tapi itu adalah "2025-11-14" local time (UTC+7)
+                    // normalizeDateString akan convert dengan benar
+                    const normalizedBackendDate = normalizeDateString(menu.tanggal)
+                    const isMatch = normalizedBackendDate === dateStr
+
+                    if (isMatch) {
+                      console.log(`[DEBUG MATCH] dateStr: ${dateStr}, normalizedBackendDate: ${normalizedBackendDate}, menu.tanggal raw: ${menu.tanggal}`)
+                    }
+                    return isMatch
                   })
                   const absensiForDate = getAbsensiForDate(dateStr)
 
@@ -572,6 +641,8 @@ function ModalCreateMenuHarian({
                       key={`day-${day}`}
                       onClick={() => {
                         if (inRange && !holiday) {
+                          console.log("[DEBUG CLICK] Tanggal diklik:", dateStr)
+                          console.log("[DEBUG CLICK] inRange:", inRange, "holiday:", holiday)
                           setFormData({ ...formData, tanggal: dateStr })
                         }
                       }}
@@ -835,8 +906,10 @@ export default function MenuPlanningPage() {
   // Map aggregated absensi data by date
   const absensiAggregatedMap: { [key: string]: AbsensiAggregated } = {}
   absensiAggregated.forEach(a => {
-    const dateKey = new Date(a.tanggal).toISOString().split('T')[0]
-    absensiAggregatedMap[dateKey] = a
+    const dateKey = normalizeDateString(a.tanggal)
+    if (dateKey) {
+      absensiAggregatedMap[dateKey] = a
+    }
   })
 
   // ✅ INITIAL LOAD: Parallel API calls
@@ -905,24 +978,49 @@ export default function MenuPlanningPage() {
             const siswas = extractArray(siswaRes?.data || [])
             const alergiMap = new Map<string, { count: number; siswas: string[] }>()
 
-            const siswaAlergiPromises = siswas.map((siswa) =>
-              apiCall<any>(`/api/siswa/${siswa.id}/alergi`)
-                .then((alergiRes) => {
-                  const alergi = extractArray(alergiRes?.data || [])
-                  return { siswa, alergi }
-                })
-                .catch(() => ({ siswa, alergi: [] }))
-            )
+            // Optimization: Try to get alergi from siswa directly, fallback to individual requests batched
+            let alergiResults: { siswa: any; alergi: any[] }[] = []
 
-            const siswaAlergiResults = await Promise.all(siswaAlergiPromises)
+            // First check if alergi data is already in siswa response
+            const siswaWithAlergiData = siswas.filter((s: any) => s.alergi)
+            if (siswaWithAlergiData.length > 0) {
+              // Use alergi data from siswa response directly
+              alergiResults = siswas.map((siswa: any) => ({
+                siswa,
+                alergi: Array.isArray(siswa.alergi) ? siswa.alergi : (siswa.alergi ? [siswa.alergi] : []),
+              }))
+            } else {
+              // Fallback: batch alergi requests per 10 siswa instead of N requests
+              const BATCH_SIZE = 10
+              const batches: Promise<{ siswa: any; alergi: any[] }[]>[] = []
 
-            for (const { siswa, alergi } of siswaAlergiResults) {
+              for (let i = 0; i < siswas.length; i += BATCH_SIZE) {
+                const batch = siswas.slice(i, i + BATCH_SIZE)
+                const batchPromise = Promise.all(
+                  batch.map((siswa) =>
+                    apiCall<any>(`/api/siswa/${siswa.id}/alergi`)
+                      .then((alergiRes) => {
+                        const alergi = extractArray(alergiRes?.data || [])
+                        return { siswa, alergi }
+                      })
+                      .catch(() => ({ siswa, alergi: [] }))
+                  )
+                )
+                batches.push(batchPromise)
+              }
+
+              const batchResults = await Promise.all(batches)
+              alergiResults = batchResults.flat()
+            }
+
+            for (const { siswa, alergi } of alergiResults) {
               for (const a of alergi) {
-                if (!alergiMap.has(a.namaAlergi)) {
-                  alergiMap.set(a.namaAlergi, { count: 0, siswas: [] })
+                const namaAlergi = a.namaAlergi || a.nama || a
+                if (!alergiMap.has(namaAlergi)) {
+                  alergiMap.set(namaAlergi, { count: 0, siswas: [] })
                 }
-                alergiMap.get(a.namaAlergi)!.count++
-                alergiMap.get(a.namaAlergi)!.siswas.push(siswa.id)
+                alergiMap.get(namaAlergi)!.count++
+                alergiMap.get(namaAlergi)!.siswas.push(siswa.id)
               }
             }
 
@@ -986,6 +1084,10 @@ export default function MenuPlanningPage() {
       try {
         const res = await apiCall<any>(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
         const menus = extractArray(res?.data || [])
+        console.log("[DEBUG] Menu Harian dari API:", menus)
+        menus.forEach((menu: any) => {
+          console.log(`[DEBUG] Menu: ${menu.namaMenu}, Tanggal Raw: ${menu.tanggal}, Normalized: ${normalizeDateString(menu.tanggal)}`)
+        })
         setMenuHarianList(menus)  // ✅ No delay!
       } catch (err) {
         console.error("Gagal load menu harian:", err)
@@ -1031,15 +1133,45 @@ export default function MenuPlanningPage() {
 
     try {
       setIsSubmitting(true)
+
+      // Validasi tanggal mulai <= tanggal selesai
+      const startDate = parseDateAsUTC(formData.tanggalMulai)
+      const endDate = parseDateAsUTC(formData.tanggalSelesai)
+
+      console.log("[DEBUG CREATE PLANNING] ========== SUBMIT PLANNING ==========")
+      console.log("[DEBUG CREATE PLANNING] tanggalMulai:", formData.tanggalMulai)
+      console.log("[DEBUG CREATE PLANNING] tanggalSelesai:", formData.tanggalSelesai)
+      console.log("[DEBUG CREATE PLANNING] sekolahId:", formData.sekolahId)
+      console.log("[DEBUG CREATE PLANNING] mingguanKe:", formData.mingguanKe)
+      console.log("[DEBUG CREATE PLANNING] startDate (UTC):", startDate)
+      console.log("[DEBUG CREATE PLANNING] endDate (UTC):", endDate)
+
+      if (!startDate || !endDate) {
+        alert("Format tanggal tidak valid")
+        setIsSubmitting(false)
+        return
+      }
+
+      if (startDate > endDate) {
+        alert("Tanggal mulai harus lebih kecil atau sama dengan tanggal selesai")
+        setIsSubmitting(false)
+        return
+      }
+
+      const requestBody = {
+        mingguanKe: parseInt(formData.mingguanKe),
+        tanggalMulai: formData.tanggalMulai,
+        tanggalSelesai: formData.tanggalSelesai,
+        sekolahId: formData.sekolahId,
+      }
+
+      console.log("[DEBUG CREATE PLANNING] REQUEST BODY:", JSON.stringify(requestBody, null, 2))
+
       await apiCall("/api/menu-planning", {
         method: "POST",
-        body: JSON.stringify({
-          mingguanKe: parseInt(formData.mingguanKe),
-          tanggalMulai: formData.tanggalMulai,
-          tanggalSelesai: formData.tanggalSelesai,
-          sekolahId: formData.sekolahId,
-        }),
+        body: JSON.stringify(requestBody),
       })
+      console.log("[DEBUG CREATE PLANNING] API RESPONSE: SUCCESS")
       alert("Menu planning berhasil dibuat")
       setShowCreateModal(false)
       setFormData({
@@ -1064,21 +1196,72 @@ export default function MenuPlanningPage() {
 
     try {
       setIsSubmitting(true)
-      await apiCall(`/api/menu-planning/${selectedPlanningId}/menu-harian`, {
+
+      console.log("[DEBUG] ========== SUBMIT MENU HARIAN ==========")
+      console.log("[DEBUG] menuFormData.tanggal INPUT:", menuFormData.tanggal)
+      console.log("[DEBUG] currentPlanning:", currentPlanning)
+      console.log("[DEBUG] currentPlanning.tanggalMulai:", currentPlanning?.tanggalMulai)
+      console.log("[DEBUG] currentPlanning.tanggalSelesai:", currentPlanning?.tanggalSelesai)
+
+      // Cek range validation di frontend - GUNAKAN UTC CONSISTENT
+      const selectedDate = parseDateAsUTC(menuFormData.tanggal)
+      const minDate = parseDateAsUTC(currentPlanning?.tanggalMulai || "")
+      const maxDate = parseDateAsUTC(currentPlanning?.tanggalSelesai || "")
+
+      console.log("[DEBUG] selectedDate (UTC):", selectedDate)
+      console.log("[DEBUG] minDate (UTC):", minDate)
+      console.log("[DEBUG] maxDate (UTC):", maxDate)
+
+      if (!selectedDate || !minDate || !maxDate) {
+        console.error("[DEBUG] INVALID DATES - cannot parse")
+        alert("Format tanggal tidak valid")
+        setIsSubmitting(false)
+        return
+      }
+
+      console.log("[DEBUG] selectedDate >= minDate?", selectedDate >= minDate)
+      console.log("[DEBUG] selectedDate <= maxDate?", selectedDate <= maxDate)
+
+      if (selectedDate < minDate || selectedDate > maxDate) {
+        console.error("[DEBUG] RANGE ERROR - tanggal di luar range!")
+        console.error(`[DEBUG] Range: ${minDate.toISOString()} to ${maxDate.toISOString()}, Selected: ${selectedDate.toISOString()}`)
+        alert("Tanggal harus berada dalam range menu planning!")
+        setIsSubmitting(false)
+        return
+      }
+
+      console.log("[DEBUG] RANGE OK - lanjut submit")
+      console.log("[DEBUG] menuFormData.tanggal DIKIRIM:", menuFormData.tanggal)
+
+      const requestBody = {
+        tanggal: menuFormData.tanggal,  // ✅ Kirim sebagai date-only format: 2025-11-14 (sesuai dengan backend)
+        namaMenu: menuFormData.namaMenu,
+        biayaPerTray: parseFloat(menuFormData.biayaPerTray) || 0,
+        jamMulaiMasak: menuFormData.jamMulaiMasak,
+        jamSelesaiMasak: menuFormData.jamSelesaiMasak,
+        kalori: parseFloat(menuFormData.kalori) || 0,
+        protein: parseFloat(menuFormData.protein) || 0,
+        lemak: parseFloat(menuFormData.lemak) || 0,
+        targetTray: parseFloat(menuFormData.targetTray) || 0,
+        karbohidrat: parseFloat(menuFormData.karbohidrat) || 0,
+      }
+      console.log("[DEBUG] REQUEST BODY:", JSON.stringify(requestBody, null, 2))
+
+      const createRes = await apiCall<any>(`/api/menu-planning/${selectedPlanningId}/menu-harian`, {
         method: "POST",
-        body: JSON.stringify({
-          tanggal: menuFormData.tanggal,
-          namaMenu: menuFormData.namaMenu,
-          biayaPerTray: parseFloat(menuFormData.biayaPerTray) || 0,
-          jamMulaiMasak: menuFormData.jamMulaiMasak,
-          jamSelesaiMasak: menuFormData.jamSelesaiMasak,
-          kalori: parseFloat(menuFormData.kalori) || 0,
-          protein: parseFloat(menuFormData.protein) || 0,
-          lemak: parseFloat(menuFormData.lemak) || 0,
-          targetTray: parseFloat(menuFormData.targetTray) || 0,
-          karbohidrat: parseFloat(menuFormData.karbohidrat) || 0,
-        }),
+        body: JSON.stringify(requestBody),
       })
+      console.log("[DEBUG] API RESPONSE: SUCCESS")
+
+      // Optimistic update - add new menu to list immediately without refetch
+      const newMenu = createRes?.data || {
+        id: `temp-${Date.now()}`,
+        ...requestBody,
+        planningId: selectedPlanningId,
+      }
+
+      setMenuHarianList(prev => [...prev, newMenu])
+
       alert("Menu harian berhasil ditambahkan")
       setShowCreateMenuModal(false)
       setMenuFormData({
@@ -1093,11 +1276,6 @@ export default function MenuPlanningPage() {
         targetTray: "",
         lemak: "",
       })
-      if (selectedPlanningId) {
-        const res = await apiCall<any>(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
-        const menus = extractArray(res?.data || [])
-        setMenuHarianList(menus)
-      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Gagal menambahkan menu harian")
     } finally {
@@ -1140,10 +1318,10 @@ export default function MenuPlanningPage() {
     return (
       <DapurLayout currentPage="menu">
         <div className="space-y-4">
-          <div className="bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg p-6 h-48 animate-pulse"></div>
+          <div className="bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg p-6 h-48 animate-pulse-fast"></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm h-32 animate-pulse">
+              <div key={i} className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm h-32 animate-pulse-fast">
                 <div className="h-3 bg-gray-200 rounded w-24 mb-3"></div>
                 <div className="h-8 bg-gray-200 rounded w-20"></div>
               </div>
@@ -1188,7 +1366,7 @@ export default function MenuPlanningPage() {
             <label className="text-sm font-semibold text-gray-700">Filter per Sekolah:</label>
           </div>
           {loading ? (
-            <div className="h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="h-12 bg-gray-200 rounded-lg animate-pulse-fast"></div>
           ) : (
             <select
               value={selectedSekolahId}
@@ -1398,7 +1576,7 @@ export default function MenuPlanningPage() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {menuHarianList.map((menu) => {
-                const dateKey = new Date(menu.tanggal).toISOString().split('T')[0]
+                const dateKey = normalizeDateString(menu.tanggal) || ""
                 const absensiForDate = absensiAggregatedMap[dateKey]
                 
                 return (

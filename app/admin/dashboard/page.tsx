@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/layout/AdminLayout';
+import { apiCache, generateCacheKey } from '@/lib/utils/cache';
 import {
   Building2, Users, Truck, Loader2, AlertCircle, TrendingUp, MessageSquare
 } from 'lucide-react';
@@ -46,6 +47,8 @@ const AdminDashboard = () => {
   const [authToken, setAuthToken] = useState("");
   const [recentTickets, setRecentTickets] = useState<Ticket[]>([]);
   const [currentTicketIndex, setCurrentTicketIndex] = useState(0);
+  const isInitialLoad = useRef(true);
+  const lastLoadTimeRef = useRef<number>(0); // ✅ Track last load time untuk smart refresh
 
   useEffect(() => {
     const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
@@ -71,29 +74,60 @@ const AdminDashboard = () => {
     }
   }, [router]);
 
-  // Fetch stats
+  // Fetch stats dengan smart caching
   const fetchStats = useCallback(async () => {
     if (!authToken) return;
 
     try {
-      setLoading(true);
+      // ✅ Smart refresh: skip background refresh jika data sudah di-load < 25 detik lalu
+      const now = Date.now();
+      if (!isInitialLoad.current && (now - lastLoadTimeRef.current) < 25000) {
+        console.log("[ADMIN DASHBOARD] Skipping refresh - data masih fresh");
+        return;
+      }
+      lastLoadTimeRef.current = now;
+
+      // Show loading hanya pada initial load
+      if (isInitialLoad.current) {
+        setLoading(true);
+        isInitialLoad.current = false;
+      }
       setError(null);
 
-      // Fetch dapur
-      const dapurRes = await fetch(`${API_BASE_URL}/api/dapur?page=1&limit=1000`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-      });
+      // Parallel fetch dapur dan sekolah dengan smart cache
+      const [dapurResult, sekolahResult] = await Promise.all([
+        apiCache.smartFetch(
+          generateCacheKey(`${API_BASE_URL}/api/dapur`, { page: 1, limit: 1000 }),
+          () => fetch(`${API_BASE_URL}/api/dapur?page=1&limit=1000`, {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          }).then(res => {
+            if (!res.ok) throw new Error(`Failed to fetch dapur (${res.status})`);
+            return res.json();
+          }),
+          10 * 60 * 1000 // ✅ Increase to 10 minute cache untuk performa lebih baik
+        ),
+        apiCache.smartFetch(
+          generateCacheKey(`${API_BASE_URL}/api/sekolah`, { page: 1, limit: 1000 }),
+          () => fetch(`${API_BASE_URL}/api/sekolah?page=1&limit=1000`, {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          }).then(res => {
+            if (!res.ok) throw new Error(`Failed to fetch sekolah (${res.status})`);
+            return res.json();
+          }),
+          10 * 60 * 1000 // ✅ Increase to 10 minute cache untuk performa lebih baik
+        ),
+      ]);
 
-      if (!dapurRes.ok) {
-        throw new Error(`Failed to fetch dapur (${dapurRes.status})`);
-      }
-
-      const dapurData = await dapurRes.json();
+      // Process dapur data
+      const dapurData = dapurResult.data;
       let dapurList = [];
-      
+
       if (dapurData.data?.data && Array.isArray(dapurData.data.data)) {
         dapurList = dapurData.data.data;
       } else if (dapurData.data && Array.isArray(dapurData.data)) {
@@ -105,37 +139,29 @@ const AdminDashboard = () => {
       const totalKaryawan = dapurList.reduce((sum: number, d: any) => sum + (d._count?.karyawan || 0), 0);
       const totalDriver = dapurList.reduce((sum: number, d: any) => sum + (d.drivers?.length || 0), 0);
 
-      // Fetch sekolah
-      const sekolahRes = await fetch(`${API_BASE_URL}/api/sekolah?page=1&limit=1000`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!sekolahRes.ok) {
-        throw new Error(`Failed to fetch sekolah (${sekolahRes.status})`);
-      }
-
-      const sekolahData = await sekolahRes.json();
+      // Process sekolah data
+      const sekolahData = sekolahResult.data;
       let sekolahList = [];
-      
+
       if (sekolahData.data?.data && Array.isArray(sekolahData.data.data)) {
         sekolahList = sekolahData.data.data;
       } else if (sekolahData.data && Array.isArray(sekolahData.data)) {
         sekolahList = sekolahData.data;
       }
 
-      setStats({
-        totalDapur: dapurList.length,
-        totalSekolah: sekolahList.length,
-        totalDriver,
-        totalKaryawan,
-        dapurDenganPIC,
-        dapurTanpaPIC,
-      });
+      // Only update stats if data changed
+      if (dapurResult.isNew || sekolahResult.isNew) {
+        setStats({
+          totalDapur: dapurList.length,
+          totalSekolah: sekolahList.length,
+          totalDriver,
+          totalKaryawan,
+          dapurDenganPIC,
+          dapurTanpaPIC,
+        });
+      }
 
-      // Fetch recent tickets
+      // Fetch recent tickets (optional - doesn't need caching)
       try {
         const ticketsRes = await fetch(`${API_BASE_URL}/api/tickets?page=1&limit=5`, {
           headers: {
@@ -165,6 +191,14 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (authToken) {
       fetchStats();
+
+      // ✅ Setup polling untuk real-time update setiap 30 detik (dari 10s)
+      // Smart refresh logic akan skip jika data masih fresh
+      const pollingInterval = setInterval(() => {
+        fetchStats();
+      }, 30000);
+
+      return () => clearInterval(pollingInterval);
     }
   }, [authToken, fetchStats]);
 
@@ -179,53 +213,58 @@ const AdminDashboard = () => {
     return () => clearInterval(interval);
   }, [recentTickets.length]);
 
-  // Loading state
+  // ✅ Skeleton loading state - tampil langsung saat awal masuk halaman
+  const SkeletonContent = (
+    <div className="space-y-6">
+      {/* Header Skeleton */}
+      <div className="space-y-2">
+        <div className="h-8 bg-gray-200 rounded w-48 animate-pulse-fast"></div>
+        <div className="h-4 bg-gray-200 rounded w-96 animate-pulse-fast"></div>
+      </div>
+
+      {/* Stats Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gray-200 rounded-lg animate-pulse-fast"></div>
+              <div className="flex-1">
+                <div className="h-4 bg-gray-200 rounded w-24 mb-2 animate-pulse-fast"></div>
+                <div className="h-8 bg-gray-200 rounded w-16 animate-pulse-fast"></div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Activities Skeleton */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-200 bg-gray-50">
+          <div className="h-5 bg-gray-200 rounded w-40 animate-pulse-fast"></div>
+        </div>
+        <div className="divide-y divide-gray-200">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="p-4">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 bg-gray-200 rounded-lg animate-pulse-fast"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-200 rounded w-48 mb-2 animate-pulse-fast"></div>
+                  <div className="h-3 bg-gray-100 rounded w-64 mb-2 animate-pulse-fast"></div>
+                  <div className="h-3 bg-gray-100 rounded w-24 animate-pulse-fast"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ✅ Always show skeleton on initial load, data fetches in background
   if (loading) {
     return (
       <AdminLayout currentPage="dashboard">
-        <div className="space-y-6">
-          {/* Header Skeleton */}
-          <div className="space-y-2">
-            <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
-            <div className="h-4 bg-gray-200 rounded w-96 animate-pulse"></div>
-          </div>
-
-          {/* Stats Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-24 mb-2 animate-pulse"></div>
-                    <div className="h-8 bg-gray-200 rounded w-16 animate-pulse"></div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Activities Skeleton */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 bg-gray-50">
-              <div className="h-5 bg-gray-200 rounded w-40 animate-pulse"></div>
-            </div>
-            <div className="divide-y divide-gray-200">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
-                    <div className="flex-1">
-                      <div className="h-4 bg-gray-200 rounded w-48 mb-2 animate-pulse"></div>
-                      <div className="h-3 bg-gray-100 rounded w-64 mb-2 animate-pulse"></div>
-                      <div className="h-3 bg-gray-100 rounded w-24 animate-pulse"></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        {SkeletonContent}
       </AdminLayout>
     );
   }

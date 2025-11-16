@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Calendar, dayjsLocalizer, View } from 'react-big-calendar';
 import dayjs from 'dayjs';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import SekolahLayout from '@/components/layout/SekolahLayout';
+import { useKalenderAkademikCache } from '@/lib/hooks/useKalenderAkademikCache';
 import { 
   Plus,
   Edit2,
@@ -80,6 +81,15 @@ const ModalForm = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {form.tanggalMulai && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs font-medium text-blue-700 mb-1">📅 Rentang tanggal dipilih</p>
+              <p className="text-sm text-blue-900">
+                {new Date(form.tanggalMulai).toLocaleDateString('id-ID')} - {new Date(form.tanggalSelesai).toLocaleDateString('id-ID')}
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Tanggal Mulai *
@@ -198,58 +208,15 @@ const ModalDetail = ({
             </button>
             <button
               onClick={() => {
-                onDelete(data);
+                if (window.confirm(`Apakah Anda yakin menghapus "${data.deskripsi}"?`)) {
+                  onDelete(data);
+                }
                 onClose();
               }}
               className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
               Hapus
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Delete Confirmation
-const ModalDelete = ({
-  isOpen,
-  onClose,
-  data,
-  onConfirm,
-  isLoading
-}: any) => {
-  if (!isOpen || !data) return null;
-
-  return (
-    <div className="fixed inset-0 bg-white/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full border border-gray-100">
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-red-600" />
-            </div>
-            <h2 className="text-lg font-bold text-gray-900">Hapus Kegiatan</h2>
-          </div>
-
-          <p className="text-gray-600 mb-2">Apakah Anda yakin menghapus:</p>
-          <p className="text-gray-900 font-semibold mb-6">{data.deskripsi}</p>
-
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Batal
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={isLoading}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-            >
-              {isLoading ? 'Menghapus...' : 'Hapus'}
             </button>
           </div>
         </div>
@@ -300,8 +267,6 @@ const CustomToolbar = ({ label, onNavigate, onView, view, views }: any) => (
 const KalenderAkademik = () => {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [sekolahId, setSekolahId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const [events, setEvents] = useState<any[]>([]);
@@ -311,16 +276,34 @@ const KalenderAkademik = () => {
 
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
   const [selected, setSelected] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isFetchingRef = useRef(false);
+  // ✅ Callback ketika unified cache ter-update dari page lain (instant sync!)
+  const handleCacheUpdate = useCallback((cachedData: any) => {
+    const kalenders = cachedData.kalenderList || []
+    setList(kalenders)
+
+    // Transform to calendar events
+    const calendarEvents = kalenders.map((item: any) => ({
+      id: item.id,
+      title: item.deskripsi,
+      start: new Date(item.tanggalMulai),
+      end: new Date(item.tanggalSelesai),
+      resource: item,
+      tanggalMulai: item.tanggalMulai,
+      tanggalSelesai: item.tanggalSelesai,
+      deskripsi: item.deskripsi
+    }))
+    setEvents(calendarEvents)
+  }, [])
+
+  const { loading, error, loadData, updateCache } = useKalenderAkademikCache(handleCacheUpdate)
 
   // Init
   useEffect(() => {
     const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
-    const sekolah = localStorage.getItem("userSekolahId") 
+    const sekolah = localStorage.getItem("userSekolahId")
       || localStorage.getItem("sekolahId")
       || localStorage.getItem("schoolId");
 
@@ -329,92 +312,41 @@ const KalenderAkademik = () => {
 
     if (token) setAuthToken(token);
     if (sekolah) setSekolahId(sekolah);
-
-    if (!token || !sekolah) {
-      setError("Token atau Sekolah ID tidak ditemukan");
-      setLoading(false);
-    }
   }, []);
 
-  // Fetch data
-  const fetchData = useCallback(async () => {
-    if (!authToken || !sekolahId) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log('Fetching kalender data...');
-
-      const url = `${API_BASE_URL}/api/kalender-akademik`;
-      console.log('Fetch URL:', url);
-
-      const res = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!res.ok) throw new Error('Gagal memuat data');
-
-      const data = await res.json();
-      console.log('Full response:', data);
-      
-      // Parse kalenders dari response
-      let kalenders = [];
-      if (data.data?.kalenders && Array.isArray(data.data.kalenders)) {
-        kalenders = data.data.kalenders;
-      } else if (data.kalenders && Array.isArray(data.kalenders)) {
-        kalenders = data.kalenders;
-      } else if (Array.isArray(data.data)) {
-        kalenders = data.data;
-      } else if (Array.isArray(data)) {
-        kalenders = data;
-      }
-
-      console.log('Kalenders found:', kalenders);
-      console.log('Kalenders count:', kalenders.length);
-
-      setList(kalenders);
-
-      // Transform to calendar events
-      const calendarEvents = kalenders.map((item: any) => ({
-        id: item.id,
-        title: item.deskripsi,
-        start: new Date(item.tanggalMulai),
-        end: new Date(item.tanggalSelesai),
-        resource: item,
-        tanggalMulai: item.tanggalMulai,
-        tanggalSelesai: item.tanggalSelesai,
-        deskripsi: item.deskripsi
-      }));
-
-      console.log('Calendar events:', calendarEvents);
-      setEvents(calendarEvents);
-    } catch (err: any) {
-      console.error('Fetch error:', err);
-      setError(err.message || 'Gagal memuat data');
-    } finally {
-      setLoading(false);
-    }
-  }, [authToken, sekolahId]);
-
+  // Load data when credentials ready
   useEffect(() => {
     if (authToken && sekolahId) {
-      fetchData();
+      loadData(sekolahId, authToken).then((cachedData) => {
+        if (cachedData) {
+          const kalenders = cachedData.kalenderList || []
+          setList(kalenders)
+
+          // Transform to calendar events
+          const calendarEvents = kalenders.map((item: any) => ({
+            id: item.id,
+            title: item.deskripsi,
+            start: new Date(item.tanggalMulai),
+            end: new Date(item.tanggalSelesai),
+            resource: item,
+            tanggalMulai: item.tanggalMulai,
+            tanggalSelesai: item.tanggalSelesai,
+            deskripsi: item.deskripsi
+          }))
+          setEvents(calendarEvents)
+        }
+      })
     }
-  }, [authToken, sekolahId, fetchData]);
+  }, [authToken, sekolahId, loadData]);
 
   // Create/Update
   const handleSubmit = async (formData: any) => {
-    if (!authToken) return;
+    if (!authToken || !sekolahId) return;
 
     try {
       setIsSubmitting(true);
-      setError(null);
 
-      const isEdit = !!selected;
+      const isEdit = !!selected && !!selected.id;
       const method = isEdit ? 'PUT' : 'POST';
       const url = isEdit
         ? `${API_BASE_URL}/api/kalender-akademik/${selected.id}`
@@ -438,33 +370,67 @@ const KalenderAkademik = () => {
         throw new Error(responseData.message || 'Gagal membuat');
       }
 
+      // ✅ Optimistic update: Add/update ke list
+      let updatedList: any[]
+      if (isEdit) {
+        updatedList = list.map(item => item.id === selected.id ? { ...item, ...formData } : item)
+      } else {
+        updatedList = [...list, responseData.data || { ...formData, id: responseData.id }]
+      }
+
+      setList(updatedList)
+      // Transform to calendar events
+      const calendarEvents = updatedList.map((item: any) => ({
+        id: item.id,
+        title: item.deskripsi,
+        start: new Date(item.tanggalMulai),
+        end: new Date(item.tanggalSelesai),
+        resource: item,
+        tanggalMulai: item.tanggalMulai,
+        tanggalSelesai: item.tanggalSelesai,
+        deskripsi: item.deskripsi
+      }))
+      setEvents(calendarEvents)
+
       setSuccess(isEdit ? 'Kegiatan berhasil diupdate' : 'Kegiatan berhasil ditambahkan');
       setShowForm(false);
       setSelected(null);
 
       setTimeout(() => setSuccess(null), 3000);
-      
-      // Reset flag dan fetch ulang
-      isFetchingRef.current = false;
-      setTimeout(() => {
-        console.log('Fetching data after create/update...');
-        fetchData();
-      }, 300);
+
+      // 🔄 Update cache dengan callback untuk sync data dari API
+      updateCache(sekolahId, authToken, {
+        kalenderList: updatedList
+      }, (freshData) => {
+        // Update state dengan data fresh dari API
+        const freshKalenders = freshData.kalenderList || []
+        setList(freshKalenders)
+        const freshEvents = freshKalenders.map((item: any) => ({
+          id: item.id,
+          title: item.deskripsi,
+          start: new Date(item.tanggalMulai),
+          end: new Date(item.tanggalSelesai),
+          resource: item,
+          tanggalMulai: item.tanggalMulai,
+          tanggalSelesai: item.tanggalSelesai,
+          deskripsi: item.deskripsi
+        }))
+        setEvents(freshEvents)
+        console.log("✅ [KALENDER] State synced with fresh API data + auto-synced to dashboard!")
+      })
     } catch (err: any) {
       console.error('Error:', err);
-      setError(err.message || 'Gagal menyimpan');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Delete - PERBAIKAN DISINI
+  // Delete
   const handleDelete = async () => {
-    if (!authToken || !selected) return;
+    if (!authToken || !sekolahId || !selected) return;
 
     try {
       setIsSubmitting(true);
-      setError(null);
 
       console.log('Deleting item with ID:', selected.id);
       console.log('Delete URL:', `${API_BASE_URL}/api/kalender-akademik/${selected.id}`);
@@ -485,7 +451,7 @@ const KalenderAkademik = () => {
       // Check response
       const contentType = res.headers.get("content-type");
       let responseData;
-      
+
       if (contentType && contentType.includes("application/json")) {
         responseData = await res.json();
         console.log('Delete response data:', responseData);
@@ -496,24 +462,54 @@ const KalenderAkademik = () => {
 
       // Accept 200, 204, or any 2xx status as success
       if (res.ok || res.status === 204) {
+        // ✅ Optimistic update: Remove dari list
+        const updatedList = list.filter(item => item.id !== selected.id)
+        setList(updatedList)
+
+        // Transform to calendar events
+        const calendarEvents = updatedList.map((item: any) => ({
+          id: item.id,
+          title: item.deskripsi,
+          start: new Date(item.tanggalMulai),
+          end: new Date(item.tanggalSelesai),
+          resource: item,
+          tanggalMulai: item.tanggalMulai,
+          tanggalSelesai: item.tanggalSelesai,
+          deskripsi: item.deskripsi
+        }))
+        setEvents(calendarEvents)
+
         setSuccess('Kegiatan berhasil dihapus');
-        setShowDelete(false);
+        setShowDetail(false);
         setSelected(null);
 
         setTimeout(() => setSuccess(null), 3000);
-        
-        // Fetch ulang data setelah delete berhasil
-        setTimeout(() => {
-          console.log('Fetching data after delete...');
-          fetchData();
-        }, 300);
+
+        // 🔄 Update cache dengan callback untuk sync data dari API
+        updateCache(sekolahId, authToken, {
+          kalenderList: updatedList
+        }, (freshData) => {
+          // Update state dengan data fresh dari API
+          const freshKalenders = freshData.kalenderList || []
+          setList(freshKalenders)
+          const freshEvents = freshKalenders.map((item: any) => ({
+            id: item.id,
+            title: item.deskripsi,
+            start: new Date(item.tanggalMulai),
+            end: new Date(item.tanggalSelesai),
+            resource: item,
+            tanggalMulai: item.tanggalMulai,
+            tanggalSelesai: item.tanggalSelesai,
+            deskripsi: item.deskripsi
+          }))
+          setEvents(freshEvents)
+          console.log("✅ [KALENDER] State synced with fresh API data + auto-synced to dashboard!")
+        })
       } else {
         throw new Error(responseData.message || responseData || 'Gagal menghapus kegiatan');
       }
     } catch (err: any) {
       console.error('Delete error:', err);
-      setError(err.message || 'Gagal menghapus kegiatan');
-      setTimeout(() => setError(null), 5000);
     } finally {
       setIsSubmitting(false);
     }
@@ -599,12 +595,16 @@ const KalenderAkademik = () => {
               onView={setView}
               date={date}
               onNavigate={setDate}
-              onSelectEvent={(event) => {
+              onSelectEvent={(event: any) => {
                 setSelected(event.resource || event);
                 setShowDetail(true);
               }}
-              onSelectSlot={(slotInfo) => {
-                setSelected(null);
+              onSelectSlot={(slotInfo: any) => {
+                setSelected({
+                  tanggalMulai: slotInfo.start.toISOString().split('T')[0],
+                  tanggalSelesai: slotInfo.end.toISOString().split('T')[0],
+                  deskripsi: ''
+                });
                 setShowForm(true);
               }}
               popup
@@ -687,21 +687,10 @@ const KalenderAkademik = () => {
         }}
         onDelete={(item: any) => {
           setSelected(item);
-          setShowDetail(false);
-          setShowDelete(true);
+          handleDelete();
         }}
       />
 
-      <ModalDelete
-        isOpen={showDelete}
-        onClose={() => {
-          setShowDelete(false);
-          setSelected(null);
-        }}
-        data={selected}
-        onConfirm={handleDelete}
-        isLoading={isSubmitting}
-      />
     </SekolahLayout>
   );
 };

@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/layout/AdminLayout';
 import {
-  Building2, Users, Package, Truck, MapPin, Phone, Mail, 
-  Eye, Edit, Trash2, Plus, Search, Filter, AlertCircle, 
-  Loader2, CheckCircle, MapPinIcon, Download, X, Navigation
+  Building2, Users, Truck, Phone, Mail,
+  Edit, Trash2, Plus, Search, AlertCircle,
+  Loader2, CheckCircle, MapPinIcon, X, Navigation,
+  Maximize2, Minimize2
 } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 
@@ -19,6 +20,7 @@ interface Dapur {
   latitude?: number;
   longitude?: number;
   status?: string;
+  province?: string | null;
   pic?: { id: string; name: string; phone?: string; email?: string };
   picDapur?: any[];
   drivers?: any[];
@@ -45,6 +47,7 @@ const DapurMapDashboard = () => {
   const router = useRouter();
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const selectedProvinceLayerRef = useRef<any>(null);
   const [dapur, setDapur] = useState<Dapur[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,13 +63,76 @@ const DapurMapDashboard = () => {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [picUsers, setPicUsers] = useState<PICUser[]>([]);
-  const [loadingPics, setLoadingPics] = useState(false);
   const [selectedPicId, setSelectedPicId] = useState("");
   const [assigningPic, setAssigningPic] = useState(false);
   const [formData, setFormData] = useState({ nama: "", alamat: "", latitude: "", longitude: "" });
   const [submitting, setSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
+  const [hoveredProvince, setHoveredProvince] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Standard province names mapping for better matching
+  // Maps from various formats (GeoJSON uppercase, API formats) to standard proper case
+  const provinceNameMap: { [key: string]: string } = {
+    // Standard proper case (from BE)
+    'aceh': 'Aceh',
+    'bali': 'Bali',
+    'banten': 'Banten',
+    'bengkulu': 'Bengkulu',
+    'daerah istimewa yogyakarta': 'Daerah Istimewa Yogyakarta',
+    'dki jakarta': 'DKI Jakarta',
+    'gorontalo': 'Gorontalo',
+    'jambi': 'Jambi',
+    'jawa barat': 'Jawa Barat',
+    'jawa tengah': 'Jawa Tengah',
+    'jawa timur': 'Jawa Timur',
+    'kalimantan barat': 'Kalimantan Barat',
+    'kalimantan selatan': 'Kalimantan Selatan',
+    'kalimantan tengah': 'Kalimantan Tengah',
+    'kalimantan timur': 'Kalimantan Timur',
+    'kalimantan utara': 'Kalimantan Utara',
+    'kepulauan bangka belitung': 'Kepulauan Bangka Belitung',
+    'kepulauan riau': 'Kepulauan Riau',
+    'lampung': 'Lampung',
+    'maluku': 'Maluku',
+    'maluku utara': 'Maluku Utara',
+    'nusa tenggara barat': 'Nusa Tenggara Barat',
+    'nusa tenggara timur': 'Nusa Tenggara Timur',
+    'papua': 'Papua',
+    'papua barat': 'Papua Barat',
+    'papua barat daya': 'Papua Barat Daya',
+    'papua pegunungan': 'Papua Pegunungan',
+    'riau': 'Riau',
+    'sulawesi barat': 'Sulawesi Barat',
+    'sulawesi selatan': 'Sulawesi Selatan',
+    'sulawesi tengah': 'Sulawesi Tengah',
+    'sulawesi tenggara': 'Sulawesi Tenggara',
+    'sulawesi utara': 'Sulawesi Utara',
+    'sumatera barat': 'Sumatera Barat',
+    'sumatera selatan': 'Sumatera Selatan',
+    'sumatera utara': 'Sumatera Utara',
+    // GeoJSON UPPERCASE formats
+    'di. aceh': 'Aceh',
+    'probanten': 'Banten',
+    'bangka belitung': 'Kepulauan Bangka Belitung',
+    'nusatenggara barat': 'Nusa Tenggara Barat',
+    'irian jaya barat': 'Papua Barat',
+    'irian jaya tengah': 'Papua',
+    'irian jaya timur': 'Papua Pegunungan',
+    // Aliases and variations
+    'jakarta': 'DKI Jakarta',
+    'yogyakarta': 'Daerah Istimewa Yogyakarta',
+    'di yogyakarta': 'Daerah Istimewa Yogyakarta',
+    'west sulawesi': 'Sulawesi Barat',
+  };
+
+  const normalizeProvinceName = (name: string | null | undefined): string | null => {
+    if (!name) return null;
+    const normalized = provinceNameMap[name.toLowerCase().trim()];
+    return normalized || name;
+  };
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text });
@@ -124,7 +190,6 @@ const DapurMapDashboard = () => {
     return Array.from(picMap.values());
   }, []);
 
-  // Assign PIC to Dapur
   const handleAssignPIC = async () => {
     if (!selectedDapur?.id || !selectedPicId) {
       showToast('error', 'Pilih PIC terlebih dahulu');
@@ -165,11 +230,9 @@ const DapurMapDashboard = () => {
     }
   };
 
-  // Open assign modal
   const openAssignPICModal = () => {
     setSelectedPicId(selectedDapur?.pic?.id || "");
     
-    // Collect PIC users dari dapur list yang sudah ada
     const allPics = collectPICUsers(dapur);
     setPicUsers(allPics);
     
@@ -181,7 +244,6 @@ const DapurMapDashboard = () => {
     setShowAssignPICModal(true);
   };
 
-  // Update Status Dapur
   const handleUpdateStatus = async (dapurId: string, newStatus: string) => {
     if (!dapurId) {
       showToast('error', 'ID Dapur tidak valid');
@@ -212,7 +274,6 @@ const DapurMapDashboard = () => {
 
       const responseData = await response.json();
 
-      // Update state dapur secara real-time
       setDapur(prevDapur =>
         prevDapur.map(d =>
           d.id === dapurId
@@ -221,7 +282,6 @@ const DapurMapDashboard = () => {
         )
       );
 
-      // Update selectedDapur jika sedang dilihat di modal
       if (selectedDapur?.id === dapurId) {
         setSelectedDapur(prev =>
           prev ? { ...prev, status: newStatus, ...responseData.data } : null
@@ -236,7 +296,7 @@ const DapurMapDashboard = () => {
     }
   };
 
-  // Initialize Map
+  // Initialize Map with Province Boundaries
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -268,6 +328,7 @@ const DapurMapDashboard = () => {
 
         mapRef.current = map;
         setIsMapReady(true);
+        loadProvinceBoundaries(map);
       } catch (err) {
         console.error("Map initialization error:", err);
       }
@@ -282,6 +343,110 @@ const DapurMapDashboard = () => {
       }
     };
   }, []);
+
+  // Function to load province boundaries
+  const loadProvinceBoundaries = useCallback(async (map: any) => {
+    try {
+      const response = await fetch('/indonesia-provinces.geojson');
+      const geoJsonData = await response.json();
+
+      const L = await import('leaflet');
+
+      // Store all layers untuk bisa reset semua sekaligus
+      const allLayers: any[] = [];
+
+      L.geoJSON(geoJsonData, {
+        style: () => ({
+          stroke: true,
+          color: '#810FCB',
+          weight: 2,
+          opacity: 1,
+          fill: true,
+          fillColor: '#810FCB',
+          fillOpacity: 0.08,
+        }),
+        onEachFeature: (feature: any, layer: any) => {
+          const provinceName = feature.properties.name;
+          allLayers.push({ layer, name: provinceName });
+
+          layer.on('click', (e: any) => {
+            e.originalEvent.stopPropagation();
+
+            // Reset ALL layers ke default
+            allLayers.forEach(({ layer: lyr }) => {
+              lyr.setStyle({
+                stroke: true,
+                color: '#810FCB',
+                weight: 2,
+                opacity: 1,
+                fill: true,
+                fillColor: '#810FCB',
+                fillOpacity: 0.08,
+              });
+            });
+
+            // Apply selected style
+            layer.setStyle({
+              stroke: true,
+              color: '#810FCB',
+              weight: 3,
+              opacity: 1,
+              fill: true,
+              fillColor: '#810FCB',
+              fillOpacity: 0.18,
+            });
+
+
+            selectedProvinceLayerRef.current = layer;
+            const normalizedName = normalizeProvinceName(provinceName);
+            setSelectedProvince(normalizedName);
+            showToast('success', `Province selected: ${normalizedName}`);
+          });
+
+          layer.on('mouseover', (e: any) => {
+            e.originalEvent.stopPropagation();
+
+            if (selectedProvinceLayerRef.current !== layer) {
+              setHoveredProvince(provinceName);
+              layer.setStyle({
+                stroke: true,
+                color: '#810FCB',
+                weight: 3,
+                opacity: 1,
+                fill: true,
+                fillColor: '#810FCB',
+                fillOpacity: 0.12,
+              });
+            }
+          });
+
+          layer.on('mouseout', (e: any) => {
+            e.originalEvent.stopPropagation();
+
+            if (selectedProvinceLayerRef.current !== layer) {
+              setHoveredProvince(null);
+              layer.setStyle({
+                stroke: true,
+                color: '#810FCB',
+                weight: 2,
+                opacity: 1,
+                fill: true,
+                fillColor: '#810FCB',
+                fillOpacity: 0.08,
+              });
+            } else {
+              setHoveredProvince(null);
+            }
+          });
+
+          layer.bindPopup(`<div class="font-semibold text-center">${provinceName}</div>`);
+        },
+      }).addTo(map);
+    } catch (err) {
+      console.error('Error loading province boundaries:', err);
+    }
+  }, []);
+
 
   // Add markers to map
   useEffect(() => {
@@ -304,11 +469,11 @@ const DapurMapDashboard = () => {
         filteredDapurList.forEach((d: Dapur) => {
           if (d.latitude && d.longitude) {
             try {
-              let iconColor = '#6b7280'; // default abu-abu
+              let iconColor = '#6b7280';
               if (d.status === 'AKTIF') {
-                iconColor = '#22c55e'; // hijau untuk AKTIF
+                iconColor = '#22c55e';
               } else if (d.status === 'TIDAK_AKTIF') {
-                iconColor = '#ef4444'; // merah untuk TIDAK_AKTIF
+                iconColor = '#ef4444';
               }
               const iconHTML = `
                 <div style="
@@ -436,6 +601,11 @@ const DapurMapDashboard = () => {
         karyawan: d._count?.karyawan || 0,
         stok: d._count?.stokBahanBaku || 0,
         sekolah: d.sekolahDilayani || [],
+        province: (typeof d.province === 'object' && d.province?.name)
+          ? d.province.name
+          : (typeof d.provinces === 'object' && d.provinces?.name)
+            ? d.provinces.name
+            : (d.province || d.provinces) || null,
       }));
 
       setDapur(mappedDapurList);
@@ -603,6 +773,35 @@ const DapurMapDashboard = () => {
     setShowDetailModal(false);
   };
 
+  const toggleFullscreen = async () => {
+    try {
+      const mapContainer = document.getElementById('map-container');
+      if (!mapContainer) return;
+
+      if (!isFullscreen) {
+        if (mapContainer.requestFullscreen) {
+          await mapContainer.requestFullscreen();
+          setIsFullscreen(true);
+        }
+      } else {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+          setIsFullscreen(false);
+        }
+      }
+
+      // Trigger map resize setelah fullscreen berubah
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      }, 300);
+    } catch (err) {
+      console.error('Fullscreen error:', err);
+      showToast('error', 'Gagal mengaktifkan fullscreen');
+    }
+  };
+
   useEffect(() => {
     if (authToken) {
       fetchDapur();
@@ -610,14 +809,41 @@ const DapurMapDashboard = () => {
   }, [authToken, fetchDapur]);
 
   const filteredDapur = useMemo(() => {
-    if (!searchQuery) return dapur;
+    let filtered = dapur;
 
-    return dapur.filter(d =>
-      d.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      d.alamat.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      d.pic?.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [dapur, searchQuery]);
+    // Filter by selected province
+    if (selectedProvince) {
+      filtered = filtered.filter(d => {
+        // Handle different data types
+        let provinceValue: any = d.province;
+
+        // If it's an object or array, try to get the name property
+        if (typeof provinceValue === 'object' && provinceValue !== null) {
+          provinceValue = (provinceValue as any).name || (provinceValue as any).nama || JSON.stringify(provinceValue);
+        }
+
+        // Convert to string if not already
+        provinceValue = String(provinceValue || '').trim();
+
+        // Normalize both sides for comparison
+        const normalizedProvince = normalizeProvinceName(provinceValue);
+        const normalizedSelected = normalizeProvinceName(selectedProvince);
+
+        return normalizedProvince === normalizedSelected;
+      });
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      filtered = filtered.filter(d =>
+        d.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        d.alamat.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        d.pic?.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    return filtered;
+  }, [dapur, searchQuery, selectedProvince]);
 
   const stats = useMemo(() => {
     return {
@@ -783,7 +1009,67 @@ const DapurMapDashboard = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[600px] relative z-0">
           <div className="lg:col-span-2 bg-transparent border-0 overflow-hidden relative z-0 rounded-lg">
-            <div id="map-container" className="w-full h-full" style={{ minHeight: '600px', position: 'relative', zIndex: 0 }}></div>
+            <div className="relative w-full h-full">
+              <div id="map-container" className="w-full h-full" style={{ minHeight: '600px', position: 'relative', zIndex: 0 }}></div>
+              
+              {/* Fullscreen Button */}
+              <button
+                onClick={toggleFullscreen}
+                className="absolute top-4 right-4 z-40 p-2.5 bg-white text-gray-700 rounded-lg hover:bg-gray-50 shadow-lg transition-colors border border-gray-200"
+                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="w-5 h-5" />
+                ) : (
+                  <Maximize2 className="w-5 h-5" />
+                )}
+              </button>
+
+              {selectedProvince && (
+                <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-4 max-w-xs z-40">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900">Selected Province</h4>
+                    <button
+                      onClick={() => {
+                        setSelectedProvince(null);
+                        if (selectedProvinceLayerRef.current) {
+                          selectedProvinceLayerRef.current.setStyle({
+                            stroke: true,
+                            color: '#810FCB',
+                            weight: 2,
+                            opacity: 1,
+                            fill: true,
+                            fillColor: '#810FCB',
+                            fillOpacity: 0.08,
+                          });
+                          selectedProvinceLayerRef.current = null;
+                        }
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-base font-bold text-gray-900 mb-2">{selectedProvince}</p>
+                  <div className="space-y-2 border-t border-gray-200 pt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">Dapur di Province:</span>
+                      <span className="text-sm font-semibold text-[#D0B064]">{filteredDapur.length}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">Total di Sistem:</span>
+                      <span className="text-sm font-semibold text-gray-700">{dapur.length}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {hoveredProvince && !selectedProvince && (
+                <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 max-w-xs z-40">
+                  <p className="text-sm font-semibold text-gray-900">{hoveredProvince}</p>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden flex flex-col">

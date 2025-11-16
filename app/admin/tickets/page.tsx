@@ -13,7 +13,8 @@ import {
   Mail,
   MessageSquare,
   X,
-  Filter
+  Filter,
+  Bot
 } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
@@ -73,26 +74,49 @@ const TicketCard = ({ ticket, onClick }: { ticket: Ticket; onClick: () => void }
     minute: '2-digit'
   });
 
+  const isIoTSystem = !ticket.user;
+  const isIoTDetection = ticket.judul?.toLowerCase().includes('basi') ||
+                         ticket.deskripsi?.toLowerCase().includes('basi');
+
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-lg p-4 border border-gray-100 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+      className={`bg-white rounded-lg p-4 border transition-all cursor-pointer ${
+        isIoTDetection
+          ? 'border-red-200 hover:border-red-400 hover:shadow-md hover:shadow-red-100'
+          : 'border-gray-100 hover:border-blue-300 hover:shadow-md'
+      }`}
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">{ticket.judul}</h3>
           <p className="text-sm text-gray-600 line-clamp-2">{ticket.deskripsi}</p>
         </div>
-        <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-          <MessageSquare className="w-5 h-5 text-blue-600" />
+        <div className={`p-2 rounded-lg flex-shrink-0 ${
+          isIoTDetection ? 'bg-red-100' : 'bg-blue-100'
+        }`}>
+          {isIoTSystem ? (
+            <Bot className={`w-5 h-5 ${isIoTDetection ? 'text-red-600' : 'text-blue-600'}`} />
+          ) : (
+            <MessageSquare className="w-5 h-5 text-blue-600" />
+          )}
         </div>
       </div>
-      <div className="flex items-center justify-between text-xs text-gray-500">
+      <div className="flex items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2">
-          <User className="w-4 h-4" />
-          <span className="truncate">{ticket.user.name}</span>
+          {isIoTSystem ? (
+            <>
+              <Bot className="w-4 h-4 text-amber-600" />
+              <span className="font-medium text-amber-700">IoT System</span>
+            </>
+          ) : (
+            <>
+              <User className="w-4 h-4 text-gray-500" />
+              <span className="truncate text-gray-600">{ticket.user?.name || 'Unknown'}</span>
+            </>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 text-gray-500">
           <Clock className="w-4 h-4" />
           <span>{createdDate}</span>
         </div>
@@ -161,33 +185,61 @@ const TicketDetailModal = ({
               <p className="text-gray-600 whitespace-pre-wrap">{ticket.deskripsi}</p>
             </div>
 
-            {/* User Info */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="font-semibold text-gray-900 mb-3">Informasi Pelapor</h3>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <User className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gray-500">Nama</p>
-                    <p className="text-sm font-medium text-gray-900">{ticket.user.name}</p>
+            {/* User Info or IoT System Info */}
+            {ticket.user ? (
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 mb-3">Informasi Pelapor</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <User className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gray-500">Nama</p>
+                      <p className="text-sm font-medium text-gray-900">{ticket.user.name}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Mail className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gray-500">Email</p>
-                    <p className="text-sm font-medium text-gray-900">{ticket.user.email}</p>
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gray-500">Email</p>
+                      <p className="text-sm font-medium text-gray-900">{ticket.user.email}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gray-500">Role</p>
-                    <p className="text-sm font-medium text-gray-900">{ticket.user.role}</p>
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gray-500">Role</p>
+                      <p className="text-sm font-medium text-gray-900">{ticket.user.role}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-lg p-4">
+                <div className="flex items-start gap-3 mb-3">
+                  <Bot className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-bold text-amber-900">Automated Alert dari IoT System</h3>
+                    <p className="text-xs text-amber-700 mt-1">Alert ini dibuat otomatis oleh sistem IoT untuk mendeteksi kondisi kritis</p>
+                  </div>
+                </div>
+                <div className="space-y-2 mt-3 pt-3 border-t border-amber-200">
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-amber-700 font-medium">Sumber</p>
+                      <p className="text-sm text-amber-900 font-semibold">Sistem Monitoring Makanan (IoT Sensors)</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-amber-700 font-medium">Tipe Alert</p>
+                      <p className="text-sm text-amber-900 font-semibold">Deteksi Makanan Basi / Expired</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Timestamps */}
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -334,9 +386,9 @@ const AdminTickets = () => {
     const matchSearch =
       ticket.judul.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.deskripsi.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.user.name.toLowerCase().includes(searchQuery.toLowerCase());
+      (ticket.user?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchRole = filterRole === '' || ticket.user.role === filterRole;
+    const matchRole = filterRole === '' || ticket.user?.role === filterRole;
 
     return matchSearch && matchRole;
   });

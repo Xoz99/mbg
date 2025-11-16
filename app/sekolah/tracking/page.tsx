@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import SekolahLayout from '@/components/layout/SekolahLayout';
-import { 
-  MapPin, Truck, Clock, CheckCircle, Navigation, Phone, User, Package, 
-  TrendingUp, MapPinned, AlertCircle, UtensilsCrossed
+import {
+  MapPin, Truck, Clock, CheckCircle, Navigation, Phone, User, Package,
+  TrendingUp, MapPinned, AlertCircle, UtensilsCrossed, Maximize2, Minimize2, Loader
 } from 'lucide-react';
 
 import dynamic from 'next/dynamic';
@@ -141,9 +141,11 @@ const TrackingPage = () => {
   const [sekolahId, setSekolahId] = useState('');
   const [sekolahData, setSekolahData] = useState<any>(null);
   const [previousPosition, setPreviousPosition] = useState<DriverPosition | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const isFetchingRef = useRef(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fullscreenMapRef = useRef<any>(null);
 
   // Initialize auth & sekolah
   useEffect(() => {
@@ -184,6 +186,20 @@ const TrackingPage = () => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, [currentTime]);
+
+  // Handle keyboard shortcut for fullscreen (ESC to close)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+
+    if (isFullscreen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isFullscreen]);
 
   const formattedTime = useMemo(() => {
     if (!currentTime) return '--:--:--';
@@ -648,12 +664,21 @@ const TrackingPage = () => {
                         <p className="text-xs text-white/70">OpenStreetMap - Real-time Location</p>
                       </div>
                     </div>
-                    {(vehicle.status === 'dalam_perjalanan' || vehicle.status === 'active') && (
-                      <div className="flex items-center gap-2 bg-blue-500/20 px-3 py-1.5 rounded-lg border border-blue-400/30">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                        <span className="text-xs md:text-sm font-semibold">Live</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {(vehicle.status === 'dalam_perjalanan' || vehicle.status === 'active') && (
+                        <div className="flex items-center gap-2 bg-blue-500/20 px-3 py-1.5 rounded-lg border border-blue-400/30">
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                          <span className="text-xs md:text-sm font-semibold">Live</span>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setIsFullscreen(true)}
+                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                        title="Full Screen (ESC untuk kembali)"
+                      >
+                        <Maximize2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -829,6 +854,88 @@ const TrackingPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Fullscreen Map Modal - Outside main layout */}
+      {isFullscreen && (
+        <div className="fixed inset-0 bg-black z-[9999] flex flex-col overflow-hidden">
+          {/* Fullscreen Header */}
+          <div className="bg-gradient-to-br from-[#1B263A] to-[#2A3749] p-4 md:p-5 text-white flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <MapPin className="w-6 h-6 flex-shrink-0" />
+              <div className="min-w-0">
+                <h3 className="text-lg md:text-xl font-semibold truncate">Peta Live Tracking - Full Screen</h3>
+                <p className="text-xs text-white/70">OpenStreetMap - Real-time Location</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {(vehicle.status === 'dalam_perjalanan' || vehicle.status === 'active') && (
+                <div className="flex items-center gap-2 bg-blue-500/20 px-3 py-1.5 rounded-lg border border-blue-400/30 whitespace-nowrap">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs md:text-sm font-semibold">Live</span>
+                </div>
+              )}
+              <button
+                onClick={() => setIsFullscreen(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
+                title="Exit Full Screen (ESC)"
+              >
+                <Minimize2 className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Fullscreen Map Container */}
+          <div className="flex-1 relative w-full overflow-hidden">
+            {mapReady ? (
+              <MapContainer center={[vehicle.lat, vehicle.lng]} zoom={13} style={{ height: '100%', width: '100%' }} ref={fullscreenMapRef}>
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
+
+                {route.length > 0 && (
+                  <Polyline positions={route} pathOptions={{ color: '#3b82f6', weight: 4, opacity: 0.7 }} />
+                )}
+
+                {/* School Marker */}
+                <Marker position={[school.lat, school.lng]} icon={createSchoolIcon()}>
+                  <Popup>
+                    <div className="p-2">
+                      <p className="font-bold text-sm">🏫 {school.name}</p>
+                      <p className="text-xs text-gray-600">{school.address}</p>
+                    </div>
+                  </Popup>
+                </Marker>
+
+                {/* Kitchen/Dapur Marker */}
+                {vehicle.dapurInfo.lat && vehicle.dapurInfo.lng && (
+                  <Marker position={[vehicle.dapurInfo.lat, vehicle.dapurInfo.lng]} icon={createKitchenIcon()}>
+                    <Popup>
+                      <div className="p-2">
+                        <p className="font-bold text-sm">🍳 {vehicle.dapurInfo.nama}</p>
+                        <p className="text-xs text-gray-600">{vehicle.dapurInfo.alamat}</p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )}
+
+                {/* Vehicle Marker */}
+                <Marker position={[vehicle.lat, vehicle.lng]} icon={createTruckIcon()}>
+                  <Popup>
+                    <div className="p-2">
+                      <p className="font-bold text-sm">🚚 {vehicle.id}</p>
+                      <p className="text-xs text-gray-600">{vehicle.driver}</p>
+                      <p className="text-xs text-gray-600">ETA: {vehicle.estimasi}</p>
+                      <p className="text-xs text-gray-600">Kecepatan: {vehicle.kecepatan}</p>
+                    </div>
+                  </Popup>
+                </Marker>
+              </MapContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center bg-gray-900">
+                <Loader className="w-12 h-12 animate-spin text-blue-400" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </SekolahLayout>
   );
 };

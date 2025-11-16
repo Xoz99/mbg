@@ -491,9 +491,10 @@ const DataKaryawan = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard title="TOTAL KARYAWAN" value={stats.total} subtitle="staff dapur" icon={Users} color="bg-blue-600" />
-        <StatCard title="AKTIF" value={stats.active} subtitle="sedang bertugas" icon={UserCheck} color="bg-green-600" />
+        <StatCard title="KARYAWAN SIAP" value={stats.active} subtitle="siap bekerja hari ini" icon={UserCheck} color="bg-green-600" />
+        <StatCard title="AKTIF" value={stats.active} subtitle="sedang bertugas" icon={CheckCircle} color="bg-emerald-600" />
         <StatCard
           title="TIDAK AKTIF"
           value={stats.inactive}

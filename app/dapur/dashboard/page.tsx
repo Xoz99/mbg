@@ -1,12 +1,11 @@
 "use client"
 
-import { useState, useEffect, useMemo, memo, useCallback, useRef } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import DapurLayout from "@/components/layout/DapurLayout"
+import { useDapurDashboardCache } from "@/lib/hooks/useDapurDashboardCache"
 import {
   ChefHat,
-  Package,
-  Truck,
   CheckCircle,
   TrendingUp,
   Eye,
@@ -14,58 +13,13 @@ import {
   CheckCircle2,
   AlertCircle,
   Plus,
-  MapPin,
-  QrCode,
   ArrowUp,
-  ArrowDown,
   Clock,
-  Users,
 } from "lucide-react"
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import Link from "next/link"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz"
 const REFRESH_INTERVAL = 300000
-
-async function getAuthToken() {
-  if (typeof window === "undefined") return ""
-  return localStorage.getItem("authToken") || ""
-}
-
-async function apiCall<T>(endpoint: string, options: any = {}): Promise<T> {
-  try {
-    const token = await getAuthToken()
-    const url = `${API_BASE_URL}${endpoint}`
-
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || `HTTP ${response.status}`)
-    }
-
-    return response.json()
-  } catch (error) {
-    throw error
-  }
-}
-
-function extractArray(data: any): any[] {
-  if (Array.isArray(data)) return data
-  if (data?.data && Array.isArray(data.data)) return data.data
-  if (typeof data === "object") {
-    const arr = Object.values(data).find((v) => Array.isArray(v))
-    if (arr) return arr as any[]
-  }
-  return []
-}
 
 const SkeletonLoader = () => (
   <div className="space-y-6 animate-pulse">
@@ -82,7 +36,7 @@ const SkeletonLoader = () => (
   </div>
 )
 
-const ProductionChart = memo(({ data }: { data: any[] }) => (
+const ProductionChart = ({ data }: { data: any[] }) => (
   <ResponsiveContainer width="100%" height={260}>
     <LineChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
       <defs>
@@ -107,49 +61,9 @@ const ProductionChart = memo(({ data }: { data: any[] }) => (
       />
     </LineChart>
   </ResponsiveContainer>
-))
-ProductionChart.displayName = "ProductionChart"
-
-const DeliveryChart = memo(({ data }: { data: any[] }) => (
-  <ResponsiveContainer width="100%" height={260}>
-    <BarChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-      <XAxis dataKey="school" stroke="#6b7280" style={{ fontSize: "11px" }} />
-      <YAxis stroke="#6b7280" style={{ fontSize: "12px" }} />
-      <Tooltip
-        contentStyle={{ backgroundColor: "#1f2937", border: "1px solid #374151", borderRadius: "8px", color: "#fff" }}
-      />
-      <Bar dataKey="trays" fill="#06b6d4" radius={[8, 8, 0, 0]} />
-    </BarChart>
-  </ResponsiveContainer>
-))
-DeliveryChart.displayName = "DeliveryChart"
-
-const StatCard = ({ title, value, subtitle, icon: Icon, trend, color }: any) => (
-  <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-all duration-300">
-    <div className="flex items-start justify-between mb-4">
-      <div className="space-y-1">
-        <p className="text-sm font-medium text-gray-600">{title}</p>
-        <p className="text-3xl font-bold text-gray-900">{value}</p>
-      </div>
-      <div className={`p-3 rounded-xl ${color}`}>
-        <Icon className="w-5 h-5 text-white" />
-      </div>
-    </div>
-
-    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-      <p className="text-xs text-gray-500">{subtitle}</p>
-      {trend !== undefined && (
-        <div
-          className={`flex items-center gap-1 text-xs font-semibold ${trend > 0 ? "text-green-600" : "text-red-600"}`}
-        >
-          {trend > 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-          {Math.abs(trend)}%
-        </div>
-      )}
-    </div>
-  </div>
 )
+
+
 
 const DashboardDapur = () => {
   const router = useRouter()
@@ -162,27 +76,16 @@ const DashboardDapur = () => {
     dapurName: "Dapur MBG",
   })
 
-  const [menuPlanningData, setMenuPlanningData] = useState<any[]>([])
-  const [loadingMenuPlanning, setLoadingMenuPlanning] = useState(true)
-  const [errorMenuPlanning, setErrorMenuPlanning] = useState<string | null>(null)
-  const [todayMenu, setTodayMenu] = useState<any>(null)
+  // ✅ Use custom hook untuk dashboard cache
+  const { loading, error, loadData, refreshData } = useDapurDashboardCache()
 
+  const [menuPlanningData, setMenuPlanningData] = useState<any[]>([])
+  const [todayMenu, setTodayMenu] = useState<any>(null)
   const [stats, setStats] = useState({
     targetHariIni: 0,
-    sudahPacking: 0,
-    totalTrays: 0,
-    traysAvailable: 0,
-    totalBaskets: 0,
-    basketsAvailable: 0,
     totalSekolah: 0,
-    sudahDikirim: 0,
-    totalBatch: 0,
-    batchInProgress: 0,
   })
-
   const [produksiMingguan, setProduksiMingguan] = useState<any[]>([])
-  const [deliveryTrips, setDeliveryTrips] = useState<any[]>([])
-  const [recentCheckpoints, setRecentCheckpoints] = useState<any[]>([])
 
   useEffect(() => {
     const userData = localStorage.getItem("mbg_user")
@@ -206,184 +109,29 @@ const DashboardDapur = () => {
     }
   }, [router])
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoadingMenuPlanning(true)
-      setErrorMenuPlanning(null)
-
-      const planningRes = await apiCall<any>("/api/menu-planning")
-      const plannings = extractArray(planningRes?.data || [])
-
-      const today = new Date()
-      const todayString = today.toISOString().split("T")[0]
-
-      let foundTodayMenu: any = null
-      let allMenus: any[] = []
-      let allDelivery: any[] = []
-
-      const weeklyStats = await Promise.all(
-        plannings.map(async (planning: any) => {
-          try {
-            const menuRes = await apiCall<any>(`/api/menu-planning/${planning.id}/menu-harian`)
-            const menus = extractArray(menuRes?.data || [])
-            allMenus = [...allMenus, ...menus]
-
-            const dayNames = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
-            const daysStatus = dayNames.map((day, idx) => {
-              const dayOfWeek = idx + 1
-              const hasMenu = menus.some((m: any) => {
-                const menuDate = new Date(m.tanggal)
-                const dateDay = menuDate.getDay()
-                const adjustedDay = dateDay === 0 ? 7 : dateDay
-                return adjustedDay === dayOfWeek
-              })
-
-              return {
-                day,
-                completed: hasMenu,
-                menuCount: menus.filter((m: any) => {
-                  const menuDate = new Date(m.tanggal)
-                  const dateDay = menuDate.getDay()
-                  const adjustedDay = dateDay === 0 ? 7 : dateDay
-                  return adjustedDay === dayOfWeek
-                }).length,
-              }
-            })
-
-            if (!foundTodayMenu) {
-              const todayMenus = menus.filter((m: any) => {
-                const menuDate = new Date(m.tanggal).toISOString().split("T")[0]
-                return menuDate === todayString
-              })
-              if (todayMenus.length > 0) {
-                foundTodayMenu = {
-                  ...todayMenus[0],
-                  sekolahNama: planning.sekolah?.nama || "Unknown",
-                }
-              }
-            }
-
-            const completedDays = daysStatus.filter((d) => d.completed).length
-            const totalDays = 6
-
-            return {
-              id: planning.id,
-              mingguanKe: planning.mingguanKe,
-              sekolahId: planning.sekolahId,
-              sekolahNama: planning.sekolah?.nama || "Unknown",
-              tanggalMulai: planning.tanggalMulai,
-              tanggalSelesai: planning.tanggalSelesai,
-              daysStatus,
-              completedDays,
-              totalDays,
-              status: completedDays === totalDays ? "COMPLETE" : "INCOMPLETE",
-              daysLeft: totalDays - completedDays,
-              totalMenuCount: menus.length,
-            }
-          } catch (err) {
-            return null
-          }
-        }),
-      )
-
-      const validStats = weeklyStats
-        .filter((s) => s !== null)
-        .sort((a, b) => {
-          if (a.status === b.status) return 0
-          return a.status === "COMPLETE" ? -1 : 1
-        })
-
-      setMenuPlanningData(validStats)
-      setTodayMenu(foundTodayMenu)
-
+  // ✅ Load data menggunakan hook
+  useEffect(() => {
+    const loadDashboardData = async () => {
       try {
-        const deliveryRes = await apiCall<any>("/api/sekolah/1/pengiriman").catch(() => null)
-        if (deliveryRes?.data) {
-          allDelivery = Array.isArray(deliveryRes.data) ? deliveryRes.data : []
+        const data = await loadData()
+        if (data) {
+          setMenuPlanningData(data.menuPlanningData || [])
+          setTodayMenu(data.todayMenu || null)
+          setStats(data.stats || { targetHariIni: 0, totalSekolah: 0 })
+          setProduksiMingguan(data.produksiMingguan || [])
         }
       } catch (err) {
-        // Silent error handling
+        console.error("Failed to load dashboard data:", err)
       }
-
-      const dateMap: { [key: string]: number } = {}
-      const schoolMap: { [key: string]: number } = {}
-
-      allMenus.forEach((menu) => {
-        if (menu.tanggal) {
-          const date = new Date(menu.tanggal).toLocaleDateString("id-ID", {
-            weekday: "short",
-            month: "short",
-            day: "2-digit",
-          })
-          dateMap[date] = (dateMap[date] || 0) + 1
-        }
-      })
-
-      allDelivery.forEach((delivery) => {
-        const school = delivery.sekolah?.nama || delivery.school || "Unknown"
-        schoolMap[school] = (schoolMap[school] || 0) + (delivery.jumlahTray || 1)
-      })
-
-      const onTime = allDelivery.filter((d) => d.status === "DELIVERED" || d.scanSekolahTime).length
-      const late = allDelivery.length - onTime
-
-      setStats({
-        targetHariIni:
-          allMenus.filter((m) => {
-            const menuDate = new Date(m.tanggal).toISOString().split("T")[0]
-            return menuDate === todayString
-          }).length * 50 || 5000,
-        sudahPacking: allMenus.length,
-        totalTrays: allDelivery.reduce((sum, d) => sum + (d.jumlahTray || 100), 0) || 5500,
-        traysAvailable: Math.max(
-          0,
-          (allDelivery.reduce((sum, d) => sum + (d.jumlahTray || 100), 0) || 5500) - allMenus.length,
-        ),
-        totalBaskets: 120,
-        basketsAvailable: 85,
-        totalSekolah: plannings.length,
-        sudahDikirim: onTime,
-        totalBatch: Math.ceil(allMenus.length / 500),
-        batchInProgress: Math.ceil(allMenus.length / 500) - onTime,
-      })
-
-      const produksiData = Object.entries(dateMap)
-        .map(([date, count]) => ({ hari: date, actual: count }))
-        .slice(-6)
-      setProduksiMingguan(produksiData)
-
-      const deliveryData = Object.entries(schoolMap)
-        .map(([school, trays]) => ({ school, trays }))
-        .slice(0, 5)
-      setDeliveryTrips(deliveryData)
-
-      const checkpoints = allDelivery
-        .filter((d) => d.scanSekolahTime || d.status === "DELIVERED")
-        .map((d, idx) => ({
-          type: d.status === "DELIVERED" ? "SCHOOL_RECEIVED" : "DRIVER_TO_SCHOOL",
-          school: d.sekolah?.nama || d.school || "Unknown School",
-          driver: d.driver?.nama || "Driver",
-          time: d.scanSekolahTime
-            ? new Date(d.scanSekolahTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
-            : "00:00",
-        }))
-        .slice(-3)
-      setRecentCheckpoints(checkpoints)
-    } catch (err) {
-      setErrorMenuPlanning(err instanceof Error ? err.message : "Gagal memuat data")
-      setMenuPlanningData([])
-    } finally {
-      setLoadingMenuPlanning(false)
     }
-  }, [])
 
-  useEffect(() => {
-    loadData()
+    loadDashboardData()
   }, [loadData])
 
+  // ✅ Setup auto-refresh interval
   useEffect(() => {
     intervalRef.current = setInterval(() => {
-      loadData()
+      refreshData()
     }, REFRESH_INTERVAL)
 
     return () => {
@@ -391,7 +139,7 @@ const DashboardDapur = () => {
         clearInterval(intervalRef.current)
       }
     }
-  }, [loadData])
+  }, [refreshData])
 
   const menuPlanningStats = useMemo(() => {
     const total = menuPlanningData.length || 1
@@ -401,53 +149,51 @@ const DashboardDapur = () => {
     return { total, complete, incomplete, critical, percentComplete: Math.round((complete / total) * 100) }
   }, [menuPlanningData])
 
-  const progressPercentage = Math.round((stats.sudahPacking / stats.targetHariIni) * 100)
-
   return (
     <DapurLayout currentPage="dashboard">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard Dapur</h1>
-            <p className="text-sm text-gray-500 mt-2">Selamat datang, {userInfo.dapurName}</p>
+            <h1 className="text-3xl font-bold text-[#1B263A]">Dashboard Dapur</h1>
+            <p className="text-sm text-[#1B263A]/60 mt-2">Selamat datang, {userInfo.dapurName}</p>
           </div>
           <div className="flex items-center gap-3">
           </div>
         </div>
 
-        {loadingMenuPlanning ? (
+        {loading ? (
           <SkeletonLoader />
         ) : (
           <>
-            {errorMenuPlanning && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm">
+            {error && (
+              <div className="rounded-xl border border-[#D0B064]/30 bg-gradient-to-br from-[#1B263A]/10 to-[#D0B064]/10 p-4 shadow-sm">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="w-5 h-5 text-[#D0B064] flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-semibold text-red-900">Error Memuat Data</p>
-                    <p className="text-sm text-red-700 mt-1">{errorMenuPlanning}</p>
+                    <p className="font-semibold text-[#1B263A]">Error Memuat Data</p>
+                    <p className="text-sm text-[#1B263A]/70 mt-1">{error}</p>
                   </div>
                 </div>
               </div>
             )}
 
             {menuPlanningStats.incomplete > 0 && (
-              <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100 p-6 shadow-sm">
+              <div className="rounded-xl border border-[#D0B064]/40 bg-gradient-to-br from-[#1B263A]/5 via-[#D0B064]/5 to-[#1B263A]/10 p-6 shadow-sm">
                 <div className="flex items-start gap-4 mb-4">
-                  <div className="p-3 bg-amber-200 rounded-lg flex-shrink-0">
-                    <AlertTriangle className="w-5 h-5 text-amber-700" />
+                  <div className="p-3 bg-[#D0B064]/20 rounded-lg flex-shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-[#D0B064]" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-amber-900 text-lg">
+                    <h3 className="font-bold text-[#1B263A] text-lg">
                       {menuPlanningStats.incomplete} Sekolah Belum Lengkap
                     </h3>
-                    <p className="text-sm text-amber-700 mt-1">
+                    <p className="text-sm text-[#1B263A]/70 mt-1">
                       {menuPlanningStats.critical} sekolah kritis (5+ hari kosong)
                     </p>
                   </div>
                   <Link
                     href="/dapur/menu"
-                    className="flex-shrink-0 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-medium text-sm whitespace-nowrap shadow-md hover:shadow-lg"
+                    className="flex-shrink-0 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#D0B064]/90 transition-colors font-medium text-sm whitespace-nowrap shadow-md hover:shadow-lg"
                   >
                     Lengkapi Sekarang
                   </Link>
@@ -455,12 +201,12 @@ const DashboardDapur = () => {
 
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-amber-900">Progress Kelengkapan</span>
-                    <span className="text-sm font-bold text-amber-900">{menuPlanningStats.percentComplete}%</span>
+                    <span className="text-sm font-medium text-[#1B263A]">Progress Kelengkapan</span>
+                    <span className="text-sm font-bold text-[#1B263A]">{menuPlanningStats.percentComplete}%</span>
                   </div>
-                  <div className="w-full bg-amber-200 rounded-full h-2.5">
+                  <div className="w-full bg-[#D0B064]/20 rounded-full h-2.5">
                     <div
-                      className="bg-amber-600 h-2.5 rounded-full transition-all"
+                      className="bg-[#D0B064] h-2.5 rounded-full transition-all"
                       style={{ width: `${menuPlanningStats.percentComplete}%` }}
                     />
                   </div>
@@ -469,33 +215,35 @@ const DashboardDapur = () => {
                 <div className="overflow-x-auto -mx-6 px-6">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-amber-200">
-                        <th className="text-left py-3 px-4 text-amber-900 font-semibold">Sekolah</th>
-                        <th className="text-center py-3 px-4 text-amber-900 font-semibold">Minggu</th>
-                        <th className="text-center py-3 px-4 text-amber-900 font-semibold">Progress</th>
-                        <th className="text-center py-3 px-4 text-amber-900 font-semibold">Status</th>
+                      <tr className="border-b border-[#D0B064]/20">
+                        <th className="text-left py-3 px-4 text-[#1B263A] font-semibold">Sekolah</th>
+                        <th className="text-center py-3 px-4 text-[#1B263A] font-semibold">Minggu</th>
+                        <th className="text-center py-3 px-4 text-[#1B263A] font-semibold">Progress</th>
+                        <th className="text-center py-3 px-4 text-[#1B263A] font-semibold">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {menuPlanningData
                         .filter((s) => s.status === "INCOMPLETE")
                         .map((week) => (
-                          <tr key={week.id} className="border-b border-amber-100 hover:bg-amber-50">
+                          <tr key={week.id} className="border-b border-[#D0B064]/10 hover:bg-[#D0B064]/5">
                             <td className="py-3 px-4">
-                              <span className="font-medium text-gray-900">{week.sekolahNama}</span>
+                              <span className="font-medium text-[#1B263A]">{week.sekolahNama}</span>
                             </td>
                             <td className="text-center py-3 px-4">
-                              <span className="text-gray-600">W{week.mingguanKe}</span>
+                              <span className="text-[#1B263A]/70">W{week.mingguanKe}</span>
                             </td>
                             <td className="text-center py-3 px-4">
-                              <span className="text-gray-900 font-semibold">
+                              <span className="text-[#1B263A] font-semibold">
                                 {week.completedDays}/{week.totalDays}
                               </span>
                             </td>
                             <td className="text-center py-3 px-4">
                               <span
                                 className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-                                  week.daysLeft >= 5 ? "bg-red-200 text-red-700" : "bg-yellow-200 text-yellow-700"
+                                  week.daysLeft >= 5 
+                                    ? "bg-[#D0B064] text-[#1B263A]" 
+                                    : "bg-[#D0B064]/40 text-[#1B263A]"
                                 }`}
                               >
                                 {week.daysLeft >= 5 ? "URGENT" : "PENDING"}
@@ -510,12 +258,12 @@ const DashboardDapur = () => {
             )}
 
             {menuPlanningStats.complete > 0 && (
-              <div className="rounded-xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-6 shadow-sm">
+              <div className="rounded-xl border border-[#D0B064]/40 bg-gradient-to-br from-[#1B263A]/5 to-[#D0B064]/5 p-6 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="p-2 bg-green-200 rounded-lg">
-                    <CheckCircle2 className="w-5 h-5 text-green-700" />
+                  <div className="p-2 bg-[#D0B064]/20 rounded-lg">
+                    <CheckCircle2 className="w-5 h-5 text-[#D0B064]" />
                   </div>
-                  <h4 className="font-bold text-gray-900">Menu Lengkap ({menuPlanningStats.complete})</h4>
+                  <h4 className="font-bold text-[#1B263A]">Menu Lengkap ({menuPlanningStats.complete})</h4>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                   {menuPlanningData
@@ -523,207 +271,154 @@ const DashboardDapur = () => {
                     .map((school) => (
                       <div
                         key={school.id}
-                        className="bg-white border border-green-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow"
+                        className="bg-white border border-[#D0B064]/30 rounded-lg p-3 shadow-sm hover:shadow-md hover:border-[#D0B064] transition-all"
                       >
-                        <p className="text-sm font-semibold text-gray-900">{school.sekolahNama}</p>
-                        <p className="text-xs text-green-600 mt-1 font-medium">✓ Week {school.mingguanKe}</p>
+                        <p className="text-sm font-semibold text-[#1B263A]">{school.sekolahNama}</p>
+                        <p className="text-xs text-[#D0B064] mt-1 font-medium">✓ Week {school.mingguanKe}</p>
                       </div>
                     ))}
                 </div>
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Target Hari Ini"
-                value={stats.targetHariIni.toLocaleString()}
-                subtitle="Unit"
-                icon={CheckCircle}
-                color="bg-blue-500"
-                trend={2.5}
-              />
-              <StatCard
-                title="Sudah Dikemas"
-                value={stats.sudahPacking.toLocaleString()}
-                subtitle={`${progressPercentage}% Target`}
-                icon={Package}
-                color="bg-cyan-500"
-                trend={5.2}
-              />
-              <StatCard
-                title="Sedang Dikirim"
-                value={`${stats.batchInProgress}/${stats.totalBatch}`}
-                subtitle="Batch"
-                icon={Truck}
-                color="bg-amber-500"
-              />
-              <StatCard
-                title="Equipment Siap"
-                value={stats.traysAvailable.toLocaleString()}
-                subtitle="Tersedia"
-                icon={Users}
-                color="bg-purple-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Production Chart */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h4 className="font-bold text-gray-900 text-lg">Produksi Mingguan</h4>
-                    <p className="text-sm text-gray-500 mt-1">Tren produksi 6 hari terakhir</p>
-                  </div>
-                  <div className="p-3 bg-blue-100 rounded-lg">
-                    <TrendingUp className="w-5 h-5 text-blue-600" />
-                  </div>
-                </div>
-                <ProductionChart data={produksiMingguan} />
-              </div>
-
-              {/* Today's Menu */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Today's Menu (Left) */}
               {todayMenu ? (
-                <div className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-400 via-orange-500 to-red-500 p-6 text-white shadow-lg">
+                <div className="rounded-2xl border border-[#D0B064]/50 bg-gradient-to-br from-[#1B263A] via-[#1B263A] to-[#2a3f52] p-6 text-white shadow-lg">
                   <div className="flex items-start justify-between mb-6">
                     <div className="flex items-start gap-3">
-                      <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
-                        <ChefHat className="w-6 h-6" />
+                      <div className="p-3 bg-[#D0B064]/20 rounded-lg backdrop-blur-sm">
+                        <ChefHat className="w-6 h-6 text-[#D0B064]" />
                       </div>
                       <div>
-                        <p className="text-sm text-white/80 font-medium">Menu Hari Ini</p>
-                        <p className="font-bold text-xl mt-1">{todayMenu.namaMenu}</p>
-                        <p className="text-sm text-white/70">{todayMenu.sekolahNama}</p>
+                        <p className="text-sm text-white/70 font-medium">Menu Hari Ini</p>
+                        <p className="font-bold text-xl mt-1 text-[#D0B064]">{todayMenu.namaMenu}</p>
+                        <p className="text-sm text-white/60">{todayMenu.sekolahNama}</p>
                       </div>
                     </div>
                     <Link
                       href="/dapur/menu"
-                      className="p-2.5 bg-white/20 rounded-lg hover:bg-white/30 transition-colors backdrop-blur-sm flex-shrink-0"
+                      className="p-2.5 bg-[#D0B064]/20 rounded-lg hover:bg-[#D0B064]/30 transition-colors backdrop-blur-sm flex-shrink-0"
                     >
-                      <Eye className="w-5 h-5" />
+                      <Eye className="w-5 h-5 text-[#D0B064]" />
                     </Link>
                   </div>
 
-                  <div className="space-y-3 bg-white/10 rounded-xl p-4 backdrop-blur-sm">
+                  <div className="space-y-3 bg-[#D0B064]/10 rounded-xl p-4 backdrop-blur-sm border border-[#D0B064]/20">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-white/80">Kalori</span>
-                      <span className="font-bold">{todayMenu.kalori} kcal</span>
+                      <span className="text-sm text-white/70">Kalori</span>
+                      <span className="font-bold text-[#D0B064]">{todayMenu.kalori} kcal</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-white/80">Protein</span>
-                      <span className="font-bold">{todayMenu.protein}g</span>
+                      <span className="text-sm text-white/70">Protein</span>
+                      <span className="font-bold text-[#D0B064]">{todayMenu.protein}g</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-white/80">Biaya/Unit</span>
-                      <span className="font-bold">Rp {todayMenu.biayaPerTray.toLocaleString()}</span>
+                      <span className="text-sm text-white/70">Biaya/Unit</span>
+                      <span className="font-bold text-[#D0B064]">Rp {todayMenu.biayaPerTray.toLocaleString()}</span>
                     </div>
-                    <div className="border-t border-white/20 pt-3 flex items-center justify-between">
-                      <span className="text-sm text-white/80 flex items-center gap-2">
+                    <div className="border-t border-[#D0B064]/20 pt-3 flex items-center justify-between">
+                      <span className="text-sm text-white/70 flex items-center gap-2">
                         <Clock className="w-4 h-4" /> Waktu Masak
                       </span>
-                      <span className="font-bold">
+                      <span className="font-bold text-[#D0B064]">
                         {todayMenu.jamMulaiMasak} - {todayMenu.jamSelesaiMasak}
                       </span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-6 shadow-sm flex flex-col justify-between">
+                <div className="rounded-2xl border border-[#D0B064]/20 bg-gradient-to-br from-[#1B263A]/5 to-[#D0B064]/5 p-6 shadow-sm flex flex-col justify-between">
                   <div>
                     <div className="flex items-start gap-3 mb-4">
-                      <div className="p-3 bg-gray-200 rounded-lg">
-                        <ChefHat className="w-6 h-6 text-gray-600" />
+                      <div className="p-3 bg-[#D0B064]/20 rounded-lg">
+                        <ChefHat className="w-6 h-6 text-[#D0B064]" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Menu Hari Ini</p>
-                        <p className="font-bold text-lg text-gray-900 mt-1">Tidak Ada</p>
+                        <p className="text-sm font-medium text-[#1B263A]/70">Menu Hari Ini</p>
+                        <p className="font-bold text-lg text-[#1B263A] mt-1">Tidak Ada</p>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-600">Belum ada menu yang dijadwalkan untuk hari ini</p>
+                    <p className="text-sm text-[#1B263A]/70">Belum ada menu yang dijadwalkan untuk hari ini</p>
                   </div>
                   <Link
                     href="/dapur/menu"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm w-fit mt-4 shadow-md hover:shadow-lg"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#D0B064] text-[#1B263A] rounded-lg hover:bg-[#D0B064]/90 transition-colors font-medium text-sm w-fit mt-4 shadow-md hover:shadow-lg"
                   >
                     <Plus className="w-4 h-4" />
                     Buat Menu
                   </Link>
                 </div>
               )}
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Delivery Chart */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              {/* Production Chart (Center) */}
+              <div className="rounded-2xl border border-[#D0B064]/20 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h3 className="font-bold text-gray-900 text-lg">Distribusi Hari Ini</h3>
-                    <p className="text-sm text-gray-500 mt-1">Jumlah unit per sekolah</p>
+                    <h4 className="font-bold text-[#1B263A] text-lg">Produksi Mingguan</h4>
+                    <p className="text-sm text-[#1B263A]/60 mt-1">Tren produksi 6 hari terakhir</p>
                   </div>
-                  <div className="p-3 bg-cyan-100 rounded-lg">
-                    <Truck className="w-5 h-5 text-cyan-600" />
-                  </div>
-                </div>
-                <DeliveryChart data={deliveryTrips} />
-
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">Progress Pengiriman</span>
-                    <span className="font-bold text-gray-900">
-                      {stats.sudahDikirim}/{stats.totalSekolah} sekolah
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div
-                      className="bg-cyan-500 h-2.5 rounded-full transition-all"
-                      style={{ width: `${(stats.sudahDikirim / stats.totalSekolah) * 100}%` }}
-                    />
+                  <div className="p-3 bg-[#D0B064]/20 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-[#D0B064]" />
                   </div>
                 </div>
+                <ProductionChart data={produksiMingguan} />
               </div>
 
-              {/* Recent Tracking */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-lg">Tracking Terbaru</h3>
-                    <p className="text-sm text-gray-500 mt-1">Update pengiriman terakhir</p>
-                  </div>
-                  <div className="p-3 bg-green-100 rounded-lg">
-                    <QrCode className="w-5 h-5 text-green-600" />
-                  </div>
-                </div>
+              {/* Target Hari Ini Card (Right) - MODERN VERSION */}
+              <div className="rounded-2xl border border-[#D0B064]/40 bg-gradient-to-br from-[#1B263A]/5 via-white to-[#D0B064]/5 p-8 shadow-lg relative overflow-hidden">
+                {/* Background accent */}
+                <div className="absolute top-0 right-0 w-40 h-40 bg-[#D0B064]/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#1B263A]/10 rounded-full -ml-16 -mb-16 blur-3xl"></div>
 
-                <div className="space-y-3 max-h-80 overflow-y-auto">
-                  {recentCheckpoints.length > 0 ? (
-                    recentCheckpoints.map((checkpoint, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="p-2.5 bg-green-100 rounded-lg flex-shrink-0">
-                          <MapPin className="w-4 h-4 text-green-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900">{checkpoint.school}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {checkpoint.type.replace(/_/g, " ")} • {checkpoint.driver}
-                          </p>
-                        </div>
-                        <span className="text-xs font-bold text-gray-600 flex-shrink-0">{checkpoint.time}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <p className="text-sm">Belum ada tracking</p>
+                <div className="relative z-10">
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-8">
+                    <div>
+                      <p className="text-sm font-semibold text-[#1B263A] uppercase tracking-wide">Target Produksi</p>
+                      <p className="text-[#1B263A]/60 text-xs mt-1">Hari Ini</p>
                     </div>
-                  )}
-                </div>
+                    <div className="p-3 bg-gradient-to-br from-[#D0B064] to-[#c49a4f] rounded-xl shadow-lg">
+                    <CheckCircle className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
 
-                <button className="w-full mt-4 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-semibold border border-blue-200">
-                  Lihat Semua Tracking
-                </button>
+                  {/* Main Number */}
+                  <div className="mb-6">
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-7xl font-black bg-gradient-to-r from-[#1B263A] to-[#D0B064] bg-clip-text text-transparent">
+                        {stats.targetHariIni.toLocaleString()}
+                      </p>
+                      <p className="text-lg font-semibold text-[#1B263A]">Unit</p>
+                    </div>
+                  </div>
+
+                  {/* Stats Row */}
+                  <div className="space-y-3 mb-6 pb-6 border-b border-[#D0B064]/20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-[#1B263A]/70">Jumlah Sekolah</span>
+                      <span className="font-bold text-[#1B263A] text-lg">{stats.totalSekolah}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-[#1B263A]/70">Per Sekolah</span>
+                      <span className="font-bold text-[#1B263A] text-lg">
+                        {stats.totalSekolah > 0 ? Math.round(stats.targetHariIni / stats.totalSekolah) : 0} unit
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Growth Indicator */}
+                  <div className="flex items-center gap-2 bg-gradient-to-r from-[#D0B064]/20 to-[#D0B064]/10 rounded-xl px-3 py-2 w-fit border border-[#D0B064]/30">
+                    <div className="flex items-center gap-1">
+                      <ArrowUp className="w-4 h-4 text-[#D0B064]" />
+                      <span className="text-sm font-bold text-[#D0B064]">2.5%</span>
+                    </div>
+                    <span className="text-xs text-[#D0B064]/80">dari kemarin</span>
+                  </div>
+                </div>
               </div>
             </div>
+
           </>
         )}
       </div>

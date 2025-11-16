@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import SekolahLayout from "@/components/layout/SekolahLayout"
-import { Users, Loader, Camera, CheckCircle, School, X, CheckCircle2, Hash, XCircle, Sparkles, Zap } from "lucide-react"
+import { useSekolahDataCache } from "@/lib/hooks/useSekolahDataCache"
+import { Users, Loader, Camera, CheckCircle, School, X, CheckCircle2, Hash, XCircle, Sparkles, Zap, AlertTriangle, User, Users2 } from "lucide-react"
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
 
 const AbsensiPenerima = () => {
   const [step, setStep] = useState<
-    "camera-face" | "processing-face" | "rfid-scan" | "input-tray" | "confirm" | "camera-menu" | "submitting" | "result"
+    "camera-face" | "processing-face" | "rfid-scan" | "input-tray" | "confirm" | "camera-menu" | "submitting" | "result" | "duplicate-warning"
   >("camera-face") 
   const [faceDetected, setFaceDetected] = useState(false)
   const [facePosition, setFacePosition] = useState<string>("") // 'too-dark', 'too-bright'
@@ -22,11 +23,25 @@ const AbsensiPenerima = () => {
 
   const [authToken, setAuthToken] = useState("")
   const [sekolahId, setSekolahId] = useState("")
+  const [credentialsReady, setCredentialsReady] = useState(false)
   const [siswaData, setSiswaData] = useState<Array<any>>([])
+  const [kelasData, setKelasData] = useState<Array<any>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [absensiData, setAbsensiData] = useState<Array<any>>([]) // Tracking siswa yang sudah absen
+  const [isDuplicate, setIsDuplicate] = useState(false) // Flag untuk duplicate warning
+  const [duplicateSiswaInfo, setDuplicateSiswaInfo] = useState<any>(null) // Info siswa yang sudah absen
 
-  const isFetchingRef = useRef(false)
+  // ✅ Callback ketika unified cache ter-update dari page lain (instant sync!)
+  const handleCacheUpdate = useCallback((cachedData: any) => {
+    console.log("🔄 [ABSENSI] Received cache update - updating siswa state instantly!")
+    setSiswaData(cachedData.siswaData || [])
+    setKelasData(cachedData.kelasData || [])
+  }, [])
+
+  const { loadData, refreshData } = useSekolahDataCache(handleCacheUpdate)
+
+  const hasInitialized = useRef(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -35,26 +50,98 @@ const AbsensiPenerima = () => {
   const rfidPollingRef = useRef<NodeJS.Timeout | null>(null)
 
   // ============================================
-  // HOOKS
+  // INITIALIZATION HOOKS
   // ============================================
+  // ✅ EFFECT 1: Wait for sekolahId to be available
   useEffect(() => {
-    const storedToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
-    const storedSekolahId = localStorage.getItem("sekolahId")
+    if (typeof window === "undefined") return
+    if (credentialsReady) return // Skip if already ready
 
-    console.log(
-      "[ABSENSI INIT] authToken:",
-      storedToken ? "EXISTS (" + storedToken.substring(0, 20) + "...)" : "MISSING",
-    )
-    console.log("[ABSENSI INIT] sekolahId:", storedSekolahId)
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    const schoolId = localStorage.getItem("sekolahId")
 
-    if (storedToken) setAuthToken(storedToken)
-    if (storedSekolahId) setSekolahId(storedSekolahId)
+    console.log("[ABSENSI] Check credentials - token:", token ? "EXISTS" : "MISSING", "schoolId:", schoolId ? "EXISTS" : "MISSING")
 
-    if (!storedToken || !storedSekolahId) {
-      setLoading(false)
-      setError("Token atau Sekolah ID tidak ditemukan")
+    if (!token) {
+      console.error("[ABSENSI] ❌ Token not found")
+      setError("Token tidak ditemukan")
+      return
     }
-  }, [])
+
+    if (schoolId) {
+      setAuthToken(token)
+      setSekolahId(schoolId)
+      // Both credentials are ready!
+      console.log("[ABSENSI] ✅ Both credentials ready, setting flag")
+      setCredentialsReady(true)
+      return
+    }
+
+    // sekolahId not ready, set up polling
+    console.log("[ABSENSI] sekolahId not ready, waiting for SekolahLayout...")
+    const pollInterval = setInterval(() => {
+      const newSchoolId = localStorage.getItem("sekolahId")
+      if (newSchoolId) {
+        console.log("[ABSENSI] ✅ sekolahId detected:", newSchoolId)
+        setAuthToken(token)
+        setSekolahId(newSchoolId)
+        clearInterval(pollInterval)
+        setCredentialsReady(true) // This will trigger EFFECT 2
+      }
+    }, 1000)
+
+    const timeout = setTimeout(() => {
+      clearInterval(pollInterval)
+      console.error("[ABSENSI] ❌ sekolahId timeout after 10s")
+      setError("Sekolah ID tidak ditemukan. Silakan login kembali.")
+    }, 10000)
+
+    return () => {
+      clearInterval(pollInterval)
+      clearTimeout(timeout)
+    }
+  }, [credentialsReady])
+
+  // ✅ EFFECT 2: Fetch data when credentials are ready
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!credentialsReady) {
+      console.log("[ABSENSI EFFECT 2] Waiting for credentialsReady flag...")
+      return
+    }
+
+    if (!authToken || !sekolahId) {
+      console.error("[ABSENSI EFFECT 2] ❌ Missing credentials even though flag is true!")
+      return
+    }
+
+    if (hasInitialized.current) {
+      console.log("[ABSENSI EFFECT 2] Already initialized, skipping")
+      return
+    }
+
+    const fetchAllData = async () => {
+      try {
+        hasInitialized.current = true
+        const cachedData = await loadData(sekolahId, authToken)
+
+        if (cachedData) {
+          setSiswaData(cachedData.siswaData || [])
+          setKelasData(cachedData.kelasData || [])
+          setError(null)
+          console.log("✅ [ABSENSI] Data loaded successfully")
+        }
+      } catch (err) {
+        console.error("❌ [ABSENSI] Error loading data:", err)
+        setError(err instanceof Error ? err.message : "Gagal mengambil data")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    setLoading(true)
+    fetchAllData()
+  }, [credentialsReady, authToken, sekolahId, loadData])
 
   useEffect(() => {
     if (step === "camera-face" && !isCameraActive) {
@@ -75,90 +162,81 @@ const AbsensiPenerima = () => {
     const perempuan = siswaData.filter((s) => s.jenisKelamin === "PEREMPUAN").length
     const uniqueKelas = new Set(siswaData.map((s) => s.kelas).filter((k) => k))
     const totalKelas = uniqueKelas.size
+    const sudahAbsen = absensiData.length
 
-    return { total, lakiLaki, perempuan, totalKelas }
-  }, [siswaData])
+    return { total, lakiLaki, perempuan, totalKelas, sudahAbsen }
+  }, [siswaData, absensiData])
 
-  const fetchSiswa = useCallback(async () => {
-    if (!sekolahId || !authToken || isFetchingRef.current) return
+  // ✅ EFFECT 3: Setup listener untuk auto-reload dari unified cache (other tabs/windows)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!credentialsReady) return
+
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    const schoolId = localStorage.getItem("sekolahId")
+
+    if (!token || !schoolId) return
+
+    // Listen untuk cache updates dari unified hook (other tabs/windows)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "sekolah_unified_cache" && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue)
+          // Update state dengan unified cache terbaru
+          setSiswaData(data.siswaData || [])
+          setKelasData(data.kelasData || [])
+          console.log("✅ [UNIFIED SYNC] Auto-synced from another tab/window")
+        } catch (err) {
+          console.error("Error parsing unified cache:", err)
+        }
+      }
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+    return () => window.removeEventListener("storage", handleStorageChange)
+  }, [credentialsReady])
+
+  const fetchAbsensiToday = useCallback(async () => {
+    if (!sekolahId || !authToken) return
 
     try {
-      isFetchingRef.current = true
-      setLoading(true)
+      // Try multiple endpoint variations
+      const endpoints = [
+        `${API_BASE_URL}/api/pengambilan-makanan/today?sekolahId=${sekolahId}`,
+        `${API_BASE_URL}/api/sekolah/${sekolahId}/pengambilan-makanan/today`,
+        `${API_BASE_URL}/api/pengambilan-makanan?sekolahId=${sekolahId}&date=today`,
+      ]
 
-      const response = await fetch(`${API_BASE_URL}/api/sekolah/${sekolahId}/siswa?page=1&limit=100`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-      })
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          })
 
-      if (!response.ok) throw new Error(`API Error: ${response.status}`)
-
-      const data = await response.json()
-
-      const siswaList = Array.isArray(data.data?.data) ? data.data.data : Array.isArray(data.data) ? data.data : data
-
-      const normalizedList = siswaList.map((siswa: any) => {
-        let kelasNama = ""
-        if (typeof siswa.kelas === "string") {
-          kelasNama = siswa.kelas
-        } else if (siswa.kelas?.nama) {
-          kelasNama = String(siswa.kelas.nama)
-        } else if (siswa.kelasId?.nama) {
-          kelasNama = String(siswa.kelasId.nama)
-        }
-
-        let alergiArray: string[] = []
-        if (siswa.alergi) {
-          if (Array.isArray(siswa.alergi)) {
-            alergiArray = siswa.alergi
-              .map((a: any) => String(a.namaAlergi || a.nama || a))
-              .filter((a: string) => a.trim())
-          } else if (typeof siswa.alergi === "string") {
-            alergiArray = siswa.alergi
-              .split(",")
-              .map((a: string) => a.trim())
-              .filter((a: string) => a)
+          if (response.ok) {
+            const data = await response.json()
+            const absenList = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
+            setAbsensiData(absenList)
+            console.log("[ABSENSI TODAY] Loaded from", endpoint, ":", absenList.length, "records")
+            return
           }
+        } catch (e) {
+          console.log("[ABSENSI TODAY] Endpoint failed:", endpoint)
+          continue
         }
+      }
 
-        let fotoUrl = siswa.fotoUrl || ""
-        if (fotoUrl && !fotoUrl.startsWith("data:") && !fotoUrl.startsWith("http")) {
-          fotoUrl = `${API_BASE_URL}${fotoUrl}`
-        }
-
-        return {
-          ...siswa,
-          id: String(siswa.id || siswa._id || ""),
-          nama: String(siswa.nama || ""),
-          nis: String(siswa.nis || ""),
-          kelas: kelasNama,
-          kelasId: String(siswa.kelasId?.id || siswa.kelas?.id || ""),
-          jenisKelamin: String(siswa.jenisKelamin || "LAKI_LAKI"),
-          umur: Number(siswa.umur || 0),
-          alergi: alergiArray,
-          statusGizi: String(siswa.statusGizi || "NORMAL"),
-          fotoUrl: fotoUrl,
-        }
-      })
-
-      setSiswaData(normalizedList)
-      setError(null)
+      // If all endpoints fail, set empty array (still allow app to function)
+      setAbsensiData([])
+      console.log("[ABSENSI TODAY] All endpoints failed, using empty data")
     } catch (err) {
-      console.error("Error fetching siswa:", err)
-      setError(err instanceof Error ? err.message : "Gagal mengambil data siswa")
-    } finally {
-      setLoading(false)
-      isFetchingRef.current = false
+      console.error("[ABSENSI TODAY] Error fetching:", err)
+      setAbsensiData([])
     }
   }, [sekolahId, authToken])
-
-  useEffect(() => {
-    if (sekolahId && authToken) {
-      fetchSiswa()
-    }
-  }, [sekolahId, authToken, fetchSiswa])
 
   const startCamera = async (facingMode: "user" | "environment" = "user") => {
     try {
@@ -202,7 +280,7 @@ const AbsensiPenerima = () => {
 
   const startFaceDetection = () => {
     detectionIntervalRef.current = setInterval(() => {
-      if (!videoRef.current || !canvasRef.current) return
+      if (!videoRef.current || !canvasRef.current || step !== "camera-face") return
 
       const video = videoRef.current
       const canvas = canvasRef.current
@@ -256,8 +334,8 @@ const AbsensiPenerima = () => {
   }
 
   const startCountdown = () => {
-    setCountdown(3)
-    let count = 3
+    setCountdown(2)
+    let count = 2
 
     countdownIntervalRef.current = setInterval(() => {
       count -= 1
@@ -265,9 +343,9 @@ const AbsensiPenerima = () => {
 
       if (count <= 0) {
         stopCountdown()
-        capturePhoto()
+        capturePhotoForValidation()
       }
-    }, 1000)
+    }, 500)
   }
 
   const stopCountdown = () => {
@@ -275,7 +353,7 @@ const AbsensiPenerima = () => {
       clearInterval(countdownIntervalRef.current)
       countdownIntervalRef.current = null
     }
-    setCountdown(3)
+    setCountdown(2)
   }
 
   const capturePhoto = () => {
@@ -300,6 +378,30 @@ const AbsensiPenerima = () => {
         submitPengambilanMakanan(photoData)
       }
     }
+  }
+
+  const capturePhotoForValidation = () => {
+    if (!videoRef.current) return
+
+    const canvas = document.createElement("canvas")
+    canvas.width = videoRef.current.videoWidth
+    canvas.height = videoRef.current.videoHeight
+    const ctx = canvas.getContext("2d")
+
+    if (ctx) {
+      ctx.drawImage(videoRef.current, 0, 0)
+      const photoData = canvas.toDataURL("image/jpeg", 0.8)
+      setFacePhoto(photoData)
+      stopCamera()
+      validateFace(photoData)
+    }
+  }
+
+  const checkDuplicate = (siswaId: string): boolean => {
+    return absensiData.some((record: any) => {
+      const recordSiswaId = String(record.siswaId || record.siswa?.id || record.siswa?.siswaId || "")
+      return recordSiswaId === String(siswaId)
+    })
   }
 
   const validateFace = async (facePhotoData: string) => {
@@ -332,9 +434,9 @@ const AbsensiPenerima = () => {
         throw new Error(result.message || "Wajah tidak dikenali")
       }
 
-      const detectedSiswa = result.data?.siswa || result.siswa || result.data
+      const detectedSiswa = result.data?.siswa || result.siswa || result.data || result
 
-      if (detectedSiswa && (detectedSiswa.siswaId || detectedSiswa.id)) {
+      if (detectedSiswa && (detectedSiswa.siswaId || detectedSiswa.id || detectedSiswa.siswaId)) {
         let alergiArray: string[] = []
         if (detectedSiswa.alergi) {
           if (Array.isArray(detectedSiswa.alergi)) {
@@ -377,14 +479,31 @@ const AbsensiPenerima = () => {
           fotoUrl: fotoUrl,
         }
 
-        setSelectedSiswa(normalizedSiswa)
-        setStep("rfid-scan")
+        // Check apakah siswa sudah absen
+        const isDuplicateAbsen = checkDuplicate(normalizedSiswa.id)
+
+        // Cari siswa dari siswaData untuk mendapatkan foto yang benar
+        const siswaFromList = siswaData.find((s: any) => String(s.id) === String(normalizedSiswa.id))
+        const siswaToUse = siswaFromList ? { ...normalizedSiswa, ...siswaFromList } : normalizedSiswa
+
+        if (isDuplicateAbsen) {
+          setSelectedSiswa(siswaToUse)
+          setDuplicateSiswaInfo(siswaToUse)
+          setIsDuplicate(true)
+          setStep("duplicate-warning")
+        } else {
+          setSelectedSiswa(siswaToUse)
+          setIsDuplicate(false)
+          setStep("rfid-scan")
+        }
       } else {
-        throw new Error("Wajah tidak dikenali. Silakan coba lagi.")
+        console.error("[VALIDATE FACE] Invalid response structure:", result)
+        throw new Error("Data siswa tidak ditemukan. Pastikan wajah terdaftar di database.")
       }
     } catch (err) {
       console.error("[VALIDATE FACE] Error:", err)
-      alert(err instanceof Error ? err.message : "Wajah tidak dikenali. Silakan coba lagi.")
+      const errorMsg = err instanceof Error ? err.message : "Wajah tidak dikenali. Silakan coba lagi."
+      alert(errorMsg)
       setFacePhoto(null)
       setStep("camera-face")
     }
@@ -494,6 +613,11 @@ const AbsensiPenerima = () => {
       })
       setStep("result")
 
+      // Refresh absensi data setelah submit
+      setTimeout(() => {
+        fetchAbsensiToday()
+      }, 500)
+
       setTimeout(() => {
         handleReset()
       }, 5000)
@@ -537,6 +661,8 @@ const AbsensiPenerima = () => {
     setSelectedSiswa(null)
     setTrayId("")
     setValidationResult(null)
+    setIsDuplicate(false)
+    setDuplicateSiswaInfo(null)
     setStep("camera-face")
   }
 
@@ -570,13 +696,20 @@ const AbsensiPenerima = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-10">
         <StatCard
           title="Total Siswa"
           value={stats.total}
           subtitle="Siswa terdaftar"
           icon={Users}
           color="bg-gradient-to-br from-blue-500 to-blue-600"
+        />
+        <StatCard
+          title="Sudah Absen"
+          value={stats.sudahAbsen}
+          subtitle={`${stats.total > 0 ? Math.round((stats.sudahAbsen / stats.total) * 100) : 0}%`}
+          icon={CheckCircle}
+          color="bg-gradient-to-br from-emerald-500 to-teal-600"
         />
         <StatCard
           title="Laki-laki"
@@ -655,21 +788,9 @@ const AbsensiPenerima = () => {
       {/* Instruction */}
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
         <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
-          {faceDetected ? "✓ Tahan posisi..." : "Posisikan wajah ke tengah"}
+          {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
         </div>
       </div>
-    </div>
-
-    {/* Manual Capture */}
-    <div className="px-6 py-6 border-t border-gray-100">
-      <button
-        onClick={capturePhoto}
-        disabled={!isCameraActive}
-        className="w-full px-6 py-3 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white rounded-xl transition-all font-semibold flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm hover:shadow-md"
-      >
-        <Camera className="w-5 h-5" />
-        Ambil Foto Manual
-      </button>
     </div>
   </div>
 )}
@@ -694,8 +815,8 @@ const AbsensiPenerima = () => {
         </div>
       </div>
     </div>
-    <h2 className="text-2xl font-bold text-gray-900 mb-2">Validasi Wajah</h2>
-    <p className="text-gray-600 text-sm mb-6">Menganalisis fitur wajah Anda...</p>
+    <h2 className="text-2xl font-bold text-gray-900 mb-2">Mengenali Wajah...</h2>
+    <p className="text-gray-600 text-sm mb-6">Menganalisis dengan AI Detection Face</p>
     <div className="flex justify-center gap-1.5">
       <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"></div>
       <div
@@ -706,6 +827,117 @@ const AbsensiPenerima = () => {
         className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"
         style={{ animationDelay: "0.2s" }}
       ></div>
+    </div>
+  </div>
+)}
+
+     {/* STEP 2.5: DUPLICATE WARNING */}
+{step === "duplicate-warning" && duplicateSiswaInfo && (
+  <div className="max-w-2xl mx-auto">
+    <div className="bg-white rounded-2xl shadow-2xl border-2 border-red-500 overflow-hidden">
+      {/* Header - Alert */}
+      <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4">
+        <div className="flex items-center gap-3">
+          <XCircle className="w-6 h-6 text-white flex-shrink-0" />
+          <div>
+            <span className="text-sm font-bold text-white block">⚠️ SISWA SUDAH ABSEN</span>
+            <p className="text-xs text-red-100 mt-1">Siswa ini telah mencatat pengambilan makanan hari ini</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-8">
+        {/* Student Info */}
+        <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl p-6 mb-8 border-2 border-red-200">
+          {/* Header dengan Info */}
+          <div className="mb-4">
+            <h3 className="text-xl font-bold text-gray-900">{duplicateSiswaInfo.nama}</h3>
+            <p className="text-sm text-gray-600">{duplicateSiswaInfo.kelas}</p>
+            <p className="text-xs text-gray-500">NIS: {duplicateSiswaInfo.nis}</p>
+          </div>
+
+          {/* Photo Comparison Grid */}
+          <div className="flex items-center justify-center gap-4 mb-4">
+            {/* Foto Siswa dari Database - LEFT */}
+            <div className="text-center">
+              <p className="text-xs font-bold text-gray-600 mb-2">👤 Foto Siswa DB</p>
+              {duplicateSiswaInfo.fotoUrl ? (
+                <img
+                  src={duplicateSiswaInfo.fotoUrl || "/placeholder.svg"}
+                  alt="Foto Siswa"
+                  className="w-28 h-28 rounded-full object-cover border-4 border-red-400 shadow-lg"
+                />
+              ) : (
+                <div className="w-28 h-28 rounded-full bg-gray-200 border-4 border-red-400 flex items-center justify-center">
+                  {duplicateSiswaInfo.jenisKelamin === "LAKI_LAKI" ? (
+                    <Users2 className="w-14 h-14 text-gray-500" />
+                  ) : (
+                    <User className="w-14 h-14 text-gray-500" />
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Divider with Warning Icon */}
+            <div className="flex flex-col items-center gap-1">
+              <AlertTriangle className="w-10 h-10 text-red-500 animate-pulse" />
+              <p className="text-xs text-red-600 font-semibold">Duplikat</p>
+            </div>
+
+            {/* Foto dari Kamera - RIGHT */}
+            <div className="text-center">
+              <p className="text-xs font-bold text-gray-600 mb-2">📷 Foto Deteksi</p>
+              {facePhoto && (
+                <img
+                  src={facePhoto || "/placeholder.svg"}
+                  alt="Foto Validasi"
+                  className="w-28 h-28 rounded-full object-cover border-4 border-red-400 shadow-lg"
+                />
+              )}
+            </div>
+          </div>
+
+          {duplicateSiswaInfo.alergi && duplicateSiswaInfo.alergi.length > 0 && (
+            <div className="mt-4 bg-red-50 rounded-lg p-3 border-l-4 border-red-500">
+              <p className="text-xs text-red-700 font-bold">⚠️ ALERGI TERDAFTAR</p>
+              <p className="text-sm text-red-800 font-semibold mt-1">{duplicateSiswaInfo.alergi.join(", ")}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Message */}
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-lg mb-8">
+          <p className="text-sm text-gray-700">
+            <span className="font-bold text-gray-900">{duplicateSiswaInfo.nama}</span> sudah tercatat absen pada hari ini.
+            <br />
+            <span className="text-xs text-gray-600 mt-2 block">Apakah Anda ingin melanjutkan atau memulai ulang dengan siswa lain?</span>
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => {
+              handleReset()
+            }}
+            className="px-6 py-3 bg-gray-200 text-gray-900 rounded-xl hover:bg-gray-300 transition-colors font-bold flex items-center justify-center gap-2"
+          >
+            <X className="w-5 h-5" />
+            Mulai Ulang
+          </button>
+          <button
+            onClick={() => {
+              setSelectedSiswa(duplicateSiswaInfo)
+              setStep("rfid-scan")
+            }}
+            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:shadow-lg text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2"
+          >
+            <CheckCircle className="w-5 h-5" />
+            Lanjutkan Anyway
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 )}
@@ -723,25 +955,66 @@ const AbsensiPenerima = () => {
 
     {/* Content */}
     <div className="p-8">
-      {/* Student Info */}
+      {/* Student Info & Photo Comparison */}
       <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 mb-8 border-2 border-emerald-200">
-        <div className="flex items-center gap-4 mb-4">
-          {facePhoto && (
-            <img
-              src={facePhoto || "/placeholder.svg"}
-              alt="Foto Validasi"
-              className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
-            />
-          )}
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-gray-900">{selectedSiswa.nama}</h3>
-            <p className="text-sm text-gray-600">{selectedSiswa.kelas}</p>
-            <p className="text-xs text-gray-500">NIS: {selectedSiswa.nis}</p>
+        {/* Header dengan Info */}
+        <div className="mb-4">
+          <h3 className="text-xl font-bold text-gray-900">{selectedSiswa.nama}</h3>
+          <p className="text-sm text-gray-600">{selectedSiswa.kelas}</p>
+          <p className="text-xs text-gray-500">NIS: {selectedSiswa.nis}</p>
+        </div>
+
+        {/* Photo Comparison Grid */}
+        <div className="flex items-center justify-center gap-6 mb-4">
+          {/* Foto Siswa dari Database - LEFT */}
+          <div className="text-center">
+            <p className="text-xs font-bold text-gray-600 mb-3">👤 Foto Siswa di DB</p>
+            {selectedSiswa.fotoUrl ? (
+              <img
+                src={selectedSiswa.fotoUrl || "/placeholder.svg"}
+                alt="Foto Siswa"
+                className="w-32 h-32 rounded-full object-cover border-4 border-emerald-400 shadow-lg"
+              />
+            ) : (
+              <div className="w-32 h-32 rounded-full bg-gray-200 border-4 border-emerald-400 flex items-center justify-center">
+                {selectedSiswa.jenisKelamin === "LAKI_LAKI" ? (
+                  <Users2 className="w-16 h-16 text-gray-500" />
+                ) : (
+                  <User className="w-16 h-16 text-gray-500" />
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Divider with Valid Icon */}
+          <div className="flex flex-col items-center gap-2">
+            <CheckCircle className="w-12 h-12 text-emerald-500 animate-pulse" />
+            <p className="text-xs text-emerald-600 font-semibold">Valid</p>
+          </div>
+
+          {/* Foto dari Kamera - RIGHT */}
+          <div className="text-center">
+            <p className="text-xs font-bold text-gray-600 mb-3">📷 Foto Deteksi Wajah</p>
+            {facePhoto && (
+              <img
+                src={facePhoto || "/placeholder.svg"}
+                alt="Foto Validasi"
+                className="w-32 h-32 rounded-full object-cover border-4 border-emerald-400 shadow-lg"
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Verification Status */}
+        <div className="bg-white rounded-lg p-3 mb-4 border-2 border-emerald-300">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <p className="text-sm font-semibold text-emerald-700">✓ Wajah cocok dengan data siswa di database</p>
           </div>
         </div>
 
         {selectedSiswa.alergi && selectedSiswa.alergi.length > 0 && (
-          <div className="mt-4 bg-red-50 rounded-lg p-3 border-l-4 border-red-500">
+          <div className="bg-red-50 rounded-lg p-3 border-l-4 border-red-500">
             <p className="text-xs text-red-700 font-bold">⚠️ ALERGI TERDAFTAR</p>
             <p className="text-sm text-red-800 font-semibold mt-1">{selectedSiswa.alergi.join(", ")}</p>
           </div>
@@ -805,23 +1078,52 @@ const AbsensiPenerima = () => {
             <div className="p-8">
               {/* Student Info */}
               <div className="mb-8">
-                <div className="flex gap-4 mb-4">
-                  {facePhoto && (
-                    <img
-                      src={facePhoto || "/placeholder.svg"}
-                      alt="Foto"
-                      className="w-20 h-20 rounded-full object-cover border-4 border-gray-200"
-                    />
-                  )}
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">{selectedSiswa.nama}</h3>
-                    <p className="text-sm text-gray-600">{selectedSiswa.kelas}</p>
-                    <p className="text-xs text-gray-500">NIS {selectedSiswa.nis}</p>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">{selectedSiswa.nama}</h3>
+                <p className="text-sm text-gray-600">{selectedSiswa.kelas} • NIS {selectedSiswa.nis}</p>
+
+                {/* Photo Comparison Grid */}
+                <div className="flex items-center justify-center gap-3 my-4">
+                  {/* Foto Siswa dari Database - LEFT */}
+                  <div className="text-center">
+                    <p className="text-xs font-bold text-gray-600 mb-2">👤 Foto Siswa DB</p>
+                    {selectedSiswa.fotoUrl ? (
+                      <img
+                        src={selectedSiswa.fotoUrl || "/placeholder.svg"}
+                        alt="Foto Siswa"
+                        className="w-24 h-24 rounded-full object-cover border-3 border-emerald-400 shadow-md"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 rounded-full bg-gray-200 border-3 border-emerald-400 flex items-center justify-center">
+                        {selectedSiswa.jenisKelamin === "LAKI_LAKI" ? (
+                          <Users2 className="w-12 h-12 text-gray-500" />
+                        ) : (
+                          <User className="w-12 h-12 text-gray-500" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Divider with Valid Icon */}
+                  <div className="flex flex-col items-center gap-1">
+                    <CheckCircle className="w-8 h-8 text-emerald-500" />
+                    <p className="text-xs text-emerald-600 font-semibold">✓</p>
+                  </div>
+
+                  {/* Foto dari Kamera - RIGHT */}
+                  <div className="text-center">
+                    <p className="text-xs font-bold text-gray-600 mb-2">📷 Foto Deteksi</p>
+                    {facePhoto && (
+                      <img
+                        src={facePhoto || "/placeholder.svg"}
+                        alt="Foto Deteksi"
+                        className="w-24 h-24 rounded-full object-cover border-3 border-emerald-400 shadow-md"
+                      />
+                    )}
                   </div>
                 </div>
 
                 {selectedSiswa.alergi && selectedSiswa.alergi.length > 0 && (
-                  <div className="bg-red-50 rounded-lg p-3 border-l-4 border-red-500">
+                  <div className="bg-red-50 rounded-lg p-3 border-l-4 border-red-500 mt-4">
                     <p className="text-xs text-red-700 font-bold">⚠️ ALERGI</p>
                     <p className="text-sm text-red-800">{selectedSiswa.alergi.join(", ")}</p>
                   </div>

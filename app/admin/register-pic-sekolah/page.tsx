@@ -17,6 +17,45 @@ interface SekolahItem {
   picPhone?: string;
 }
 
+const provinceIdMap: { [key: string]: string } = {
+  'Aceh': '11',
+  'Sumatera Utara': '12',
+  'Sumatera Barat': '13',
+  'Riau': '14',
+  'Jambi': '15',
+  'Sumatera Selatan': '16',
+  'Lampung': '18',
+  'Kepulauan Bangka Belitung': '19',
+  'Kepulauan Riau': '17',
+  'DKI Jakarta': '31',
+  'Jawa Barat': '32',
+  'Jawa Tengah': '33',
+  'DI Yogyakarta': '34',
+  'Jawa Timur': '35',
+  'Banten': '36',
+  'Bali': '51',
+  'Nusa Tenggara Barat': '52',
+  'Nusa Tenggara Timur': '53',
+  'Kalimantan Barat': '61',
+  'Kalimantan Tengah': '62',
+  'Kalimantan Selatan': '63',
+  'Kalimantan Timur': '64',
+  'Kalimantan Utara': '65',
+  'Sulawesi Utara': '71',
+  'Sulawesi Tengah': '72',
+  'Sulawesi Selatan': '73',
+  'Sulawesi Tenggara': '74',
+  'Gorontalo': '75',
+  'Sulawesi Barat': '76',
+  'Maluku': '81',
+  'Maluku Utara': '82',
+  'Papua Barat': '91',
+  'Papua': '94',
+  'Papua Selatan': '93',
+  'Papua Tengah': '94',
+  'Papua Barat Daya': '96',
+};
+
 const RegisterPICSekolahPage = () => {
   const router = useRouter();
   const [authToken, setAuthToken] = useState('');
@@ -36,7 +75,8 @@ const RegisterPICSekolahPage = () => {
     email: '',
     phone: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    province: ''
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -173,6 +213,10 @@ const RegisterPICSekolahPage = () => {
       newErrors.phone = 'Nomor telepon tidak valid';
     }
 
+    if (!formData.province) {
+      newErrors.province = 'Pilih provinsi terlebih dahulu';
+    }
+
     if (!formData.password) {
       newErrors.password = 'Password harus diisi';
     } else if (formData.password.length < 8) {
@@ -204,7 +248,8 @@ const RegisterPICSekolahPage = () => {
         phone: formData.phone.trim(),
         password: formData.password,
         role: 'PIC_SEKOLAH',
-        sekolahId: selectedSekolahId
+        sekolahId: selectedSekolahId,
+        provinceId: formData.province ? provinceIdMap[formData.province] : ''
       };
 
       const response = await fetch('https://demombgv1.xyz/api/auth/register', {
@@ -221,8 +266,21 @@ const RegisterPICSekolahPage = () => {
         throw new Error(errorData.message || `Error: ${response.status}`);
       }
 
+      // Update sekolah with provinceId
+      if (selectedSekolahId && formData.province) {
+        const provinceId = provinceIdMap[formData.province];
+        await fetch(`https://demombgv1.xyz/api/sekolah/${selectedSekolahId}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ provinceId }),
+        });
+      }
+
       showToast('success', 'PIC Sekolah berhasil didaftarkan!');
-      setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
+      setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '', province: '' });
       setErrors({});
       setSelectedSekolahId('');
       await fetchSekolahList(authToken);
@@ -344,6 +402,59 @@ const RegisterPICSekolahPage = () => {
                     placeholder="08123456789"
                   />
                   {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Provinsi</label>
+                  <select
+                    value={formData.province}
+                    onChange={(e) => {
+                      setFormData({ ...formData, province: e.target.value });
+                      if (errors.province) setErrors({ ...errors, province: '' });
+                    }}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                      errors.province ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">-- Pilih Provinsi --</option>
+                    <option value="Aceh">Aceh</option>
+                    <option value="Sumatera Utara">Sumatera Utara</option>
+                    <option value="Sumatera Barat">Sumatera Barat</option>
+                    <option value="Riau">Riau</option>
+                    <option value="Jambi">Jambi</option>
+                    <option value="Sumatera Selatan">Sumatera Selatan</option>
+                    <option value="Lampung">Lampung</option>
+                    <option value="Kepulauan Bangka Belitung">Kepulauan Bangka Belitung</option>
+                    <option value="Kepulauan Riau">Kepulauan Riau</option>
+                    <option value="DKI Jakarta">DKI Jakarta</option>
+                    <option value="Jawa Barat">Jawa Barat</option>
+                    <option value="Jawa Tengah">Jawa Tengah</option>
+                    <option value="DI Yogyakarta">DI Yogyakarta</option>
+                    <option value="Jawa Timur">Jawa Timur</option>
+                    <option value="Banten">Banten</option>
+                    <option value="Bali">Bali</option>
+                    <option value="Nusa Tenggara Barat">Nusa Tenggara Barat</option>
+                    <option value="Nusa Tenggara Timur">Nusa Tenggara Timur</option>
+                    <option value="Kalimantan Barat">Kalimantan Barat</option>
+                    <option value="Kalimantan Tengah">Kalimantan Tengah</option>
+                    <option value="Kalimantan Selatan">Kalimantan Selatan</option>
+                    <option value="Kalimantan Timur">Kalimantan Timur</option>
+                    <option value="Kalimantan Utara">Kalimantan Utara</option>
+                    <option value="Sulawesi Utara">Sulawesi Utara</option>
+                    <option value="Sulawesi Tengah">Sulawesi Tengah</option>
+                    <option value="Sulawesi Selatan">Sulawesi Selatan</option>
+                    <option value="Sulawesi Tenggara">Sulawesi Tenggara</option>
+                    <option value="Gorontalo">Gorontalo</option>
+                    <option value="Sulawesi Barat">Sulawesi Barat</option>
+                    <option value="Maluku">Maluku</option>
+                    <option value="Maluku Utara">Maluku Utara</option>
+                    <option value="Papua Barat">Papua Barat</option>
+                    <option value="Papua">Papua</option>
+                    <option value="Papua Selatan">Papua Selatan</option>
+                    <option value="Papua Tengah">Papua Tengah</option>
+                    <option value="Papua Barat Daya">Papua Barat Daya</option>
+                  </select>
+                  {errors.province && <p className="text-xs text-red-600 mt-1">{errors.province}</p>}
                 </div>
 
                 <div>

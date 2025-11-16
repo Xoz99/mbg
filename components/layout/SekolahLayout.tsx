@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, ReactNode, useEffect, useRef } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
+import { useSekolahData } from '@/lib/hooks/useSekolahData';
+import {
   Home,
-  Users, 
   GraduationCap,
   MapPin,
   ClipboardCheck,
-  MessageSquare,
-  Calendar,
   Menu,
   X,
   LogOut,
@@ -231,29 +229,51 @@ const BubbleReport = ({
 // SekolahLayout Component
 const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutProps) => {
   const router = useRouter();
-  
-  const hasInitialized = useRef(false);
-  const fetchInProgress = useRef(false);
+  const { loading, error, sekolahInfo, clearCache } = useSekolahData();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [authToken, setAuthToken] = useState("");
-  const [sekolahId, setSekolahId] = useState("");
   const [expandedMenu, setExpandedMenu] = useState<string | null>('data');
-  
-  const [sekolahInfo, setSekolahInfo] = useState({
-    nama: '',
-    alamat: '',
-    kota: '',
-    pic: '',
-    picPhone: '',
-    picEmail: '',
-    kode: '',
-    latitude: 0,
-    longitude: 0
-  });
+
+  // Auto-expand menu based on currentPage
+  useEffect(() => {
+    const getNavigation = () => {
+      return [
+        { id: 'dashboard', name: 'Dashboard', icon: Home, path: '/sekolah/dashboard' },
+        {
+          id: 'data',
+          name: 'Data',
+          icon: GraduationCap,
+          hasSubmenu: true,
+          submenu: [
+            { id: 'siswa', name: 'Data Siswa', path: '/sekolah/siswa' },
+            { id: 'kelas', name: 'Data Kelas', path: '/sekolah/kelas' },
+            { id: 'kalender-akademik', name: 'Kalender Akademik', path: '/sekolah/kalender-akademik' }
+          ]
+        },
+        {
+          id: 'operasional',
+          name: 'Operasional',
+          icon: ClipboardCheck,
+          hasSubmenu: true,
+          submenu: [
+            { id: 'presensi', name: 'Presensi Siswa', path: '/sekolah/presensi' },
+            { id: 'absensi', name: 'Absensi Penerima', path: '/sekolah/absensi' },
+            { id: 'tracking', name: 'Tracking MBG', path: '/sekolah/tracking' },
+          ]
+        },
+      ]
+    }
+
+    const nav = getNavigation()
+    // Find parent menu yang contains current page
+    const parentMenu = nav.find((item: any) =>
+      item.submenu?.some((subitem: any) => subitem.id === currentPage)
+    )
+
+    if (parentMenu) {
+      setExpandedMenu(parentMenu.id)
+    }
+  }, [currentPage])
 
   const getNavigation = () => {
     return [
@@ -279,6 +299,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
         icon: ClipboardCheck,
         hasSubmenu: true,
         submenu: [
+          { id: 'presensi', name: 'Presensi Siswa', path: '/sekolah/presensi' },
           { id: 'absensi', name: 'Absensi Penerima', path: '/sekolah/absensi' },
           { id: 'tracking', name: 'Tracking MBG', path: '/sekolah/tracking' },
         ]
@@ -288,209 +309,14 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
 
   const navigation = getNavigation();
 
-  useEffect(() => {
-    if (hasInitialized.current) return;
-    if (typeof window === 'undefined') return;
-
-    hasInitialized.current = true;
-
-    const userData = localStorage.getItem('mbg_user');
-    const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
-    const storedSekolahId = localStorage.getItem('sekolahId');
-
-    if (!userData || !token) {
-      router.push('/auth/login');
-      return;
-    }
-
-    try {
-      const user = JSON.parse(userData);
-      setAuthToken(token);
-      
-      if (storedSekolahId) {
-        setSekolahId(storedSekolahId);
-        console.log("[SEKOLAH LAYOUT] Sekolah ID dari localStorage:", storedSekolahId);
-      } else {
-        setSekolahId('');
-      }
-    } catch (err) {
-      console.error('Error parsing user data:', err);
-      router.push('/auth/login');
-    }
-  }, [router]);
-
-  useEffect(() => {
-    if (!sekolahId && !authToken) return;
-    if (fetchInProgress.current) return;
-
-    const fetchData = async () => {
-      if (fetchInProgress.current) return;
-      
-      try {
-        fetchInProgress.current = true;
-        setLoading(true);
-
-        if (!sekolahId) {
-          const userData = localStorage.getItem('mbg_user');
-          if (userData && authToken) {
-            const user = JSON.parse(userData);
-            await findSekolahByPIC(user.id, authToken);
-          }
-        } else {
-          await fetchSekolahDetail(sekolahId, authToken);
-        }
-
-        setLoading(false);
-      } catch (err) {
-        console.error('[SEKOLAH LAYOUT] Error in fetch:', err);
-        setLoading(false);
-      } finally {
-        fetchInProgress.current = false;
-      }
-    };
-
-    fetchData();
-  }, [sekolahId, authToken]);
-
-  const findSekolahByPIC = async (picId: string, token: string) => {
-    try {
-      console.log("[SEKOLAH LAYOUT] Mencari sekolah untuk PIC ID:", picId);
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/sekolah?page=1&limit=100`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log("[SEKOLAH LAYOUT] Sekolah list response:", result);
-
-      let sekolahList = [];
-      if (Array.isArray(result.data?.data)) {
-        sekolahList = result.data.data;
-      } else if (Array.isArray(result.data)) {
-        sekolahList = result.data;
-      } else if (Array.isArray(result)) {
-        sekolahList = result;
-      }
-
-      let foundSekolah = null;
-
-      for (const sekolah of sekolahList) {
-        if (sekolah.picSekolah && Array.isArray(sekolah.picSekolah)) {
-          const matchingPIC = sekolah.picSekolah.find(
-            (pic: any) => pic.id === picId
-          );
-
-          if (matchingPIC) {
-            foundSekolah = sekolah;
-            console.log("[SEKOLAH LAYOUT] Sekolah ditemukan:", foundSekolah);
-            break;
-          }
-        }
-      }
-
-      if (foundSekolah) {
-        localStorage.setItem('sekolahId', foundSekolah.id);
-        setSekolahId(foundSekolah.id);
-      } else {
-        console.warn("[SEKOLAH LAYOUT] Sekolah tidak ditemukan untuk PIC ini");
-        setError('Sekolah tidak ditemukan untuk PIC ini');
-      }
-    } catch (err) {
-      console.error("[SEKOLAH LAYOUT] Error mencari sekolah:", err);
-      setError('Gagal mencari sekolah');
-    }
-  };
-
-  const fetchSekolahDetail = async (sekolahId: string, token: string) => {
-    try {
-      console.log("[SEKOLAH LAYOUT] Fetch detail sekolah:", sekolahId);
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/sekolah/${sekolahId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log("[SEKOLAH LAYOUT] Sekolah detail:", result);
-
-      let sekolah = result.data || result;
-      
-      if (sekolah && typeof sekolah === 'object' && !sekolah.nama && sekolah.data) {
-        sekolah = sekolah.data;
-      }
-
-      updateSekolahInfo(sekolah);
-      setError(null);
-    } catch (err) {
-      console.error("[SEKOLAH LAYOUT] Error fetch detail:", err);
-      setError('Gagal memuat data sekolah');
-    }
-  };
-
-  const updateSekolahInfo = (sekolah: any) => {
-    if (!sekolah) return;
-
-    const picData = sekolah.picSekolah && Array.isArray(sekolah.picSekolah) && sekolah.picSekolah.length > 0 
-      ? sekolah.picSekolah[0] 
-      : null;
-
-    const alamat = String(sekolah.alamat || '');
-    const kota = extractKota(alamat) || 'Sekolah';
-
-    setSekolahInfo({
-      nama: String(sekolah.nama || 'Sekolah MBG'),
-      alamat: alamat,
-      kota: kota,
-      pic: picData ? String(picData.name || picData.namaLengkap || '-') : '-',
-      picPhone: picData ? String(picData.phone || picData.noHp || '') : '',
-      picEmail: picData ? String(picData.email || '') : '',
-      kode: generateKodeSekolah(String(sekolah.id || '')),
-      latitude: Number(sekolah.latitude) || 0,
-      longitude: Number(sekolah.longitude) || 0
-    });
-
-    setError(null);
-  };
-
-  const extractKota = (alamat: string): string => {
-    if (!alamat) return '';
-    const parts = String(alamat).split(',');
-    if (parts.length > 1) {
-      return parts[parts.length - 1].trim();
-    }
-    return '';
-  };
-
-  const generateKodeSekolah = (id: string): string => {
-    if (!id) return 'SKL-000';
-    const shortId = String(id).slice(-3).toUpperCase();
-    return `SKL-${shortId}`;
-  };
-
   const handleNavigation = (path: string) => {
     router.push(path);
   };
 
   const handleLogout = () => {
+    // Clear sekolah data cache
+    clearCache();
+
     if (typeof window !== 'undefined') {
       localStorage.removeItem('mbg_user');
       localStorage.removeItem('mbg_token');
@@ -636,7 +462,11 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
                       {item.submenu.map((subitem: any, index: number) => (
                         <button
                           key={subitem.id}
-                          onClick={() => handleNavigation(subitem.path)}
+                          onClick={() => {
+                            handleNavigation(subitem.path);
+                            // Keep submenu open after navigation
+                            // (state will update based on currentPage from parent)
+                          }}
                           className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm transform ${
                             isSubmenuOpen
                               ? 'translate-x-0 opacity-100'
@@ -720,9 +550,8 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
       </main>
 
       {/* BubbleReport Component */}
-      <BubbleReport 
+      <BubbleReport
         apiBaseUrl={API_BASE_URL}
-        authToken={authToken}
       />
     </div>
   );
