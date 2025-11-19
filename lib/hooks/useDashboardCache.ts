@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, useEffect } from "react"
 import { cacheEmitter } from "@/lib/utils/cacheEmitter"
+import { getTodayDateString, extractDateString, parseDateAsUTC, getMondayOfCurrentWeek, addDaysToDateString } from "@/lib/utils/dateUtils"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz"
 const CACHE_KEY = "sekolah_dashboard_cache"
@@ -169,23 +170,10 @@ export const useDashboardCache = (onCacheUpdate?: (data: CachedData) => void) =>
         "Content-Type": "application/json",
       }
 
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-
-      const dayOfWeek = today.getDay()
-      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-
-      const mondayDate = new Date(today)
-      mondayDate.setDate(today.getDate() - daysToMonday)
-      mondayDate.setHours(0, 0, 0, 0)
-
-      const fridayDate = new Date(mondayDate)
-      fridayDate.setDate(mondayDate.getDate() + 4)
-      fridayDate.setHours(23, 59, 59, 999)
-
-      const mondayString = mondayDate.toISOString().split("T")[0]
-      const fridayString = fridayDate.toISOString().split("T")[0]
-      const todayString = today.toISOString().split("T")[0]
+      // ✅ FIXED: Use UTC-consistent date functions instead of mixing local/UTC dates
+      const todayString = getTodayDateString()
+      const mondayString = getMondayOfCurrentWeek()
+      const fridayString = addDaysToDateString(mondayString, 4) || mondayString
 
       if (!kelasArray || kelasArray.length === 0) {
         return {
@@ -203,10 +191,10 @@ export const useDashboardCache = (onCacheUpdate?: (data: CachedData) => void) =>
       const daysOfWeek = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]
       const chartDataByDate: { [key: string]: { hari: string; hadir: number; tidakHadir: number } } = {}
 
+      // ✅ FIXED: Build week data using UTC-consistent date functions
       for (let i = 0; i < 5; i++) {
-        const dateForDay = new Date(mondayDate)
-        dateForDay.setDate(mondayDate.getDate() + i)
-        const dateString = dateForDay.toISOString().split("T")[0]
+        const dateString = addDaysToDateString(mondayString, i)
+        if (!dateString) continue
         chartDataByDate[dateString] = {
           hari: daysOfWeek[i],
           hadir: 0,
@@ -238,9 +226,9 @@ export const useDashboardCache = (onCacheUpdate?: (data: CachedData) => void) =>
               if (!a.tanggal) continue
 
               try {
-                const eventDate = new Date(a.tanggal)
-                eventDate.setHours(0, 0, 0, 0)
-                const absenDateString = eventDate.toISOString().split("T")[0]
+                // ✅ FIXED: Use UTC-consistent date extraction
+                const absenDateString = extractDateString(a.tanggal)
+                if (!absenDateString) continue
 
                 if (absenDateString < mondayString || absenDateString > fridayString) continue
 
