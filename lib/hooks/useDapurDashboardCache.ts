@@ -413,24 +413,22 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
     }
   }, [contextPlannings])
 
-  // ✅ Load data with cache priority
+  // ✅ Load data with cache priority - show cache immediately, fetch background
   const loadData = useCallback(async () => {
     const cacheId = "dapur_dashboard"
-
-    // Wait for context to finish loading
-    if (contextLoading) {
-      return
-    }
 
     // 1. Check memory cache first (fastest)
     if (globalMemoryCache.has(cacheId)) {
       const cached = globalMemoryCache.get(cacheId)!
       const age = Date.now() - cached.timestamp
 
-      if (age < CACHE_EXPIRY) {
-        setLoading(false)
-        return cached
+      setLoading(false)
+
+      // Refetch in background if expired AND context is loaded
+      if (age >= CACHE_EXPIRY && !contextLoading) {
+        fetchAndUpdateCache(cacheId)
       }
+      return cached
     }
 
     // 2. Check localStorage
@@ -441,24 +439,29 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
           const parsed = JSON.parse(localCached) as DapurDashboardData
           const age = Date.now() - parsed.timestamp
 
-          if (age < CACHE_EXPIRY) {
-            globalMemoryCache.set(cacheId, parsed)
-            setLoading(false)
-            return parsed
-          } else if (age < CACHE_EXPIRY * 2) {
-            setLoading(false)
-            globalMemoryCache.set(cacheId, parsed)
+          // Show cache immediately (even if stale)
+          globalMemoryCache.set(cacheId, parsed)
+          setLoading(false)
+
+          // Refetch in background if expired AND context is loaded
+          if (age >= CACHE_EXPIRY && !contextLoading) {
             fetchAndUpdateCache(cacheId)
-            return parsed
           }
+          return parsed
         } catch (e) {
           // Failed to parse cache
         }
       }
     }
 
-    // 3. No cache, need to fetch
-    return fetchAndUpdateCache(cacheId)
+    // 3. If context is loaded, fetch from API. Otherwise just set loading to false
+    if (!contextLoading) {
+      return fetchAndUpdateCache(cacheId)
+    } else {
+      // Context still loading - just mark loading as false to show cached data
+      setLoading(false)
+      return
+    }
   }, [fetchDapurDashboardData, contextLoading])
 
   // ✅ Fetch and update both memory and localStorage cache
@@ -614,8 +617,8 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
 
       // Background refresh: Fetch latest data dari API tanpa blocking UI
       backgroundRefresh("dapur_dashboard", (freshData) => {
-        // Emit fresh data juga
-        if (freshData) {
+        // Only update if data actually changed (compare hash)
+        if (freshData && freshData.hash !== updatedData.hash) {
           const validFreshData: DapurDashboardData = {
             menuPlanningData: Array.isArray(freshData.menuPlanningData) ? freshData.menuPlanningData : [],
             todayMenu: freshData.todayMenu || null,

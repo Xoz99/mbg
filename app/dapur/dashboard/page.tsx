@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import DapurLayout from "@/components/layout/DapurLayout"
 import { useDapurDashboardCache } from "@/lib/hooks/useDapurDashboardCache"
 import { useProduksiCache } from "@/lib/hooks/useProduksiCache"
+import { useDapurContext } from "@/lib/context/DapurContext"
 import {
   ChefHat,
   CheckCircle,
@@ -78,12 +79,15 @@ const DashboardDapur = () => {
   })
 
   const [menuPlanningData, setMenuPlanningData] = useState<any[]>([])
-  const [todayMenu, setTodayMenu] = useState<any>(null)
+  const [todayMenus, setTodayMenus] = useState<any[]>([])
+  const [currentMenuIndex, setCurrentMenuIndex] = useState(0)
   const [stats, setStats] = useState({
     targetHariIni: 0,
     totalSekolah: 0,
   })
   const [produksiMingguan, setProduksiMingguan] = useState<any[]>([])
+  const [isLoadingComplete, setIsLoadingComplete] = useState(false)
+  const autoPlayIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // ✅ Callback untuk update state ketika data di-fetch dari background
   const handleCacheUpdate = useCallback((data: any) => {
@@ -93,32 +97,63 @@ const DashboardDapur = () => {
   }, [])
 
   // ✅ Use custom hook untuk fetch menu planning data dan stats
-  const { loading, loadData, refreshData } = useDapurDashboardCache(handleCacheUpdate)
+  const { loading: dashboardLoading, loadData, refreshData } = useDapurDashboardCache(handleCacheUpdate)
 
   // ✅ Use produksi cache for menu hari ini times (correct time display)
-  const { batches } = useProduksiCache()
+  const { batches, loading: produksiLoading } = useProduksiCache()
 
-  // ✅ Extract today's menu from first batch with correct times
+  // ✅ Get context loading state
+  const { isLoading: contextLoading } = useDapurContext()
+
+  // ✅ Extract all today's menus from batches for carousel
   useEffect(() => {
     if (batches && batches.length > 0) {
-      const firstBatch = batches.find((b) => b.dailyMenu)
-      if (firstBatch && firstBatch.dailyMenu) {
-        setTodayMenu({
-          namaMenu: firstBatch.dailyMenu.namaMenu || "Menu",
-          sekolahNama: firstBatch.sekolahName,
-          kalori: firstBatch.dailyMenu.kalori || 0,
-          protein: firstBatch.dailyMenu.protein || 0,
-          biayaPerTray: firstBatch.dailyMenu.biayaPerTray || 0,
-          jamMulaiMasak: firstBatch.startTime || "",
-          jamSelesaiMasak: firstBatch.endTime || "",
-        })
-      } else {
-        setTodayMenu(null)
-      }
+      const menus = batches
+        .filter((b) => b.dailyMenu)
+        .map((batch) => ({
+          namaMenu: batch.dailyMenu.namaMenu || "Menu",
+          sekolahNama: batch.sekolahName,
+          kalori: batch.dailyMenu.kalori || 0,
+          protein: batch.dailyMenu.protein || 0,
+          biayaPerTray: batch.dailyMenu.biayaPerTray || 0,
+          jamMulaiMasak: batch.startTime || "",
+          jamSelesaiMasak: batch.endTime || "",
+        }))
+
+      setTodayMenus(menus)
+      setCurrentMenuIndex(0)
     } else {
-      setTodayMenu(null)
+      setTodayMenus([])
+      setCurrentMenuIndex(0)
     }
   }, [batches])
+
+  // ✅ Setup auto-play carousel
+  useEffect(() => {
+    if (todayMenus.length <= 1) {
+      // No need for carousel if 0 or 1 menu
+      if (autoPlayIntervalRef.current) {
+        clearInterval(autoPlayIntervalRef.current)
+        autoPlayIntervalRef.current = null
+      }
+      return
+    }
+
+    // Auto-play every 5 seconds
+    autoPlayIntervalRef.current = setInterval(() => {
+      setCurrentMenuIndex((prev) => (prev + 1) % todayMenus.length)
+    }, 5000)
+
+    return () => {
+      if (autoPlayIntervalRef.current) {
+        clearInterval(autoPlayIntervalRef.current)
+        autoPlayIntervalRef.current = null
+      }
+    }
+  }, [todayMenus])
+
+  // Helper to get current menu
+  const currentMenu = todayMenus.length > 0 ? todayMenus[currentMenuIndex] : null
 
   useEffect(() => {
     const userData = localStorage.getItem("mbg_user")
@@ -173,6 +208,14 @@ const DashboardDapur = () => {
     }
   }, [refreshData])
 
+  // ✅ Show page only when ALL data is loaded
+  useEffect(() => {
+    // Wait for both dashboard and produksi data to load
+    if (!dashboardLoading && !produksiLoading && menuPlanningData.length > 0) {
+      setIsLoadingComplete(true)
+    }
+  }, [dashboardLoading, produksiLoading, menuPlanningData])
+
   const menuPlanningStats = useMemo(() => {
     const total = menuPlanningData.length || 1
     const complete = menuPlanningData.filter((s) => s.status === "COMPLETE").length
@@ -191,89 +234,88 @@ const DashboardDapur = () => {
           </div>
         </div>
 
-        {loading ? (
-          <SkeletonLoader />
-        ) : (
-          <>
-            {menuPlanningStats.incomplete > 0 && (
-              <div className="rounded-xl border border-[#D0B064]/40 bg-gradient-to-br from-[#1B263A]/5 via-[#D0B064]/5 to-[#1B263A]/10 p-6 shadow-sm">
-                <div className="flex items-start gap-4 mb-4">
-                  <div className="p-3 bg-[#D0B064]/20 rounded-lg flex-shrink-0">
-                    <AlertTriangle className="w-5 h-5 text-[#D0B064]" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-[#1B263A] text-lg">
-                      {menuPlanningStats.incomplete} Sekolah Belum Lengkap
-                    </h3>
-                    <p className="text-sm text-[#1B263A]/70 mt-1">
-                      {menuPlanningStats.critical} sekolah kritis (5+ hari kosong)
-                    </p>
-                  </div>
-                  <Link
-                    href="/dapur/menu"
-                    className="flex-shrink-0 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#D0B064]/90 transition-colors font-medium text-sm whitespace-nowrap shadow-md hover:shadow-lg"
-                  >
-                    Lengkapi Sekarang
-                  </Link>
+        <>
+          {!isLoadingComplete ? (
+            <SkeletonLoader />
+          ) : menuPlanningStats.incomplete > 0 ? (
+            <div className="rounded-xl border border-[#D0B064]/40 bg-gradient-to-br from-[#1B263A]/5 via-[#D0B064]/5 to-[#1B263A]/10 p-6 shadow-sm">
+              <div className="flex items-start gap-4 mb-4">
+                <div className="p-3 bg-[#D0B064]/20 rounded-lg flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-[#D0B064]" />
                 </div>
-
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-[#1B263A]">Progress Kelengkapan</span>
-                    <span className="text-sm font-bold text-[#1B263A]">{menuPlanningStats.percentComplete}%</span>
-                  </div>
-                  <div className="w-full bg-[#D0B064]/20 rounded-full h-2.5">
-                    <div
-                      className="bg-[#D0B064] h-2.5 rounded-full transition-all"
-                      style={{ width: `${menuPlanningStats.percentComplete}%` }}
-                    />
-                  </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-[#1B263A] text-lg">
+                    {menuPlanningStats.incomplete} Sekolah Belum Lengkap
+                  </h3>
+                  <p className="text-sm text-[#1B263A]/70 mt-1">
+                    {menuPlanningStats.critical} sekolah kritis (5+ hari kosong)
+                  </p>
                 </div>
+                <Link
+                  href="/dapur/menu"
+                  className="flex-shrink-0 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#D0B064]/90 transition-colors font-medium text-sm whitespace-nowrap shadow-md hover:shadow-lg"
+                >
+                  Lengkapi Sekarang
+                </Link>
+              </div>
 
-                <div className="overflow-x-auto -mx-6 px-6">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[#D0B064]/20">
-                        <th className="text-left py-3 px-4 text-[#1B263A] font-semibold">Sekolah</th>
-                        <th className="text-center py-3 px-4 text-[#1B263A] font-semibold">Minggu</th>
-                        <th className="text-center py-3 px-4 text-[#1B263A] font-semibold">Progress</th>
-                        <th className="text-center py-3 px-4 text-[#1B263A] font-semibold">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {menuPlanningData
-                        .filter((s) => s.status === "INCOMPLETE")
-                        .map((week) => (
-                          <tr key={week.id} className="border-b border-[#D0B064]/10 hover:bg-[#D0B064]/5">
-                            <td className="py-3 px-4">
-                              <span className="font-medium text-[#1B263A]">{week.sekolahNama}</span>
-                            </td>
-                            <td className="text-center py-3 px-4">
-                              <span className="text-[#1B263A]/70">W{week.mingguanKe}</span>
-                            </td>
-                            <td className="text-center py-3 px-4">
-                              <span className="text-[#1B263A] font-semibold">
-                                {week.completedDays}/{week.totalDays}
-                              </span>
-                            </td>
-                            <td className="text-center py-3 px-4">
-                              <span
-                                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-                                  week.daysLeft >= 5 
-                                    ? "bg-[#D0B064] text-[#1B263A]" 
-                                    : "bg-[#D0B064]/40 text-[#1B263A]"
-                                }`}
-                              >
-                                {week.daysLeft >= 5 ? "URGENT" : "PENDING"}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-[#1B263A]">Progress Kelengkapan</span>
+                  <span className="text-sm font-bold text-[#1B263A]">{menuPlanningStats.percentComplete}%</span>
+                </div>
+                <div className="w-full bg-[#D0B064]/20 rounded-full h-2.5">
+                  <div
+                    className="bg-[#D0B064] h-2.5 rounded-full transition-all"
+                    style={{ width: `${menuPlanningStats.percentComplete}%` }}
+                  />
                 </div>
               </div>
-            )}
+
+              <div className="overflow-x-auto -mx-6 px-6">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#D0B064]/20">
+                      <th className="text-left py-3 px-4 text-[#1B263A] font-semibold">Sekolah</th>
+                      <th className="text-center py-3 px-4 text-[#1B263A] font-semibold">Minggu</th>
+                      <th className="text-center py-3 px-4 text-[#1B263A] font-semibold">Progress</th>
+                      <th className="text-center py-3 px-4 text-[#1B263A] font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {menuPlanningData
+                      .filter((s) => s.status === "INCOMPLETE")
+                      .map((week) => (
+                        <tr key={week.id} className="border-b border-[#D0B064]/10 hover:bg-[#D0B064]/5">
+                          <td className="py-3 px-4">
+                            <span className="font-medium text-[#1B263A]">{week.sekolahNama}</span>
+                          </td>
+                          <td className="text-center py-3 px-4">
+                            <span className="text-[#1B263A]/70">W{week.mingguanKe}</span>
+                          </td>
+                          <td className="text-center py-3 px-4">
+                            <span className="text-[#1B263A] font-semibold">
+                              {week.completedDays}/{week.totalDays}
+                            </span>
+                          </td>
+                          <td className="text-center py-3 px-4">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
+                                week.daysLeft >= 5
+                                  ? "bg-[#D0B064] text-[#1B263A]"
+                                  : "bg-[#D0B064]/40 text-[#1B263A]"
+                              }`}
+                            >
+                              {week.daysLeft >= 5 ? "URGENT" : "PENDING"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
 
             {menuPlanningStats.complete > 0 && (
               <div className="rounded-xl border border-[#D0B064]/40 bg-gradient-to-br from-[#1B263A]/5 to-[#D0B064]/5 p-6 shadow-sm">
@@ -300,8 +342,8 @@ const DashboardDapur = () => {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Today's Menu (Left) */}
-              {todayMenu ? (
+              {/* Today's Menu Carousel (Left) */}
+              {currentMenu ? (
                 <div className="rounded-2xl border border-[#D0B064]/50 bg-gradient-to-br from-[#1B263A] via-[#1B263A] to-[#2a3f52] p-6 text-white shadow-lg">
                   <div className="flex items-start justify-between mb-6">
                     <div className="flex items-start gap-3">
@@ -310,8 +352,8 @@ const DashboardDapur = () => {
                       </div>
                       <div>
                         <p className="text-sm text-white/70 font-medium">Menu Hari Ini</p>
-                        <p className="font-bold text-xl mt-1 text-[#D0B064]">{todayMenu.namaMenu}</p>
-                        <p className="text-sm text-white/60">{todayMenu.sekolahNama}</p>
+                        <p className="font-bold text-xl mt-1 text-[#D0B064]">{currentMenu.namaMenu}</p>
+                        <p className="text-sm text-white/60">{currentMenu.sekolahNama}</p>
                       </div>
                     </div>
                     <Link
@@ -325,25 +367,52 @@ const DashboardDapur = () => {
                   <div className="space-y-3 bg-[#D0B064]/10 rounded-xl p-4 backdrop-blur-sm border border-[#D0B064]/20">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-white/70">Kalori</span>
-                      <span className="font-bold text-[#D0B064]">{todayMenu.kalori} kcal</span>
+                      <span className="font-bold text-[#D0B064]">{currentMenu.kalori} kcal</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-white/70">Protein</span>
-                      <span className="font-bold text-[#D0B064]">{todayMenu.protein}g</span>
+                      <span className="font-bold text-[#D0B064]">{currentMenu.protein}g</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-white/70">Biaya/Unit</span>
-                      <span className="font-bold text-[#D0B064]">Rp {todayMenu.biayaPerTray.toLocaleString()}</span>
+                      <span className="font-bold text-[#D0B064]">Rp {currentMenu.biayaPerTray.toLocaleString()}</span>
                     </div>
                     <div className="border-t border-[#D0B064]/20 pt-3 flex items-center justify-between">
                       <span className="text-sm text-white/70 flex items-center gap-2">
                         <Clock className="w-4 h-4" /> Waktu Masak
                       </span>
                       <span className="font-bold text-[#D0B064]">
-                        {todayMenu.jamMulaiMasak} - {todayMenu.jamSelesaiMasak}
+                        {currentMenu.jamMulaiMasak} - {currentMenu.jamSelesaiMasak}
                       </span>
                     </div>
                   </div>
+
+                  {/* Pagination Dots */}
+                  {todayMenus.length > 1 && (
+                    <div className="flex items-center justify-center gap-2 mt-6">
+                      {todayMenus.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setCurrentMenuIndex(index)
+                            // Reset auto-play when user clicks
+                            if (autoPlayIntervalRef.current) {
+                              clearInterval(autoPlayIntervalRef.current)
+                            }
+                            autoPlayIntervalRef.current = setInterval(() => {
+                              setCurrentMenuIndex((prev) => (prev + 1) % todayMenus.length)
+                            }, 5000)
+                          }}
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            index === currentMenuIndex
+                              ? "bg-[#D0B064] w-6"
+                              : "bg-[#D0B064]/40 hover:bg-[#D0B064]/60"
+                          }`}
+                          aria-label={`Go to menu ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-2xl border border-[#D0B064]/20 bg-gradient-to-br from-[#1B263A]/5 to-[#D0B064]/5 p-6 shadow-sm flex flex-col justify-between">
@@ -437,8 +506,7 @@ const DashboardDapur = () => {
               </div>
             </div>
 
-          </>
-        )}
+        </>
       </div>
     </DapurLayout>
   )

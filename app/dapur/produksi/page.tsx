@@ -317,6 +317,41 @@ export default function ProduksiHarianPage() {
                         </div>
                       </div>
 
+                      {/* ✅ NEW: Display allergen alternative menu breakdown */}
+                      {(() => {
+                        // Load from localStorage (temporary fix)
+                        const allergenAlternativesMap = JSON.parse(localStorage.getItem('menu_allergen_alternatives') || '{}')
+                        const allergenAlt = allergenAlternativesMap[batch.dailyMenu?.id]
+                        return batch.dailyMenu?.alternativeMenu || batch.dailyMenu?.alternativeMenuName || allergenAlt
+                      })() && (() => {
+                        const allergenAlternativesMap = JSON.parse(localStorage.getItem('menu_allergen_alternatives') || '{}')
+                        const allergenAlt = allergenAlternativesMap[batch.dailyMenu?.id]
+                        const altMenuNama = batch.dailyMenu?.alternativeMenu?.nama || batch.dailyMenu?.alternativeMenuName || allergenAlt?.nama
+                        const altTargetTray = batch.dailyMenu?.alternativeMenu?.targetTray || batch.dailyMenu?.alternativeTargetTray || allergenAlt?.targetTray
+
+                        return (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <p className="text-xs font-semibold text-amber-900 mb-2">Breakdown Menu:</p>
+                            <div className="space-y-1 text-xs">
+                              <div className="flex justify-between text-amber-800">
+                                <span>{batch.dailyMenu?.namaMenu}</span>
+                                <span className="font-semibold">{batch.dailyMenu?.targetTray} porsi</span>
+                              </div>
+                              <div className="flex justify-between text-amber-800">
+                                <span>{altMenuNama}</span>
+                                <span className="font-semibold">{altTargetTray} porsi</span>
+                              </div>
+                              <div className="pt-1 mt-1 border-t border-amber-200 flex justify-between font-bold text-amber-900">
+                                <span>Total</span>
+                                <span>
+                                  {(batch.dailyMenu?.targetTray || 0) + (altTargetTray || 0)} porsi
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })()}
+
                       <div className="space-y-1 text-sm">
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-gray-400" />
@@ -368,6 +403,46 @@ export default function ProduksiHarianPage() {
                     <p className="text-3xl font-bold text-green-900">{selectedBatch.packedTrays}</p>
                   </div>
                 </div>
+
+                {/* ✅ NEW: Display allergen alternative menu breakdown in detail */}
+                {(() => {
+                  const allergenAlternativesMap = JSON.parse(localStorage.getItem('menu_allergen_alternatives') || '{}')
+                  const allergenAlt = allergenAlternativesMap[selectedBatch.dailyMenu?.id]
+                  return selectedBatch.dailyMenu?.alternativeMenu || selectedBatch.dailyMenu?.alternativeMenuName || allergenAlt
+                })() && (() => {
+                  const allergenAlternativesMap = JSON.parse(localStorage.getItem('menu_allergen_alternatives') || '{}')
+                  const allergenAlt = allergenAlternativesMap[selectedBatch.dailyMenu?.id]
+                  const altMenuNama = selectedBatch.dailyMenu?.alternativeMenu?.nama || selectedBatch.dailyMenu?.alternativeMenuName || allergenAlt?.nama
+                  const altTargetTray = selectedBatch.dailyMenu?.alternativeMenu?.targetTray || selectedBatch.dailyMenu?.alternativeTargetTray || allergenAlt?.targetTray
+
+                  return (
+                    <div className="bg-amber-50 border border-amber-300 rounded-xl p-4">
+                      <h4 className="font-bold text-amber-900 mb-3">Breakdown Menu Harian</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-200">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{selectedBatch.dailyMenu?.namaMenu}</p>
+                            <p className="text-xs text-gray-600">Menu Utama</p>
+                          </div>
+                          <p className="text-lg font-bold text-amber-900">{selectedBatch.dailyMenu?.targetTray} porsi</p>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-200">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{altMenuNama}</p>
+                            <p className="text-xs text-gray-600">Menu Alternatif (Alergi)</p>
+                          </div>
+                          <p className="text-lg font-bold text-amber-900">{altTargetTray} porsi</p>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-amber-100 rounded-lg border border-amber-300">
+                          <p className="font-bold text-amber-900">Total Porsi Hari Ini</p>
+                          <p className="text-2xl font-bold text-amber-900">
+                            {(selectedBatch.dailyMenu?.targetTray || 0) + (altTargetTray || 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 <div>
                   <h4 className="font-bold text-gray-900 mb-3">Checkpoints</h4>

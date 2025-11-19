@@ -614,36 +614,79 @@ const DashboardSekolah = () => {
 
         {/* Menu Harian Card */}
         {menuHariIni && (
-          <div className="bg-gradient-to-r from-[#1B263A] to-[#243B55] rounded-2xl p-6 text-white shadow-lg">
+          <div className="bg-gradient-to-r from-[#1B263A] to-[#243B55] rounded-2xl p-8 text-white shadow-lg">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* Menu Info */}
               <div className="md:col-span-2">
-                <p className="text-xs font-semibold opacity-90 tracking-widest uppercase">Menu Hari Ini</p>
-                <h2 className="text-4xl font-bold mb-2 mt-2">{menuHariIni.namaMenu || "-"}</h2>
-                <p className="text-sm opacity-90">{menuHariIni.menuPlanning?.sekolah?.nama || "Sekolah"}</p>
+                <p className="text-sm font-semibold opacity-90 tracking-widest uppercase">Menu Hari Ini</p>
+                <h2 className="text-5xl font-bold mb-3 mt-3">{menuHariIni.namaMenu || "-"}</h2>
+                <p className="text-base opacity-90">{menuHariIni.menuPlanning?.sekolah?.nama || "Sekolah"}</p>
               </div>
 
               {/* Menu Stats Grid */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-3">
-                  <p className="text-xs opacity-90 mb-1">Kalori</p>
-                  <p className="text-2xl font-bold">{menuHariIni.kalori || 0}</p>
-                  <p className="text-xs opacity-75">kcal</p>
+                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4">
+                  <p className="text-sm opacity-90 mb-2">Kalori</p>
+                  <p className="text-3xl font-bold">{menuHariIni.kalori || 0}</p>
+                  <p className="text-sm opacity-75">kcal</p>
                 </div>
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-3">
-                  <p className="text-xs opacity-90 mb-1">Protein</p>
-                  <p className="text-2xl font-bold">{menuHariIni.protein || 0}</p>
-                  <p className="text-xs opacity-75">g</p>
+                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4">
+                  <p className="text-sm opacity-90 mb-2">Protein</p>
+                  <p className="text-3xl font-bold">{menuHariIni.protein || 0}</p>
+                  <p className="text-sm opacity-75">g</p>
                 </div>
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-3">
-                  <p className="text-xs opacity-90 mb-1">Biaya/Tray</p>
-                  <p className="text-lg font-bold">Rp {menuHariIni.biayaPerTray?.toLocaleString("id-ID") || 0}</p>
+                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4">
+                  <p className="text-sm opacity-90 mb-2">Biaya/Tray</p>
+                  <p className="text-xl font-bold">Rp {menuHariIni.biayaPerTray?.toLocaleString("id-ID") || 0}</p>
                 </div>
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-3">
-                  <p className="text-xs opacity-90 mb-1">Waktu</p>
-                  <p className="text-xs font-bold">{menuHariIni.jamMulaiMasak} - {menuHariIni.jamSelesaiMasak}</p>
+                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4">
+                  <p className="text-sm opacity-90 mb-2">Waktu</p>
+                  <p className="text-base font-bold">{menuHariIni.jamMulaiMasak} - {menuHariIni.jamSelesaiMasak}</p>
                 </div>
               </div>
+
+              {/* ✅ NEW: Menu Alternatif for Allergies */}
+              {(() => {
+                const allergenAlternativesMap = JSON.parse(typeof window !== 'undefined' ? localStorage.getItem('menu_allergen_alternatives') || '{}' : '{}')
+                const allergenAlt = allergenAlternativesMap[menuHariIni.id]
+                return menuHariIni.alternativeMenu || menuHariIni.alternativeMenuName || allergenAlt
+              })() && (
+                <div className="md:col-span-3 mt-6 pt-6 border-t border-white/20">
+                  <p className="text-sm font-semibold opacity-90 tracking-widest uppercase mb-4">Menu Alternatif (Alergi)</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-amber-500/20 backdrop-blur-sm rounded-xl p-4 border border-amber-300/30">
+                      <p className="text-sm opacity-90 mb-2">Menu Utama</p>
+                      <p className="text-lg font-bold">{menuHariIni.namaMenu}</p>
+                      <p className="text-sm opacity-75 mt-2">{menuHariIni.targetTray} porsi</p>
+                    </div>
+                    <div className="bg-amber-500/20 backdrop-blur-sm rounded-xl p-4 border border-amber-300/30">
+                      <p className="text-sm opacity-90 mb-2">Menu Alergi</p>
+                      <p className="text-lg font-bold">
+                        {menuHariIni.alternativeMenu?.nama || menuHariIni.alternativeMenuName || (() => {
+                          const allergenAlternativesMap = JSON.parse(typeof window !== 'undefined' ? localStorage.getItem('menu_allergen_alternatives') || '{}' : '{}')
+                          return allergenAlternativesMap[menuHariIni.id]?.nama || '-'
+                        })()}
+                      </p>
+                      <p className="text-sm opacity-75 mt-2">
+                        {menuHariIni.alternativeMenu?.targetTray || menuHariIni.alternativeTargetTray || (() => {
+                          const allergenAlternativesMap = JSON.parse(typeof window !== 'undefined' ? localStorage.getItem('menu_allergen_alternatives') || '{}' : '{}')
+                          return allergenAlternativesMap[menuHariIni.id]?.targetTray || 0
+                        })()} porsi
+                      </p>
+                    </div>
+                    <div className="bg-green-500/20 backdrop-blur-sm rounded-xl p-4 border border-green-300/30">
+                      <p className="text-sm opacity-90 mb-2">Total Porsi</p>
+                      <p className="text-4xl font-bold">
+                        {menuHariIni.targetTray + (menuHariIni.alternativeMenu?.targetTray || menuHariIni.alternativeTargetTray || (() => {
+                          const allergenAlternativesMap = JSON.parse(typeof window !== 'undefined' ? localStorage.getItem('menu_allergen_alternatives') || '{}' : '{}')
+                          return allergenAlternativesMap[menuHariIni.id]?.targetTray || 0
+                        })())}
+                      </p>
+                      <p className="text-sm opacity-75">porsi</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

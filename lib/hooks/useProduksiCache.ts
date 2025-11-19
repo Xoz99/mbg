@@ -5,7 +5,7 @@ import { useDapurContext } from '@/lib/context/DapurContext';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://demombgv1.xyz';
 const CACHE_KEY = 'produksi_cache';
-const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
 
 interface ProduksiBatch {
   id: string;
@@ -27,35 +27,44 @@ interface CachedProduksiData {
   timestamp: number;
 }
 
-// Memory cache untuk session
 const memoryCache = new Map<string, CachedProduksiData>();
 
-// Helper functions
 async function getAuthToken() {
   if (typeof window === 'undefined') return '';
   return localStorage.getItem('authToken') || localStorage.getItem('mbg_token') || '';
 }
 
-async function apiCall<T>(endpoint: string, options: any = {}): Promise<T> {
+async function apiCall<T>(endpoint: string, options: any = {}, timeoutMs: number = 10000): Promise<T> {
   try {
     const token = await getAuthToken();
     const url = `${API_BASE_URL}${endpoint}`;
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}`);
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+          ...options.headers,
+        },
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
     }
-
-    return response.json();
   } catch (error) {
     console.error(`[API Error] ${endpoint}:`, error);
     throw error;
@@ -72,17 +81,15 @@ function extractArray(data: any): any[] {
   return [];
 }
 
-// Normalize date string untuk handle timezone conversion
 function normalizeDateString(dateString: string | null | undefined): string | null {
   if (!dateString) return null;
 
   dateString = dateString.trim();
 
-  // Jika format ISO (YYYY-MM-DDTHH:MM:SS.000Z), convert ke local timezone
   if (dateString.includes('T')) {
     try {
       const utcDate = new Date(dateString);
-      const localDate = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000); // +7 jam untuk Indonesia
+      const localDate = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000);
       const year = localDate.getUTCFullYear();
       const month = String(localDate.getUTCMonth() + 1).padStart(2, '0');
       const day = String(localDate.getUTCDate()).padStart(2, '0');
@@ -93,7 +100,6 @@ function normalizeDateString(dateString: string | null | undefined): string | nu
     }
   }
 
-  // Jika format YYYY-MM-DD, return sebagaimana adanya
   if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
     return dateString;
   }
@@ -103,7 +109,7 @@ function normalizeDateString(dateString: string | null | undefined): string | nu
 }
 
 interface UseProduksiCacheOptions {
-  pollingInterval?: number; // milliseconds, default 30000 (30s), 0 to disable
+  pollingInterval?: number;
 }
 
 export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
@@ -114,63 +120,71 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
   const hasInitialized = useRef(false);
   const fetchInProgress = useRef(false);
   const pollingInterval = useRef<NodeJS.Timeout | null>(null);
-  const pollingIntervalMs = options?.pollingInterval ?? 30000; // Default 30 detik
+  const pollingIntervalMs = options?.pollingInterval ?? 30000;
 
-  // Get menu plannings from global context
-  const { menuPlannings: contextPlannings, isLoading: contextLoading } = useDapurContext();
+  // Get menu plannings dari context
+  const { menuPlannings, isLoading: contextLoading } = useDapurContext();
 
   // Fetch production data
-  const fetchProduksiData = useCallback(async (contextPlannings: any[]): Promise<ProduksiBatch[]> => {
+  const fetchProduksiData = useCallback(async (plannings: any[]): Promise<ProduksiBatch[]> => {
     try {
-      console.time('fetchProduksiData');
+      const fetchStartTime = performance.now();
 
-      // Get today's date dalam local timezone (UTC+7)
       const now = new Date();
       const todayLocalDate = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-      const today = `${todayLocalDate.getUTCFullYear()}-${String(todayLocalDate.getUTCMonth() + 1).padStart(2, '0')}-${String(todayLocalDate.getUTCDate()).padStart(2, '0')}`;
+      let today = `${todayLocalDate.getUTCFullYear()}-${String(todayLocalDate.getUTCMonth() + 1).padStart(2, '0')}-${String(todayLocalDate.getUTCDate()).padStart(2, '0')}`;
+      
+      // TODO: Remove this after creating menu for actual today
+      // today = '2025-11-12'; // TEMPORARY - use this date that has data
+      
       console.log(`[useProduksiCache] Today's date (local): ${today}`);
 
-      // Use menu-planning from context (global cache)
-      const plannings = contextPlannings;
       console.log(`[useProduksiCache] Using ${plannings.length} plannings from context`);
 
-      // Parallel fetch menu-harian untuk semua planning
+      // Parallel fetch menu-harian
       const menuPromises = plannings.map((planning) =>
         apiCall<any>(
-          `/api/menu-planning/${planning.id}/menu-harian?limit=20&page=1&tanggal=${today}`
+          `/api/menu-planning/${planning.id}/menu-harian?limit=1&page=1&tanggal=${today}`,
+          {},
+          20000
         )
           .then((menuRes) => {
             const menus = extractArray(menuRes?.data || []);
             return { planning, menus };
           })
           .catch((err) => {
-            console.warn(
-              `[useProduksiCache] Gagal fetch menu untuk planning ${planning.id}:`,
-              err
-            );
+            console.warn(`[useProduksiCache] Gagal fetch menu untuk planning ${planning.id}:`, err);
             return { planning, menus: [] };
           })
       );
 
+      const menuStartTime = performance.now();
       const menuResults = await Promise.all(menuPromises);
+      const menuEndTime = performance.now();
+      console.log(`[useProduksiCache] Fetch menus took ${(menuEndTime - menuStartTime).toFixed(2)}ms`);
 
-      // Filter menus untuk hari ini
+      // Filter menus - hanya ambil yang tanggalnya sama dengan TODAY
       const todayMenus: any[] = [];
       menuResults.forEach(({ planning, menus }) => {
         menus.forEach((menu) => {
           const menuDate = normalizeDateString(menu.tanggal);
-          console.log(
-            `[useProduksiCache] Menu date: ${menuDate}, Today: ${today}, Match: ${menuDate === today}`
-          );
           if (menuDate === today) {
+            console.log(`[useProduksiCache] Found menu for today: ${menuDate}`);
             todayMenus.push({ planning, menu });
           }
         });
       });
 
-      // Parallel fetch checkpoint untuk semua menu hari ini
+      console.log(`[useProduksiCache] Found ${todayMenus.length} menus for today`);
+
+      // Parallel fetch checkpoint
+      const checkpointStartTime = performance.now();
       const batchPromises = todayMenus.map(({ planning, menu }) =>
-        apiCall<any>(`/api/menu-harian/${menu.id}/checkpoint?limit=10`)
+        apiCall<any>(
+          `/api/menu-harian/${menu.id}/checkpoint?limit=10`,
+          {},
+          15000
+        )
           .catch(() => ({ data: { data: [] } }))
           .then((checkpointRes) => {
             const checkpoints = extractArray(checkpointRes?.data || []);
@@ -203,44 +217,46 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
             } as ProduksiBatch;
           })
           .catch((err) => {
-            console.warn(
-              `[useProduksiCache] Gagal fetch batch data untuk menu ${menu.id}:`,
-              err
-            );
+            console.warn(`[useProduksiCache] Gagal fetch batch data untuk menu ${menu.id}:`, err);
             return null;
           })
       );
 
-      const batchesData = (await Promise.all(batchPromises)).filter(
-        (b) => b !== null
-      );
+      const batchesData = (await Promise.all(batchPromises)).filter((b) => b !== null);
+      const checkpointEndTime = performance.now();
+      console.log(`[useProduksiCache] Fetch checkpoints took ${(checkpointEndTime - checkpointStartTime).toFixed(2)}ms`);
 
-      console.timeEnd('fetchProduksiData');
+      console.log(`[useProduksiCache] Created ${batchesData.length} batches`);
+      const fetchEndTime = performance.now();
+      console.log(`[useProduksiCache] Total fetch time: ${(fetchEndTime - fetchStartTime).toFixed(2)}ms`);
       return batchesData;
     } catch (err) {
       console.error('[useProduksiCache] Error fetching production data:', err);
       throw err;
     }
-  }, [contextPlannings]);
+  }, []);
 
   // Load data dengan cache
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (plannings: any[]) => {
     const cacheId = 'produksi_cache';
 
-    // 1. Check memory cache first
+    // Check memory cache first
     if (memoryCache.has(cacheId)) {
       const cached = memoryCache.get(cacheId)!;
       const age = Date.now() - cached.timestamp;
 
-      if (age < CACHE_EXPIRY) {
-        console.log('✅ [useProduksiCache] Using memory cache (fresh)');
-        setBatches(cached.batches);
-        setLoading(false);
-        return cached.batches;
+      console.log(`✅ [useProduksiCache] Using memory cache (age: ${Math.round(age / 1000)}s)`);
+      setBatches(cached.batches);
+      setLoading(false);
+
+      // Refetch in background if expired
+      if (age >= CACHE_EXPIRY && plannings && plannings.length > 0) {
+        fetchAndUpdateCache(cacheId, plannings);
       }
+      return cached.batches;
     }
 
-    // 2. Check localStorage
+    // Check localStorage
     if (typeof window !== 'undefined') {
       const localCached = localStorage.getItem(CACHE_KEY);
       if (localCached) {
@@ -248,38 +264,37 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
           const parsed = JSON.parse(localCached) as CachedProduksiData;
           const age = Date.now() - parsed.timestamp;
 
-          if (age < CACHE_EXPIRY) {
-            console.log('✅ [useProduksiCache] Using localStorage cache (fresh)');
-            memoryCache.set(cacheId, parsed);
-            setBatches(parsed.batches);
-            setLoading(false);
-            return parsed.batches;
-          } else if (age < CACHE_EXPIRY * 2) {
-            console.log('⚠️ [useProduksiCache] Using stale cache, refetching in background');
-            setBatches(parsed.batches);
-            setLoading(false);
-            memoryCache.set(cacheId, parsed);
-            // Background refetch
-            fetchAndUpdateCache(cacheId);
-            return parsed.batches;
+          console.log(`✅ [useProduksiCache] Using localStorage cache (age: ${Math.round(age / 1000)}s)`);
+          memoryCache.set(cacheId, parsed);
+          setBatches(parsed.batches);
+          setLoading(false);
+
+          // Refetch in background if expired
+          if (age >= CACHE_EXPIRY && plannings && plannings.length > 0) {
+            fetchAndUpdateCache(cacheId, plannings);
           }
+          return parsed.batches;
         } catch (e) {
           console.warn('[useProduksiCache] Failed to parse localStorage cache');
         }
       }
     }
 
-    // 3. No cache, need to fetch
-    console.log('📥 [useProduksiCache] No cache found, fetching from API');
-    return fetchAndUpdateCache(cacheId);
-  }, [fetchProduksiData, contextLoading]);
+    // If we have plannings, fetch from API
+    if (plannings && plannings.length > 0) {
+      console.log('📥 [useProduksiCache] No cache found, fetching from API');
+      return fetchAndUpdateCache(cacheId, plannings);
+    } else {
+      console.log('[useProduksiCache] No plannings available, skipping load');
+      setLoading(false);
+      return [];
+    }
+  }, [fetchProduksiData]);
 
-  // Fetch and update cache
   const fetchAndUpdateCache = useCallback(
-    async (cacheId: string) => {
-      // Wait for context to load
-      if (contextLoading) {
-        console.log('[useProduksiCache] Waiting for context to load...');
+    async (cacheId: string, plannings: any[]) => {
+      if (!plannings || plannings.length === 0) {
+        console.log('[useProduksiCache] No plannings, skipping fetch');
         return batches;
       }
 
@@ -293,20 +308,17 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
         setLoading(true);
         setError(null);
 
-        const batchesData = await fetchProduksiData(contextPlannings);
+        const batchesData = await fetchProduksiData(plannings);
 
         const cachedData: CachedProduksiData = {
           batches: batchesData,
           timestamp: Date.now(),
         };
 
-        // Update memory cache
         memoryCache.set(cacheId, cachedData);
 
-        // Update localStorage
         if (typeof window !== 'undefined') {
           localStorage.setItem(CACHE_KEY, JSON.stringify(cachedData));
-          console.log('[useProduksiCache] Saved to localStorage');
         }
 
         setBatches(batchesData);
@@ -314,8 +326,7 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
         return batchesData;
       } catch (err) {
         console.error('❌ [useProduksiCache] Error:', err);
-        const errorMsg =
-          err instanceof Error ? err.message : 'Gagal memuat data produksi';
+        const errorMsg = err instanceof Error ? err.message : 'Gagal memuat data produksi';
         setError(errorMsg);
         throw err;
       } finally {
@@ -323,45 +334,24 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
         setLoading(false);
       }
     },
-    [fetchProduksiData, batches, contextLoading, contextPlannings]
+    [fetchProduksiData, batches]
   );
 
-  // ✅ Setup polling untuk auto-refresh data
-  const setupPolling = useCallback(async (cacheId: string) => {
-    // Skip jika polling disabled
-    if (pollingIntervalMs <= 0) {
-      console.log('[useProduksiCache] Polling disabled');
-      return;
-    }
-
-    // Clear existing polling jika ada
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current);
-    }
-
-    console.log(`[useProduksiCache] Starting polling every ${pollingIntervalMs}ms`);
-
-    // Fetch data immediately on first poll
-    try {
-      const freshData = await fetchProduksiData(contextPlannings);
-      const cachedData: CachedProduksiData = {
-        batches: freshData,
-        timestamp: Date.now(),
-      };
-      memoryCache.set(cacheId, cachedData);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(cachedData));
+  const setupPolling = useCallback(
+    async (cacheId: string, plannings: any[]) => {
+      if (pollingIntervalMs <= 0) {
+        console.log('[useProduksiCache] Polling disabled');
+        return;
       }
-      setBatches(freshData);
-    } catch (err) {
-      console.warn('[useProduksiCache] Initial poll failed:', err);
-    }
 
-    // Setup interval for periodic refresh
-    pollingInterval.current = setInterval(async () => {
+      if (pollingInterval.current) {
+        clearInterval(pollingInterval.current);
+      }
+
+      console.log(`[useProduksiCache] Starting polling every ${pollingIntervalMs}ms`);
+
       try {
-        console.log('[useProduksiCache] Polling refresh...');
-        const freshData = await fetchProduksiData(contextPlannings);
+        const freshData = await fetchProduksiData(plannings);
         const cachedData: CachedProduksiData = {
           batches: freshData,
           timestamp: Date.now(),
@@ -371,17 +361,42 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
           localStorage.setItem(CACHE_KEY, JSON.stringify(cachedData));
         }
         setBatches(freshData);
-        console.log('✅ [useProduksiCache] Polling refresh complete');
       } catch (err) {
-        console.error('[useProduksiCache] Polling refresh failed:', err);
+        console.warn('[useProduksiCache] Initial poll failed:', err);
       }
-    }, pollingIntervalMs);
-  }, [pollingIntervalMs, fetchProduksiData, contextPlannings]);
 
-  // Initialize hook dengan proper useEffect
+      pollingInterval.current = setInterval(async () => {
+        try {
+          console.log('[useProduksiCache] Polling refresh...');
+          const freshData = await fetchProduksiData(plannings);
+          const cachedData: CachedProduksiData = {
+            batches: freshData,
+            timestamp: Date.now(),
+          };
+          memoryCache.set(cacheId, cachedData);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cachedData));
+          }
+          setBatches(freshData);
+          console.log('✅ [useProduksiCache] Polling refresh complete');
+        } catch (err) {
+          console.error('[useProduksiCache] Polling refresh failed:', err);
+        }
+      }, pollingIntervalMs);
+    },
+    [pollingIntervalMs, fetchProduksiData]
+  );
+
+  // ✅ FIXED: Initialize when context plannings are ready
   useEffect(() => {
     if (hasInitialized.current) return;
     if (typeof window === 'undefined') return;
+    if (contextLoading) return; // ✅ Wait for context loading to finish
+    if (!menuPlannings || menuPlannings.length === 0) {
+      console.log('[useProduksiCache] No menu plannings from context');
+      setLoading(false);
+      return;
+    }
 
     hasInitialized.current = true;
 
@@ -397,13 +412,12 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
 
       try {
         console.log('[useProduksiCache] Initializing...');
-        const result = await loadData();
+        const result = await loadData(menuPlannings);
         console.log('[useProduksiCache] Initialize complete');
 
-        // ✅ Start polling after initial load
         const cacheId = 'produksi_cache';
         if (pollingIntervalMs > 0) {
-          setupPolling(cacheId);
+          setupPolling(cacheId, menuPlannings);
         }
       } catch (err) {
         console.error('[useProduksiCache] Error initializing:', err);
@@ -414,7 +428,6 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
 
     initializeProduksiData();
 
-    // ✅ Cleanup polling on unmount
     return () => {
       if (pollingInterval.current) {
         console.log('[useProduksiCache] Clearing polling interval');
@@ -422,10 +435,8 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
         pollingInterval.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [menuPlannings, contextLoading, loadData, setupPolling, pollingIntervalMs]);
 
-  // Clear cache
   const clearCache = useCallback(() => {
     memoryCache.clear();
     if (typeof window !== 'undefined') {
@@ -434,14 +445,12 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
     console.log('✅ [useProduksiCache] Cache cleared');
   }, []);
 
-  // Refresh data
   const refreshData = useCallback(async () => {
     const cacheId = 'produksi_cache';
     clearCache();
-    return fetchAndUpdateCache(cacheId);
-  }, [clearCache, fetchAndUpdateCache]);
+    return fetchAndUpdateCache(cacheId, menuPlannings);
+  }, [clearCache, fetchAndUpdateCache, menuPlannings]);
 
-  // Stop polling
   const stopPolling = useCallback(() => {
     if (pollingInterval.current) {
       console.log('[useProduksiCache] Stopping polling');
@@ -450,18 +459,20 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
     }
   }, []);
 
-  // Start polling with optional new interval
-  const startPolling = useCallback(async (intervalMs?: number) => {
-    const cacheId = 'produksi_cache';
-    const interval = intervalMs ?? pollingIntervalMs;
+  const startPolling = useCallback(
+    async (intervalMs?: number) => {
+      const cacheId = 'produksi_cache';
+      const interval = intervalMs ?? pollingIntervalMs;
 
-    if (interval <= 0) {
-      console.log('[useProduksiCache] Cannot start polling with interval <= 0');
-      return;
-    }
+      if (interval <= 0) {
+        console.log('[useProduksiCache] Cannot start polling with interval <= 0');
+        return;
+      }
 
-    await setupPolling(cacheId);
-  }, [pollingIntervalMs, setupPolling]);
+      await setupPolling(cacheId, menuPlannings);
+    },
+    [pollingIntervalMs, setupPolling, menuPlannings]
+  );
 
   return {
     loading,
