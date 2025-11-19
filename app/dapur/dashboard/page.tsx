@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import DapurLayout from "@/components/layout/DapurLayout"
 import { useDapurDashboardCache } from "@/lib/hooks/useDapurDashboardCache"
@@ -76,9 +76,6 @@ const DashboardDapur = () => {
     dapurName: "Dapur MBG",
   })
 
-  // ✅ Use custom hook untuk dashboard cache
-  const { loading, error, loadData, refreshData } = useDapurDashboardCache()
-
   const [menuPlanningData, setMenuPlanningData] = useState<any[]>([])
   const [todayMenu, setTodayMenu] = useState<any>(null)
   const [stats, setStats] = useState({
@@ -86,6 +83,18 @@ const DashboardDapur = () => {
     totalSekolah: 0,
   })
   const [produksiMingguan, setProduksiMingguan] = useState<any[]>([])
+
+  // ✅ Callback untuk update state ketika data di-fetch dari background
+  const handleCacheUpdate = useCallback((data: any) => {
+    console.log("[Dashboard] Cache updated from background")
+    setMenuPlanningData(data.menuPlanningData || [])
+    setTodayMenu(data.todayMenu || null)
+    setStats(data.stats || { targetHariIni: 0, totalSekolah: 0 })
+    setProduksiMingguan(data.produksiMingguan || [])
+  }, [])
+
+  // ✅ Use custom hook dengan callback untuk handle background fetch
+  const { loading, error, loadData, refreshData } = useDapurDashboardCache(handleCacheUpdate)
 
   useEffect(() => {
     const userData = localStorage.getItem("mbg_user")
