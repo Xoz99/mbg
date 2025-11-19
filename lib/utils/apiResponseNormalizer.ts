@@ -26,9 +26,8 @@ export function normalizeMenuData(menu: any): any {
   }
 
   // ✅ Fix time fields if they exist
-  // Note: jamMulai/jamSelesai are already stored as local time strings like "01:09"
-  // They might be offset by 7 hours from what user expects
-  // This depends on how backend stores them - we'll handle if needed
+  // Note: jamMulai/jamSelesai are already stored as local time strings like "08:09"
+  // API already returns correct local time values, so no normalization needed
 
   return normalized
 }

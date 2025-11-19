@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, useEffect } from "react"
 import { cacheEmitter } from "@/lib/utils/cacheEmitter"
 import { useDapurContext } from "@/lib/context/DapurContext"
-import { normalizeDashboardData, normalizeMenuHarianArray } from "@/lib/utils/apiResponseNormalizer"
+import { normalizeDashboardData } from "@/lib/utils/apiResponseNormalizer"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz"
 const CACHE_KEY = "dapur_dashboard_cache"
@@ -180,8 +180,6 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
               `/api/menu-planning/${planning.id}/menu-harian?limit=20&page=1&startDate=${planningStart}&endDate=${planningEnd}`
             )
             let menus = extractArray(menuRes?.data || [])
-            // ✅ NORMALIZE: Fix timezone offset in menu data
-            menus = normalizeMenuHarianArray(menus)
 
             // ✅ FIXED: Fetch calendar akademik per sekolah (sekolahId required!)
             let holidays: string[] = []
