@@ -142,41 +142,60 @@ export default function ProduksiHarianPage() {
   if (loading) {
     return (
       <DapurLayout currentPage="produksi">
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Produksi Harian</h1>
-            <p className="text-gray-600 mt-1">Monitor delivery batch dan tracking checkpoint</p>
+        <div className="space-y-6 p-6">
+          {/* Header Skeleton */}
+          <div className="space-y-3">
+            <div className="h-10 bg-gray-200 rounded-lg w-2/5 animate-pulse"></div>
+            <div className="h-4 bg-gray-200 rounded-lg w-3/5 animate-pulse"></div>
           </div>
 
+          {/* Stats Cards Skeleton */}
           <SkeletonStats />
 
+          {/* Progress + Timeline Section */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 animate-pulse-fast">
-              <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-              <div className="space-y-3">
-                <div className="h-12 bg-gray-100 rounded"></div>
-                <div className="h-3 bg-gray-200 rounded"></div>
-                <div className="grid grid-cols-3 gap-3">
+            {/* Left: Progress Card */}
+            <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 animate-pulse">
+              <div className="space-y-4">
+                <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
+                <div className="space-y-3">
+                  <div className="h-12 bg-gray-100 rounded-lg"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 mt-6">
                   {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-20 bg-gray-100 rounded"></div>
+                    <div key={i} className="bg-gray-100 rounded-xl p-3 space-y-2">
+                      <div className="h-2 bg-gray-200 rounded w-1/2"></div>
+                      <div className="h-6 bg-gray-200 rounded"></div>
+                    </div>
                   ))}
                 </div>
               </div>
             </div>
 
+            {/* Right: Timeline Chart */}
             <div className="lg:col-span-3">
               <SkeletonChart />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 animate-pulse-fast">
-            <div className="h-10 bg-gray-200 rounded"></div>
+          {/* Filter Buttons Skeleton */}
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 animate-pulse">
+            <div className="flex gap-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-10 bg-gray-200 rounded-lg w-24"></div>
+              ))}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(3)].map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
+          {/* Batch Cards Grid Skeleton */}
+          <div className="space-y-4">
+            <div className="h-6 bg-gray-200 rounded w-1/4 animate-pulse"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
           </div>
         </div>
       </DapurLayout>
@@ -317,41 +336,6 @@ export default function ProduksiHarianPage() {
                         </div>
                       </div>
 
-                      {/* ✅ NEW: Display allergen alternative menu breakdown */}
-                      {(() => {
-                        // Load from localStorage (temporary fix)
-                        const allergenAlternativesMap = JSON.parse(localStorage.getItem('menu_allergen_alternatives') || '{}')
-                        const allergenAlt = allergenAlternativesMap[batch.dailyMenu?.id]
-                        return batch.dailyMenu?.alternativeMenu || batch.dailyMenu?.alternativeMenuName || allergenAlt
-                      })() && (() => {
-                        const allergenAlternativesMap = JSON.parse(localStorage.getItem('menu_allergen_alternatives') || '{}')
-                        const allergenAlt = allergenAlternativesMap[batch.dailyMenu?.id]
-                        const altMenuNama = batch.dailyMenu?.alternativeMenu?.nama || batch.dailyMenu?.alternativeMenuName || allergenAlt?.nama
-                        const altTargetTray = batch.dailyMenu?.alternativeMenu?.targetTray || batch.dailyMenu?.alternativeTargetTray || allergenAlt?.targetTray
-
-                        return (
-                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                            <p className="text-xs font-semibold text-amber-900 mb-2">Breakdown Menu:</p>
-                            <div className="space-y-1 text-xs">
-                              <div className="flex justify-between text-amber-800">
-                                <span>{batch.dailyMenu?.namaMenu}</span>
-                                <span className="font-semibold">{batch.dailyMenu?.targetTray} porsi</span>
-                              </div>
-                              <div className="flex justify-between text-amber-800">
-                                <span>{altMenuNama}</span>
-                                <span className="font-semibold">{altTargetTray} porsi</span>
-                              </div>
-                              <div className="pt-1 mt-1 border-t border-amber-200 flex justify-between font-bold text-amber-900">
-                                <span>Total</span>
-                                <span>
-                                  {(batch.dailyMenu?.targetTray || 0) + (altTargetTray || 0)} porsi
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })()}
-
                       <div className="space-y-1 text-sm">
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-gray-400" />
@@ -403,46 +387,6 @@ export default function ProduksiHarianPage() {
                     <p className="text-3xl font-bold text-green-900">{selectedBatch.packedTrays}</p>
                   </div>
                 </div>
-
-                {/* ✅ NEW: Display allergen alternative menu breakdown in detail */}
-                {(() => {
-                  const allergenAlternativesMap = JSON.parse(localStorage.getItem('menu_allergen_alternatives') || '{}')
-                  const allergenAlt = allergenAlternativesMap[selectedBatch.dailyMenu?.id]
-                  return selectedBatch.dailyMenu?.alternativeMenu || selectedBatch.dailyMenu?.alternativeMenuName || allergenAlt
-                })() && (() => {
-                  const allergenAlternativesMap = JSON.parse(localStorage.getItem('menu_allergen_alternatives') || '{}')
-                  const allergenAlt = allergenAlternativesMap[selectedBatch.dailyMenu?.id]
-                  const altMenuNama = selectedBatch.dailyMenu?.alternativeMenu?.nama || selectedBatch.dailyMenu?.alternativeMenuName || allergenAlt?.nama
-                  const altTargetTray = selectedBatch.dailyMenu?.alternativeMenu?.targetTray || selectedBatch.dailyMenu?.alternativeTargetTray || allergenAlt?.targetTray
-
-                  return (
-                    <div className="bg-amber-50 border border-amber-300 rounded-xl p-4">
-                      <h4 className="font-bold text-amber-900 mb-3">Breakdown Menu Harian</h4>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-200">
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900">{selectedBatch.dailyMenu?.namaMenu}</p>
-                            <p className="text-xs text-gray-600">Menu Utama</p>
-                          </div>
-                          <p className="text-lg font-bold text-amber-900">{selectedBatch.dailyMenu?.targetTray} porsi</p>
-                        </div>
-                        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-200">
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900">{altMenuNama}</p>
-                            <p className="text-xs text-gray-600">Menu Alternatif (Alergi)</p>
-                          </div>
-                          <p className="text-lg font-bold text-amber-900">{altTargetTray} porsi</p>
-                        </div>
-                        <div className="flex items-center justify-between p-3 bg-amber-100 rounded-lg border border-amber-300">
-                          <p className="font-bold text-amber-900">Total Porsi Hari Ini</p>
-                          <p className="text-2xl font-bold text-amber-900">
-                            {(selectedBatch.dailyMenu?.targetTray || 0) + (altTargetTray || 0)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })()}
 
                 <div>
                   <h4 className="font-bold text-gray-900 mb-3">Checkpoints</h4>

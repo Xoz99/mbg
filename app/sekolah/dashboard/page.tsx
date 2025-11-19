@@ -358,6 +358,46 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
         </div>
       </div>
       <MiniCalendar />
+
+      {/* Upcoming Events Section */}
+      <div className="mt-8 pt-6 border-t border-slate-200">
+        <p className="text-sm font-bold mb-4 text-slate-700">📌 Event Mendatang</p>
+        <div className="space-y-2 max-h-80 overflow-y-auto">
+          {reminder?.events && reminder.events.length > 0 ? (
+            reminder.events.slice(0, 10).map((event: any, idx: number) => (
+              <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+                <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0"></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-900 truncate">{event.nama}</p>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {new Date(event.tanggal).toLocaleDateString("id-ID", {
+                      month: "short",
+                      day: "numeric"
+                    })}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-slate-500">Tidak ada event mendatang</p>
+          )}
+        </div>
+      </div>
+
+      {/* Additional Info Section */}
+      <div className="mt-6 pt-6 border-t border-slate-200">
+        <p className="text-sm font-bold mb-4 text-slate-700">📞 Info Kontak</p>
+        <div className="space-y-3 text-xs text-slate-600">
+          <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+            <span className="text-lg">📍</span>
+            <span className="font-medium">Lokasi: {reminder?.alamat || "Tidak tersedia"}</span>
+          </div>
+          <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+            <span className="text-lg">📋</span>
+            <span className="font-medium">Status: {reminder?.status || "Aktif"}</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -605,94 +645,51 @@ const DashboardSekolah = () => {
 
   return (
     <SekolahLayout currentPage="dashboard">
-      <div className="space-y-6 p-8 bg-gradient-to-br from-slate-50 to-white min-h-screen">
+      <div className="space-y-8 p-6 md:p-8 bg-gradient-to-br from-slate-50 to-white min-h-screen">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2 tracking-tight">Dashboard PIC Sekolah</h1>
-          <p className="text-slate-600 text-lg">Monitoring Distribusi Makanan Bergizi & Status Gizi Siswa</p>
+        <div className="mb-6">
+          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2 tracking-tight">Dashboard PIC Sekolah</h1>
+          <p className="text-slate-600 text-base md:text-lg">Monitoring Distribusi Makanan Bergizi & Status Gizi Siswa</p>
         </div>
 
         {/* Menu Harian Card */}
         {menuHariIni && (
-          <div className="bg-gradient-to-r from-[#1B263A] to-[#243B55] rounded-2xl p-8 text-white shadow-lg">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="bg-gradient-to-r from-[#1B263A] to-[#243B55] rounded-2xl p-6 md:p-8 text-white shadow-lg">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
               {/* Menu Info */}
               <div className="md:col-span-2">
-                <p className="text-sm font-semibold opacity-90 tracking-widest uppercase">Menu Hari Ini</p>
-                <h2 className="text-5xl font-bold mb-3 mt-3">{menuHariIni.namaMenu || "-"}</h2>
-                <p className="text-base opacity-90">{menuHariIni.menuPlanning?.sekolah?.nama || "Sekolah"}</p>
+                <p className="text-xs md:text-sm font-semibold opacity-90 tracking-widest uppercase">Menu Hari Ini</p>
+                <h2 className="text-3xl md:text-4xl font-bold mb-2 mt-3">{menuHariIni.namaMenu || "-"}</h2>
+                <p className="text-sm md:text-base opacity-90">{menuHariIni.menuPlanning?.sekolah?.nama || "Sekolah"}</p>
               </div>
 
               {/* Menu Stats Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4">
-                  <p className="text-sm opacity-90 mb-2">Kalori</p>
-                  <p className="text-3xl font-bold">{menuHariIni.kalori || 0}</p>
-                  <p className="text-sm opacity-75">kcal</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-[#1B263A] bg-opacity-90 rounded-lg p-4">
+                  <p className="text-xs opacity-90 mb-2">Kalori</p>
+                  <p className="text-2xl md:text-3xl font-bold">{menuHariIni.kalori || 0}</p>
+                  <p className="text-xs opacity-75">kcal</p>
                 </div>
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4">
-                  <p className="text-sm opacity-90 mb-2">Protein</p>
-                  <p className="text-3xl font-bold">{menuHariIni.protein || 0}</p>
-                  <p className="text-sm opacity-75">g</p>
+                <div className="bg-[#1B263A] bg-opacity-90 rounded-lg p-4">
+                  <p className="text-xs opacity-90 mb-2">Protein</p>
+                  <p className="text-2xl md:text-3xl font-bold">{menuHariIni.protein || 0}</p>
+                  <p className="text-xs opacity-75">g</p>
                 </div>
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4">
-                  <p className="text-sm opacity-90 mb-2">Biaya/Tray</p>
-                  <p className="text-xl font-bold">Rp {menuHariIni.biayaPerTray?.toLocaleString("id-ID") || 0}</p>
+                <div className="bg-[#1B263A] bg-opacity-90 rounded-lg p-4">
+                  <p className="text-xs opacity-90 mb-2">Biaya/Tray</p>
+                  <p className="text-sm md:text-base font-bold">Rp {menuHariIni.biayaPerTray?.toLocaleString("id-ID") || 0}</p>
                 </div>
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-xl p-4">
-                  <p className="text-sm opacity-90 mb-2">Waktu</p>
-                  <p className="text-base font-bold">{menuHariIni.jamMulaiMasak} - {menuHariIni.jamSelesaiMasak}</p>
+                <div className="bg-[#1B263A] bg-opacity-90 rounded-lg p-4">
+                  <p className="text-xs opacity-90 mb-2">Waktu</p>
+                  <p className="text-xs md:text-sm font-bold">{menuHariIni.jamMulaiMasak} - {menuHariIni.jamSelesaiMasak}</p>
                 </div>
               </div>
-
-              {/* ✅ NEW: Menu Alternatif for Allergies */}
-              {(() => {
-                const allergenAlternativesMap = JSON.parse(typeof window !== 'undefined' ? localStorage.getItem('menu_allergen_alternatives') || '{}' : '{}')
-                const allergenAlt = allergenAlternativesMap[menuHariIni.id]
-                return menuHariIni.alternativeMenu || menuHariIni.alternativeMenuName || allergenAlt
-              })() && (
-                <div className="md:col-span-3 mt-6 pt-6 border-t border-white/20">
-                  <p className="text-sm font-semibold opacity-90 tracking-widest uppercase mb-4">Menu Alternatif (Alergi)</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-amber-500/20 backdrop-blur-sm rounded-xl p-4 border border-amber-300/30">
-                      <p className="text-sm opacity-90 mb-2">Menu Utama</p>
-                      <p className="text-lg font-bold">{menuHariIni.namaMenu}</p>
-                      <p className="text-sm opacity-75 mt-2">{menuHariIni.targetTray} porsi</p>
-                    </div>
-                    <div className="bg-amber-500/20 backdrop-blur-sm rounded-xl p-4 border border-amber-300/30">
-                      <p className="text-sm opacity-90 mb-2">Menu Alergi</p>
-                      <p className="text-lg font-bold">
-                        {menuHariIni.alternativeMenu?.nama || menuHariIni.alternativeMenuName || (() => {
-                          const allergenAlternativesMap = JSON.parse(typeof window !== 'undefined' ? localStorage.getItem('menu_allergen_alternatives') || '{}' : '{}')
-                          return allergenAlternativesMap[menuHariIni.id]?.nama || '-'
-                        })()}
-                      </p>
-                      <p className="text-sm opacity-75 mt-2">
-                        {menuHariIni.alternativeMenu?.targetTray || menuHariIni.alternativeTargetTray || (() => {
-                          const allergenAlternativesMap = JSON.parse(typeof window !== 'undefined' ? localStorage.getItem('menu_allergen_alternatives') || '{}' : '{}')
-                          return allergenAlternativesMap[menuHariIni.id]?.targetTray || 0
-                        })()} porsi
-                      </p>
-                    </div>
-                    <div className="bg-green-500/20 backdrop-blur-sm rounded-xl p-4 border border-green-300/30">
-                      <p className="text-sm opacity-90 mb-2">Total Porsi</p>
-                      <p className="text-4xl font-bold">
-                        {menuHariIni.targetTray + (menuHariIni.alternativeMenu?.targetTray || menuHariIni.alternativeTargetTray || (() => {
-                          const allergenAlternativesMap = JSON.parse(typeof window !== 'undefined' ? localStorage.getItem('menu_allergen_alternatives') || '{}' : '{}')
-                          return allergenAlternativesMap[menuHariIni.id]?.targetTray || 0
-                        })())}
-                      </p>
-                      <p className="text-sm opacity-75">porsi</p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
 
-        {/* STAT CARDS GRID - 3 Columns */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* STAT CARDS GRID - Responsive */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           <StatCard
             title="Total Siswa"
             value={stats.totalSiswa}
@@ -738,32 +735,32 @@ const DashboardSekolah = () => {
         </div>
 
         {/* Kalender + Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Kalender Reminder */}
-          <div className="flex flex-col lg:row-span-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left: Kalender Reminder - Full Height */}
+          <div className="flex flex-col">
             <KalenderReminder reminder={kalenderReminder} />
           </div>
 
           {/* Right: Charts */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-8">
             {/* Absensi Chart */}
-            <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
-              <h3 className="text-lg font-bold text-slate-900 mb-6">📊 Absensi Minggu Ini</h3>
+            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
+              <h3 className="text-base md:text-lg font-bold text-slate-900 mb-6">📊 Absensi Minggu Ini</h3>
               <AttendanceChart data={absensiChart} />
             </div>
 
             {/* Distribusi Gizi Chart */}
-            <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
-              <h3 className="text-lg font-bold text-slate-900 mb-6">🍎 Distribusi Status Gizi</h3>
+            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
+              <h3 className="text-base md:text-lg font-bold text-slate-900 mb-6">🍎 Distribusi Status Gizi</h3>
               <GiziDistributionChart data={siswaDiagram} />
             </div>
           </div>
         </div>
 
         {/* Kelas Table */}
-        <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-slate-900">📚 Data Kelas</h3>
+        <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-base md:text-lg font-bold text-slate-900">📚 Data Kelas</h3>
             <button className="text-sm text-slate-600 hover:text-slate-900 font-medium flex items-center gap-1 transition-colors">
               Lihat Semua
               <ChevronRight className="w-4 h-4" />
@@ -775,11 +772,11 @@ const DashboardSekolah = () => {
               <table className="w-full">
                 <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
                   <tr>
-                    <th className="text-left py-4 px-4 text-sm font-bold text-slate-700">Kelas</th>
-                    <th className="text-left py-4 px-4 text-sm font-bold text-slate-700">Total Siswa</th>
-                    <th className="text-left py-4 px-4 text-sm font-bold text-slate-700">Laki-laki</th>
-                    <th className="text-left py-4 px-4 text-sm font-bold text-slate-700">Perempuan</th>
-                    <th className="text-left py-4 px-4 text-sm font-bold text-slate-700">Alergi</th>
+                    <th className="text-left py-5 px-5 text-xs md:text-sm font-bold text-slate-700">Kelas</th>
+                    <th className="text-left py-5 px-5 text-xs md:text-sm font-bold text-slate-700">Total Siswa</th>
+                    <th className="text-left py-5 px-5 text-xs md:text-sm font-bold text-slate-700">Laki-laki</th>
+                    <th className="text-left py-5 px-5 text-xs md:text-sm font-bold text-slate-700">Perempuan</th>
+                    <th className="text-left py-5 px-5 text-xs md:text-sm font-bold text-slate-700">Alergi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -788,11 +785,11 @@ const DashboardSekolah = () => {
                       key={idx}
                       className="border-b border-slate-200 hover:bg-slate-50 transition-colors duration-150"
                     >
-                      <td className="py-4 px-4 font-semibold text-slate-900">{kelas.nama}</td>
-                      <td className="py-4 px-4 text-slate-700 font-medium">{kelas.totalSiswa || 0}</td>
-                      <td className="py-4 px-4 text-slate-600">{kelas.lakiLaki || 0}</td>
-                      <td className="py-4 px-4 text-slate-600">{kelas.perempuan || 0}</td>
-                      <td className="py-4 px-4">
+                      <td className="py-5 px-5 text-sm font-semibold text-slate-900">{kelas.nama}</td>
+                      <td className="py-5 px-5 text-sm text-slate-700 font-medium">{kelas.totalSiswa || 0}</td>
+                      <td className="py-5 px-5 text-sm text-slate-600">{kelas.lakiLaki || 0}</td>
+                      <td className="py-5 px-5 text-sm text-slate-600">{kelas.perempuan || 0}</td>
+                      <td className="py-5 px-5">
                         {kelas.alergiCount > 0 ? (
                           <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 inline-block">
                             {kelas.alergiCount} siswa

@@ -122,9 +122,19 @@ const DashboardDapur = () => {
 
       setTodayMenus(menus)
       setCurrentMenuIndex(0)
+
+      // ✅ Update stats to match actual production batches
+      const totalTarget = batches.reduce((acc, batch) => acc + (batch.expectedTrays || 0), 0)
+      const totalSekolah = batches.length
+      setStats({
+        targetHariIni: totalTarget,
+        totalSekolah: totalSekolah,
+      })
+      console.log(`[DashboardDapur] Updated stats from batches - Target: ${totalTarget}, Sekolah: ${totalSekolah}`)
     } else {
       setTodayMenus([])
       setCurrentMenuIndex(0)
+      // Keep existing stats if no batches
     }
   }, [batches])
 

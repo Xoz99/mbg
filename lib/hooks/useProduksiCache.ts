@@ -88,12 +88,12 @@ function normalizeDateString(dateString: string | null | undefined): string | nu
 
   if (dateString.includes('T')) {
     try {
-      const utcDate = new Date(dateString);
-      const localDate = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000);
-      const year = localDate.getUTCFullYear();
-      const month = String(localDate.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(localDate.getUTCDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      // Extract the DATE COMPONENT from the ISO string BEFORE conversion
+      // Backend stores user's intended date as YYYY-MM-DD, then appends T17:00:00Z
+      // So we extract the date part which represents the INTENDED date
+      const datePart = dateString.substring(0, 10); // Get YYYY-MM-DD
+      console.log(`[normalizeDateString] ISO date ${dateString} -> intended date: ${datePart}`);
+      return datePart;
     } catch (e) {
       console.warn(`[normalizeDateString] Failed to parse ISO date: ${dateString}`);
       return dateString.split('T')[0];
@@ -130,21 +130,25 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
     try {
       const fetchStartTime = performance.now();
 
+      // Get today's date in UTC first (what backend uses)
       const now = new Date();
+      const utcDate = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+
+      // Also get local date (timezone +7) for fallback
       const todayLocalDate = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-      let today = `${todayLocalDate.getUTCFullYear()}-${String(todayLocalDate.getUTCMonth() + 1).padStart(2, '0')}-${String(todayLocalDate.getUTCDate()).padStart(2, '0')}`;
-      
-      // TODO: Remove this after creating menu for actual today
-      // today = '2025-11-12'; // TEMPORARY - use this date that has data
-      
-      console.log(`[useProduksiCache] Today's date (local): ${today}`);
+      const localDate = `${todayLocalDate.getUTCFullYear()}-${String(todayLocalDate.getUTCMonth() + 1).padStart(2, '0')}-${String(todayLocalDate.getUTCDate()).padStart(2, '0')}`;
+
+      // Use local date since API likely filters by local date
+      let today = localDate;
+
+      console.log(`[useProduksiCache] UTC date: ${utcDate}, Local date (UTC+7): ${localDate}, Using: ${today}`);
 
       console.log(`[useProduksiCache] Using ${plannings.length} plannings from context`);
 
-      // Parallel fetch menu-harian
+      // Parallel fetch menu-harian (fetch multiple to ensure we get today's menu)
       const menuPromises = plannings.map((planning) =>
         apiCall<any>(
-          `/api/menu-planning/${planning.id}/menu-harian?limit=1&page=1&tanggal=${today}`,
+          `/api/menu-planning/${planning.id}/menu-harian?limit=30&page=1`,
           {},
           20000
         )
@@ -166,16 +170,18 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
       // Filter menus - hanya ambil yang tanggalnya sama dengan TODAY
       const todayMenus: any[] = [];
       menuResults.forEach(({ planning, menus }) => {
+        console.log(`[useProduksiCache] Planning ${planning.id} returned ${menus.length} menus`);
         menus.forEach((menu) => {
           const menuDate = normalizeDateString(menu.tanggal);
+          console.log(`[useProduksiCache] Menu ${menu.id}: stored as ${menu.tanggal}, normalized to ${menuDate}, comparing with ${today}`);
           if (menuDate === today) {
-            console.log(`[useProduksiCache] Found menu for today: ${menuDate}`);
+            console.log(`[useProduksiCache] ✅ MATCH! Found menu for today: ${menuDate}`);
             todayMenus.push({ planning, menu });
           }
         });
       });
 
-      console.log(`[useProduksiCache] Found ${todayMenus.length} menus for today`);
+      console.log(`[useProduksiCache] Found ${todayMenus.length} menus for today (target date: ${today})`);
 
       // Parallel fetch checkpoint
       const checkpointStartTime = performance.now();

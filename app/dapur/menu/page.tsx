@@ -892,74 +892,6 @@ function ModalCreateMenuHarian({
             </div>
           </div>
 
-          {/* ✅ NEW: ALLERGEN ALTERNATIVE MENU SECTION */}
-          <div className="border-t pt-4 space-y-3">
-            <div>
-              <label className="flex items-center gap-3 text-sm font-semibold text-gray-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.hasAlternativeMenu || false}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      hasAlternativeMenu: e.target.checked,
-                      alternativeMenuName: e.target.checked ? formData.alternativeMenuName : "",
-                      alternativeTargetTray: e.target.checked ? formData.alternativeTargetTray : "",
-                    })
-                  }
-                  className="w-4 h-4 rounded border-gray-300"
-                />
-                <span>Ada menu alternatif untuk alergi?</span>
-              </label>
-            </div>
-
-            {formData.hasAlternativeMenu && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-amber-900">Nama Menu Alternatif *</label>
-                  <input
-                    type="text"
-                    value={formData.alternativeMenuName || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        alternativeMenuName: e.target.value,
-                      })
-                    }
-                    placeholder="Contoh: Nasi Goreng (untuk yang alergi ikan)"
-                    className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-amber-900">Jumlah Porsi untuk Alternatif *</label>
-                  <input
-                    type="number"
-                    step="1"
-                    value={formData.alternativeTargetTray || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        alternativeTargetTray: e.target.value,
-                      })
-                    }
-                    placeholder="Contoh: 3"
-                    className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent"
-                  />
-                </div>
-
-                {formData.tanggal && formData.targetTray && formData.alternativeTargetTray && (
-                  <div className="bg-white border border-amber-200 rounded p-2 text-xs text-amber-800">
-                    <p className="font-semibold mb-1">Rincian Porsi:</p>
-                    <p>• Menu Utama ({formData.namaMenu}): {formData.targetTray} porsi</p>
-                    <p>• Menu Alternatif ({formData.alternativeMenuName}): {formData.alternativeTargetTray} porsi</p>
-                    <p className="font-semibold mt-1 text-amber-900">Total: {parseInt(formData.targetTray || "0") + parseInt(formData.alternativeTargetTray || "0")} porsi</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
           <div className="flex gap-3 pt-4 border-t">
             <button
               onClick={onClose}
@@ -970,7 +902,7 @@ function ModalCreateMenuHarian({
             </button>
             <button
               onClick={onSubmit}
-              disabled={isSubmitting || (formData.hasAlternativeMenu && (!formData.alternativeMenuName || !formData.alternativeTargetTray))}
+              disabled={isSubmitting}
               className="flex-1 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] disabled:opacity-50 font-medium transition"
             >
               {isSubmitting ? "Memproses..." : "Tambah"}
@@ -1034,10 +966,6 @@ export default function MenuPlanningPage() {
     karbohidrat: "",
     targetTray: "",
     lemak: "",
-    // ✅ NEW: Allergen alternative menu
-    hasAlternativeMenu: false,
-    alternativeMenuName: "",
-    alternativeTargetTray: "",
   })
 
   const [ingredientWarnings, setIngredientWarnings] = useState<{
@@ -1425,8 +1353,7 @@ export default function MenuPlanningPage() {
       console.log("[DEBUG] RANGE OK - lanjut submit")
       console.log("[DEBUG] menuFormData.tanggal DIKIRIM:", menuFormData.tanggal)
 
-      // ✅ NEW: Include allergen alternative menu data
-      const requestBody: any = {
+      const requestBody = {
         tanggal: menuFormData.tanggal,  // ✅ Kirim sebagai date-only format: 2025-11-14 (sesuai dengan backend)
         namaMenu: menuFormData.namaMenu,
         biayaPerTray: parseFloat(menuFormData.biayaPerTray) || 0,
@@ -1437,14 +1364,6 @@ export default function MenuPlanningPage() {
         lemak: parseFloat(menuFormData.lemak) || 0,
         targetTray: parseFloat(menuFormData.targetTray) || 0,
         karbohidrat: parseFloat(menuFormData.karbohidrat) || 0,
-      }
-
-      // ✅ NEW: Add allergen alternative menu if exists
-      if (menuFormData.hasAlternativeMenu && menuFormData.alternativeMenuName && menuFormData.alternativeTargetTray) {
-        requestBody.alternativeMenu = {
-          nama: menuFormData.alternativeMenuName,
-          targetTray: parseInt(menuFormData.alternativeTargetTray) || 0,
-        }
       }
       console.log("[DEBUG] REQUEST BODY:", JSON.stringify(requestBody, null, 2))
 
@@ -1459,18 +1378,6 @@ export default function MenuPlanningPage() {
         id: `temp-${Date.now()}`,
         ...requestBody,
         planningId: selectedPlanningId,
-      }
-
-      // ✅ NEW: Save allergen alternative menu to localStorage (temporary fix until backend supports it)
-      if (menuFormData.hasAlternativeMenu && menuFormData.alternativeMenuName) {
-        const menuId = newMenu.id
-        const allergenAlternativesMap = JSON.parse(localStorage.getItem('menu_allergen_alternatives') || '{}')
-        allergenAlternativesMap[menuId] = {
-          nama: menuFormData.alternativeMenuName,
-          targetTray: parseInt(menuFormData.alternativeTargetTray) || 0,
-        }
-        localStorage.setItem('menu_allergen_alternatives', JSON.stringify(allergenAlternativesMap))
-        console.log("[DEBUG] Saved allergen alternative to localStorage:", menuId)
       }
 
       setMenuHarianList(prev => [...prev, newMenu])
@@ -1502,10 +1409,6 @@ export default function MenuPlanningPage() {
         karbohidrat: "",
         targetTray: "",
         lemak: "",
-        // ✅ Reset allergen alternative
-        hasAlternativeMenu: false,
-        alternativeMenuName: "",
-        alternativeTargetTray: "",
       })
     } catch (err) {
       alert(err instanceof Error ? err.message : "Gagal menambahkan menu harian")
@@ -1894,9 +1797,6 @@ export default function MenuPlanningPage() {
                     karbohidrat: "",
                     targetTray: "",
                     lemak: "",
-                    hasAlternativeMenu: false,
-                    alternativeMenuName: "",
-                    alternativeTargetTray: "",
                   })
                   setShowCreateMenuModal(true)
                 }}
@@ -1934,9 +1834,6 @@ export default function MenuPlanningPage() {
                     karbohidrat: "",
                     targetTray: "",
                     lemak: "",
-                    hasAlternativeMenu: false,
-                    alternativeMenuName: "",
-                    alternativeTargetTray: "",
                   })
                   setShowCreateMenuModal(true)
                 }}
@@ -1950,11 +1847,6 @@ export default function MenuPlanningPage() {
               {menuHarianList.map((menu) => {
                 const dateKey = normalizeDateString(menu.tanggal) || ""
                 const absensiForDate = absensiAggregatedMap[dateKey]
-
-                // ✅ NEW: Load allergen alternative from localStorage (temporary fix)
-                const allergenAlternativesMap = JSON.parse(localStorage.getItem('menu_allergen_alternatives') || '{}')
-                const allergenAlternative = allergenAlternativesMap[menu.id]
-                const hasAlternative = menu.alternativeMenu || menu.alternativeMenuName || allergenAlternative
 
                 return (
                   <div key={menu.id} className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm hover:shadow-md transition">
@@ -2033,27 +1925,6 @@ export default function MenuPlanningPage() {
                         <span className="font-semibold">{menu.karbohidrat}g</span>
                       </div>
                     </div>
-
-                    {/* ✅ NEW: Display allergen alternative menu if exists */}
-                    {hasAlternative && (
-                      <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                        <p className="text-xs font-semibold text-amber-900 mb-2">Rincian Porsi Harian:</p>
-                        <div className="space-y-1 text-xs">
-                          <div className="flex justify-between text-amber-800">
-                            <span>Menu Utama ({menu.namaMenu}):</span>
-                            <span className="font-semibold">{menu.targetTray} porsi</span>
-                          </div>
-                          <div className="flex justify-between text-amber-800">
-                            <span>Menu Alergi ({menu.alternativeMenu?.nama || menu.alternativeMenuName || allergenAlternative?.nama}):</span>
-                            <span className="font-semibold">{menu.alternativeMenu?.targetTray || menu.alternativeTargetTray || allergenAlternative?.targetTray} porsi</span>
-                          </div>
-                          <div className="pt-1 mt-1 border-t border-amber-200 flex justify-between font-bold text-amber-900">
-                            <span>Total:</span>
-                            <span>{(menu.targetTray || 0) + (menu.alternativeMenu?.targetTray || menu.alternativeTargetTray || allergenAlternative?.targetTray || 0)} porsi</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )
               })}
