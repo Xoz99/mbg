@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import DapurLayout from '@/components/layout/DapurLayout';
-import { 
-  CheckCircle, AlertCircle, Loader, RefreshCw, ChefHat, Package, 
+import { useScanCache } from '@/lib/hooks/useScanCache';
+import {
+  CheckCircle, AlertCircle, Loader, RefreshCw, ChefHat, Package,
   Boxes, Navigation, X, ZoomIn
 } from 'lucide-react';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
 
 enum TipeCheckpoint {
   MULAI_MEMASAK = 'MULAI_MEMASAK',
@@ -134,7 +133,7 @@ const CheckpointViewPage = () => {
     try {
       const token = getAuthToken();
       const response = await fetch(
-        `${API_BASE_URL}/api/menu-harian/${id}/checkpoint`,
+        `https://demombgv1.xyz/api/menu-harian/${id}/checkpoint`,
         {
           method: 'GET',
           headers: { 
@@ -196,7 +195,7 @@ const CheckpointViewPage = () => {
         const token = getAuthToken();
         
         // Fetch semua menu-planning dulu
-        const planningRes = await fetch(`${API_BASE_URL}/api/menu-planning`, {
+        const planningRes = await fetch(`https://demombgv1.xyz/api/menu-planning`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -211,7 +210,7 @@ const CheckpointViewPage = () => {
         // Untuk setiap planning, fetch menu-harian
         for (const planning of plannings) {
           try {
-            const menuRes = await fetch(`${API_BASE_URL}/api/menu-planning/${planning.id}/menu-harian`, {
+            const menuRes = await fetch(`https://demombgv1.xyz/api/menu-planning/${planning.id}/menu-harian`, {
               headers: {
                 'Authorization': `Bearer ${token}`
               }

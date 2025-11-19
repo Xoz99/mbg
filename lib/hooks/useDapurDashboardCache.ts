@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, useEffect } from "react"
 import { cacheEmitter } from "@/lib/utils/cacheEmitter"
+import { useDapurContext } from "@/lib/context/DapurContext"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz"
 const CACHE_KEY = "dapur_dashboard_cache"
@@ -25,6 +26,68 @@ function extractArray(data: any): any[] {
     if (arr) return arr as any[]
   }
   return []
+}
+
+// ✅ Parse date string in UTC to avoid timezone issues
+// Date strings like "2024-11-18" should be parsed as UTC date, not local
+function parseDateAsUTC(dateString: string): Date | null {
+  if (!dateString) return null
+
+  // If date-only format (YYYY-MM-DD), parse as UTC midnight
+  if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [year, month, day] = dateString.split('-').map(Number)
+    return new Date(Date.UTC(year, month - 1, day))
+  }
+
+  // Otherwise use standard Date parsing (works with ISO format)
+  const date = new Date(dateString)
+  return isNaN(date.getTime()) ? null : date
+}
+
+// ✅ Get day of week (1-7) where 1=Monday, 7=Sunday in UTC
+function getDayOfWeekUTC(dateString: string): number {
+  const date = parseDateAsUTC(dateString)
+  if (!date) return 0
+
+  // getUTCDay() returns 0-6 where 0=Sunday, 1=Monday, etc
+  const utcDay = date.getUTCDay()
+  // Convert to 1-7 where 1=Monday, 7=Sunday
+  return utcDay === 0 ? 7 : utcDay
+}
+
+// ✅ Get today's date as YYYY-MM-DD in UTC-consistent format
+// This ensures consistent date comparison across all timezone contexts
+function getTodayDateString(): string {
+  const now = new Date()
+  // Get UTC time components
+  const year = now.getUTCFullYear()
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(now.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// ✅ Extract date string from menu.tanggal in UTC-consistent format
+// Handles both YYYY-MM-DD and ISO datetime formats correctly
+function extractMenuDateString(tanggalField: string): string | null {
+  if (!tanggalField) return null
+
+  // If it's ISO datetime format (has T), take only the date part
+  if (tanggalField.includes("T")) {
+    // Parse as UTC to ensure consistent date extraction
+    const dateUTC = parseDateAsUTC(tanggalField)
+    if (!dateUTC) return null
+    return dateUTC.toISOString().split("T")[0]
+  }
+
+  // If it's already YYYY-MM-DD format, return as-is
+  if (tanggalField.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return tanggalField
+  }
+
+  // Fallback: try to parse as regular date and extract
+  const date = new Date(tanggalField)
+  if (isNaN(date.getTime())) return null
+  return date.toISOString().split("T")[0]
 }
 
 async function getAuthToken() {
@@ -72,8 +135,10 @@ const globalMemoryCache = new Map<string, DapurDashboardData>()
 export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData) => void) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const hasInitialized = useRef(false)
   const fetchInProgress = useRef(false)
+
+  // Get menu plannings from global context
+  const { menuPlannings: contextPlannings, isLoading: contextLoading } = useDapurContext()
 
   // ✅ Setup listener untuk cache updates dari component lain (dalam tab yang sama)
   useEffect(() => {
@@ -88,64 +153,120 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
   }, [onCacheUpdate])
 
   // ✅ Fetch dapur dashboard data
-  const fetchDapurDashboardData = useCallback(async () => {
+  const fetchDapurDashboardData = useCallback(async (contextMenuPlannings: any[]) => {
     try {
       console.time("fetchDapurDashboard")
 
-      // Fetch menu planning
-      const planningRes = await apiCall<any>("/api/menu-planning?limit=20&page=1")
-      const plannings = extractArray(planningRes?.data || [])
+      // Use menu plannings from context (global cache)
+      const plannings = contextMenuPlannings
+      console.log(`[DAPUR DASHBOARD CACHE] Using ${plannings.length} plannings from context`)
 
-      const today = new Date()
-      const todayString = today.toISOString().split("T")[0]
+      // ✅ FIXED: Use UTC-consistent date format for "today"
+      const todayString = getTodayDateString()
 
-      // Calculate week range
-      const weekStart = new Date(today)
-      weekStart.setDate(today.getDate() - today.getDay() + 1) // Monday
-      const weekStartString = weekStart.toISOString().split("T")[0]
-
-      const weekEnd = new Date(weekStart)
-      weekEnd.setDate(weekStart.getDate() + 6) // Sunday
-      const weekEndString = weekEnd.toISOString().split("T")[0]
-
+      // ✅ FIXED: Don't hardcode week range - use each planning's own date range!
       let foundTodayMenu: any = null
       let allMenus: any[] = []
 
       const weeklyStats = await Promise.all(
         plannings.map(async (planning: any) => {
           try {
+            // ✅ Use planning's date range, not current week!
+            const planningStart = planning.tanggalMulai
+            const planningEnd = planning.tanggalSelesai
+
             const menuRes = await apiCall<any>(
-              `/api/menu-planning/${planning.id}/menu-harian?limit=20&page=1&startDate=${weekStartString}&endDate=${weekEndString}`
+              `/api/menu-planning/${planning.id}/menu-harian?limit=20&page=1&startDate=${planningStart}&endDate=${planningEnd}`
             )
             const menus = extractArray(menuRes?.data || [])
+
+            // ✅ FIXED: Fetch calendar akademik per sekolah (sekolahId required!)
+            let holidays: string[] = []
+            try {
+              const calendarRes = await apiCall<any>(`/api/kalender-akademik?sekolahId=${planning.sekolahId}&limit=100`)
+              // API returns: { data: { kalenders: [...], pagination: {...} } }
+              const calendarList = calendarRes?.data?.kalenders || []
+              holidays = calendarList
+                .map((c: any) => c.tanggalMulai || c.tanggal || c.date)
+                .filter((d: string) => d) // Filter out empty dates
+            } catch (err) {
+              // Continue without holidays if fetch fails
+            }
             allMenus = [...allMenus, ...menus]
 
-            const dayNames = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
-            const daysStatus = dayNames.map((day, idx) => {
-              const dayOfWeek = idx + 1
-              const hasMenu = menus.some((m: any) => {
-                const menuDate = new Date(m.tanggal)
-                const dateDay = menuDate.getDay()
-                const adjustedDay = dateDay === 0 ? 7 : dateDay
-                return adjustedDay === dayOfWeek
-              })
+            // Parse planning dates
+            const planningStartDate = parseDateAsUTC(planningStart)
+            const planningEndDate = parseDateAsUTC(planningEnd)
 
-              return {
-                day,
-                completed: hasMenu,
-                menuCount: menus.filter((m: any) => {
-                  const menuDate = new Date(m.tanggal)
-                  const dateDay = menuDate.getDay()
-                  const adjustedDay = dateDay === 0 ? 7 : dateDay
-                  return adjustedDay === dayOfWeek
-                }).length,
+            if (!planningStartDate || !planningEndDate) {
+              return null
+            }
+
+            // Normalize all menu dates to YYYY-MM-DD strings ONCE
+            const menuDateStrings = new Set(
+              menus.map((m: any) => {
+                // Extract just the date part (YYYY-MM-DD) - NO timezone conversion!
+                const dateStr = m.tanggal
+                if (!dateStr) return null
+                // If it's ISO format (has T), just take the date part
+                if (dateStr.includes("T")) {
+                  return dateStr.split("T")[0]
+                }
+                // Otherwise assume it's already YYYY-MM-DD
+                return dateStr
+              }).filter(Boolean)
+            )
+
+
+            // Normalize holidays to YYYY-MM-DD strings
+            const holidayDateStrings = new Set(
+              holidays.map((h: string) => {
+                if (!h) return null
+                if (h.includes("T")) {
+                  return h.split("T")[0]
+                }
+                return h
+              }).filter(Boolean)
+            )
+
+
+            const daysStatus: Array<{day: string; completed: boolean; menuCount: number}> = []
+            const dayNames = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
+
+            // ✅ FIXED: Count ALL workdays (Senin-Sabtu) within planning range
+            // NOT just first 6 days!
+            const currentDate = new Date(planningStartDate)
+
+            while (currentDate <= planningEndDate) {
+              const dateString = currentDate.toISOString().split("T")[0]
+              const isHoliday = holidayDateStrings.has(dateString)
+              const dayOfWeek = currentDate.getUTCDay()
+              const adjustedDay = dayOfWeek === 0 ? 7 : dayOfWeek // 1=Monday, 7=Sunday
+
+              // Count all weekdays (Senin-Sabtu = 1-6) AND NOT holidays
+              if (adjustedDay >= 1 && adjustedDay <= 6 && !isHoliday) {
+                const dayName = dayNames[adjustedDay - 1]
+                const hasMenu = menuDateStrings.has(dateString)
+                const menuCount = menus.filter((m: any) => {
+                  const mDateStr = m.tanggal?.includes("T") ? m.tanggal.split("T")[0] : m.tanggal
+                  return mDateStr === dateString
+                }).length
+
+                daysStatus.push({
+                  day: dayName,
+                  completed: hasMenu,
+                  menuCount,
+                })
               }
-            })
+
+              currentDate.setUTCDate(currentDate.getUTCDate() + 1)
+            }
 
             if (!foundTodayMenu) {
+              // ✅ FIXED: Use consistent UTC-based date extraction
               const todayMenus = menus.filter((m: any) => {
-                const menuDate = new Date(m.tanggal).toISOString().split("T")[0]
-                return menuDate === todayString
+                const menuDateString = extractMenuDateString(m.tanggal)
+                return menuDateString === todayString
               })
               if (todayMenus.length > 0) {
                 foundTodayMenu = {
@@ -156,7 +277,8 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
             }
 
             const completedDays = daysStatus.filter((d) => d.completed).length
-            const totalDays = 6
+            const totalDays = daysStatus.length // ✅ Dynamic - excludes holidays!
+
 
             return {
               id: planning.id,
@@ -201,8 +323,8 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
       // Calculate target for today
       const todayMenus = allMenus.filter((m) => {
         if (!m.tanggal) return false
-        const menuDate = new Date(m.tanggal).toISOString().split("T")[0]
-        return menuDate === todayString
+        const menuDateString = extractMenuDateString(m.tanggal)
+        return menuDateString === todayString
       })
       const totalTargetHariIni = todayMenus.reduce((sum, m) => sum + (m.targetTray || 0), 0)
 
@@ -227,11 +349,17 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
       console.error("Error fetching dapur dashboard data:", err)
       throw err
     }
-  }, [])
+  }, [contextPlannings])
 
   // ✅ Load data with cache priority
   const loadData = useCallback(async () => {
     const cacheId = "dapur_dashboard"
+
+    // Wait for context to finish loading
+    if (contextLoading) {
+      console.log("[DAPUR DASHBOARD CACHE] Waiting for context to load...")
+      return
+    }
 
     // 1. Check memory cache first (fastest)
     if (globalMemoryCache.has(cacheId)) {
@@ -274,11 +402,17 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
     // 3. No cache, need to fetch
     console.log("📥 [DAPUR DASHBOARD CACHE] No cache found, fetching from API")
     return fetchAndUpdateCache(cacheId)
-  }, [fetchDapurDashboardData])
+  }, [fetchDapurDashboardData, contextLoading])
 
   // ✅ Fetch and update both memory and localStorage cache
   const fetchAndUpdateCache = useCallback(
     async (cacheId: string) => {
+      // Wait for context to load
+      if (contextLoading) {
+        console.log("[DAPUR DASHBOARD CACHE] Waiting for context to load...")
+        return
+      }
+
       if (fetchInProgress.current) {
         console.log("[DAPUR DASHBOARD] Fetch already in progress, skipping")
         return
@@ -288,7 +422,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
         fetchInProgress.current = true
         setLoading(true)
 
-        const dashboardData = await fetchDapurDashboardData()
+        const dashboardData = await fetchDapurDashboardData(contextPlannings)
 
         // Safety checks
         const validData: DapurDashboardData = {
@@ -319,7 +453,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
         setLoading(false)
       }
     },
-    [fetchDapurDashboardData]
+    [fetchDapurDashboardData, contextLoading, contextPlannings]
   )
 
   // ✅ Clear cache
@@ -337,6 +471,51 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
     clearCache()
     return fetchAndUpdateCache(cacheId)
   }, [clearCache, fetchAndUpdateCache])
+
+  // ✅ Background refresh dengan callback (declare before updateCache)
+  const backgroundRefresh = useCallback(
+    async (cacheId: string, onSuccess?: (data: DapurDashboardData) => void) => {
+      try {
+        console.log("🔄 [DAPUR DASHBOARD] Starting background refresh...")
+        const freshData = await fetchDapurDashboardData(contextPlannings)
+
+        // Safety checks
+        const cachedData: DapurDashboardData = {
+          menuPlanningData: Array.isArray(freshData.menuPlanningData) ? freshData.menuPlanningData : [],
+          todayMenu: freshData.todayMenu || null,
+          stats: freshData.stats || { targetHariIni: 0, totalSekolah: 0 },
+          produksiMingguan: Array.isArray(freshData.produksiMingguan) ? freshData.produksiMingguan : [],
+          hash: simpleHash(JSON.stringify(freshData)),
+          timestamp: Date.now(),
+        }
+
+        // Update UNIFIED memory cache
+        globalMemoryCache.set(cacheId, cachedData)
+
+        // Update localStorage
+        if (typeof window !== "undefined") {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(cachedData))
+        }
+
+        console.log("✅ [DAPUR DASHBOARD] Background refresh completed successfully")
+
+        // Trigger callback
+        if (onSuccess && typeof onSuccess === "function") {
+          try {
+            onSuccess(cachedData)
+          } catch (callbackErr) {
+            console.error("⚠️ [DAPUR DASHBOARD] Error in onSuccess callback:", callbackErr)
+          }
+        }
+
+        return cachedData
+      } catch (err) {
+        console.error("⚠️ [DAPUR DASHBOARD] Background refresh failed:", err)
+        // Don't throw - let UI continue with optimistic data
+      }
+    },
+    [fetchDapurDashboardData, contextPlannings]
+  )
 
   // ✅ Update cache dengan data baru (optimistic + background refresh)
   const updateCache = useCallback(
@@ -412,52 +591,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
 
       return updatedData
     },
-    []
-  )
-
-  // ✅ Background refresh dengan callback
-  const backgroundRefresh = useCallback(
-    async (cacheId: string, onSuccess?: (data: DapurDashboardData) => void) => {
-      try {
-        console.log("🔄 [DAPUR DASHBOARD] Starting background refresh...")
-        const freshData = await fetchDapurDashboardData()
-
-        // Safety checks
-        const cachedData: DapurDashboardData = {
-          menuPlanningData: Array.isArray(freshData.menuPlanningData) ? freshData.menuPlanningData : [],
-          todayMenu: freshData.todayMenu || null,
-          stats: freshData.stats || { targetHariIni: 0, totalSekolah: 0 },
-          produksiMingguan: Array.isArray(freshData.produksiMingguan) ? freshData.produksiMingguan : [],
-          hash: simpleHash(JSON.stringify(freshData)),
-          timestamp: Date.now(),
-        }
-
-        // Update UNIFIED memory cache
-        globalMemoryCache.set(cacheId, cachedData)
-
-        // Update localStorage
-        if (typeof window !== "undefined") {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(cachedData))
-        }
-
-        console.log("✅ [DAPUR DASHBOARD] Background refresh completed successfully")
-
-        // Trigger callback
-        if (onSuccess && typeof onSuccess === "function") {
-          try {
-            onSuccess(cachedData)
-          } catch (callbackErr) {
-            console.error("⚠️ [DAPUR DASHBOARD] Error in onSuccess callback:", callbackErr)
-          }
-        }
-
-        return cachedData
-      } catch (err) {
-        console.error("⚠️ [DAPUR DASHBOARD] Background refresh failed:", err)
-        // Don't throw - let UI continue with optimistic data
-      }
-    },
-    [fetchDapurDashboardData]
+    [backgroundRefresh]
   )
 
   return {

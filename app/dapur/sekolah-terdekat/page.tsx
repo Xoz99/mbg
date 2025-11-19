@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import DapurLayout from '@/components/layout/DapurLayout';
+import { useSekolahTerdekatCache } from '@/lib/hooks/useSekolahTerdekatCache';
 import {
   MapPin, RefreshCw, Check, AlertCircle
 } from 'lucide-react';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
 
 interface Sekolah {
   id: string;
@@ -56,15 +55,15 @@ const calculateDistance = (
 
 export default function DapurSekolahProximityPage() {
   const router = useRouter();
-  const [authToken, setAuthToken] = useState('');
-  const [dapurInfo, setDapurInfo] = useState<DapurInfo | null>(null);
-  const [sekolahList, setSekolahList] = useState<SekolahWithDistance[]>([]);
-  const [originalSekolahList, setOriginalSekolahList] = useState<SekolahWithDistance[]>([]);
-  const [loadingSekolah, setLoadingSekolah] = useState(true);
   const [radiusKm, setRadiusKm] = useState(20);
+  const [dapurInfo, setDapurInfo] = useState<DapurInfo | null>(null);
+
+  const { loading: cacheLoading, error: cacheError, loadData, refreshData } = useSekolahTerdekatCache();
+  const [sekolahList, setSekolahList] = useState<SekolahWithDistance[]>([]);
+  const [loadingSekolah, setLoadingSekolah] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Get dapur ID from localStorage or route
+  // Get auth token and dapur info on mount
   useEffect(() => {
     const token = localStorage.getItem('authToken') || localStorage.getItem('mbg_token');
     const dapurId = localStorage.getItem('userDapurId');
@@ -74,50 +73,53 @@ export default function DapurSekolahProximityPage() {
       return;
     }
 
-    setAuthToken(token);
-
     if (!dapurId) {
       setError('Dapur ID tidak ditemukan');
       return;
     }
 
-    fetchDapurAndSekolah(token, dapurId);
+    fetchDapurInfo(token, dapurId);
   }, [router]);
 
-  // Auto-filter sekolah ketika radiusKm berubah
+  // Load sekolah cache data
   useEffect(() => {
-    if (originalSekolahList.length > 0) {
-      const filteredSekolah = originalSekolahList
-        .filter((s: SekolahWithDistance) => s.distance <= radiusKm)
-        .sort((a: SekolahWithDistance, b: SekolahWithDistance) => a.distance - b.distance);
-      
-      setSekolahList(filteredSekolah);
-    }
-  }, [radiusKm, originalSekolahList]);
+    if (cacheLoading) return;
 
-  const fetchDapurAndSekolah = async (token: string, dapurId: string) => {
+    const loadSekolah = async () => {
+      try {
+        const cachedData = await loadData();
+        if (cachedData?.sekolah) {
+          updateSekolahList(cachedData.sekolah);
+        }
+      } catch (err) {
+        setError('Gagal memuat data sekolah');
+        console.error(err);
+      } finally {
+        setLoadingSekolah(false);
+      }
+    };
+
+    loadSekolah();
+  }, [cacheLoading]);
+
+  const fetchDapurInfo = async (token: string, dapurId: string) => {
     try {
-      setLoadingSekolah(true);
-      setError(null);
-
-      // Fetch dapur info
-      const dapurRes = await fetch(`${API_BASE_URL}/api/dapur/${dapurId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/dapur/${dapurId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
 
-      if (!dapurRes.ok) {
+      if (!response.ok) {
         throw new Error('Gagal memuat data dapur');
       }
 
-      const dapurData = await dapurRes.json();
+      const dapurData = await response.json();
       const dapur = dapurData.data || dapurData;
 
       if (!dapur.latitude || !dapur.longitude) {
         setError('Dapur tidak memiliki koordinat lokasi. Silakan update data dapur terlebih dahulu.');
-        setLoadingSekolah(false);
         return;
       }
 
@@ -128,53 +130,25 @@ export default function DapurSekolahProximityPage() {
         longitude: dapur.longitude,
       });
 
-      // Fetch all sekolah
-      const sekolahRes = await fetch(`${API_BASE_URL}/api/sekolah?page=1&limit=100`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching dapur:', err);
+      setError(err instanceof Error ? err.message : 'Gagal memuat data dapur');
+    }
+  };
 
-      if (!sekolahRes.ok) {
-        throw new Error('Gagal memuat data sekolah');
-      }
+  const updateSekolahList = async (sekolahList: any[]) => {
+    if (!dapurInfo) return;
 
-      const sekolahData = await sekolahRes.json();
-      let sekolahListData = [];
+    try {
+      const token = localStorage.getItem('authToken') || localStorage.getItem('mbg_token') || '';
 
-      if (Array.isArray(sekolahData.data?.data)) {
-        sekolahListData = sekolahData.data.data;
-      } else if (Array.isArray(sekolahData.data)) {
-        sekolahListData = sekolahData.data;
-      } else if (Array.isArray(sekolahData)) {
-        sekolahListData = sekolahData;
-      }
-
-      // Get linked sekolah IDs from dapur object
-      let linkedSekolahIds: string[] = [];
-
-      // Try multiple sources for linked sekolah
-      if (dapur.linkedSekolah && Array.isArray(dapur.linkedSekolah)) {
-        linkedSekolahIds = dapur.linkedSekolah.map((s: any) => s.id || s);
-        console.log('✓ Linked sekolah dari dapur.linkedSekolah:', linkedSekolahIds);
-      } else if (dapur.sekolah && Array.isArray(dapur.sekolah)) {
-        linkedSekolahIds = dapur.sekolah.map((s: any) => s.id || s);
-        console.log('✓ Linked sekolah dari dapur.sekolah:', linkedSekolahIds);
-      } else if (dapur.DapurSekolah && Array.isArray(dapur.DapurSekolah)) {
-        linkedSekolahIds = dapur.DapurSekolah.map((ds: any) => ds.sekolahId || ds.id);
-        console.log('✓ Linked sekolah dari dapur.DapurSekolah:', linkedSekolahIds);
-      } else {
-        console.log('ℹ Tidak ada linked sekolah ditemukan di dapur object');
-        linkedSekolahIds = [];
-      }
-
-      // Calculate distances and filter by radius
-      let sekolahWithDistance = sekolahListData
+      // Calculate distances
+      let sekolahWithDistance = sekolahList
         .map((s: any) => {
           const distance = calculateDistance(
-            dapur.latitude,
-            dapur.longitude,
+            dapurInfo.latitude || 0,
+            dapurInfo.longitude || 0,
             s.latitude || 0,
             s.longitude || 0
           );
@@ -187,19 +161,18 @@ export default function DapurSekolahProximityPage() {
             alamat: s.alamat || s.address || '',
             latitude: s.latitude,
             longitude: s.longitude,
-            siswaCount: 0, // Default, akan di-update dari API
+            siswaCount: 0,
             distance: Math.round(distance * 100) / 100,
-            isLinked: linkedSekolahIds.includes(s.id),
+            isLinked: false,
           };
         })
-        .filter((s: SekolahWithDistance) => s.distance <= radiusKm)
         .sort((a: SekolahWithDistance, b: SekolahWithDistance) => a.distance - b.distance);
 
-      // Fetch siswa count untuk setiap sekolah
-      const sekolahWithSiswaCount = await Promise.all(
+      // Fetch siswa count and linked status
+      const sekolahWithDetails = await Promise.all(
         sekolahWithDistance.map(async (sekolah: SekolahWithDistance) => {
           try {
-            const siswaRes = await fetch(`${API_BASE_URL}/api/sekolah/${sekolah.id}/siswa`, {
+            const siswaRes = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/sekolah/${sekolah.id}/siswa`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -208,50 +181,45 @@ export default function DapurSekolahProximityPage() {
 
             if (siswaRes.ok) {
               const siswaData = await siswaRes.json();
-              
-              // Handle berbagai format response
-              let siswaList = [];
-              if (Array.isArray(siswaData.data?.data)) {
-                siswaList = siswaData.data.data;
-              } else if (Array.isArray(siswaData.data)) {
-                siswaList = siswaData.data;
-              } else if (Array.isArray(siswaData)) {
-                siswaList = siswaData;
-              }
+              let siswaList = Array.isArray(siswaData.data?.data) ? siswaData.data.data : Array.isArray(siswaData.data) ? siswaData.data : [];
 
               return {
                 ...sekolah,
                 siswaCount: siswaList.length,
               };
-            } else {
-              console.warn(`Gagal fetch siswa untuk sekolah ${sekolah.id}`);
-              return sekolah;
             }
+            return sekolah;
           } catch (err) {
-            console.error(`Error fetching siswa for sekolah ${sekolah.id}:`, err);
+            console.warn(`Failed to fetch siswa for ${sekolah.id}`);
             return sekolah;
           }
         })
       );
 
-      setSekolahList(sekolahWithSiswaCount);
-      setOriginalSekolahList(sekolahWithSiswaCount);
+      setSekolahList(sekolahWithDetails);
     } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan');
-    } finally {
-      setLoadingSekolah(false);
+      console.error('Error updating sekolah list:', err);
     }
   };
 
-  const handleRefresh = () => {
-    if (authToken && dapurInfo) {
-      const dapurId = localStorage.getItem('userDapurId');
-      if (dapurId) {
-        fetchDapurAndSekolah(authToken, dapurId);
+  const handleRefresh = async () => {
+    try {
+      const cachedData = await refreshData();
+      if (cachedData?.sekolah) {
+        updateSekolahList(cachedData.sekolah);
       }
+    } catch (err) {
+      setError('Gagal memperbarui data');
+      console.error(err);
     }
   };
+
+  // Filter sekolah by radius
+  const filteredSekolah = useMemo(() => {
+    return sekolahList
+      .filter((s: SekolahWithDistance) => s.distance <= radiusKm)
+      .sort((a: SekolahWithDistance, b: SekolahWithDistance) => a.distance - b.distance);
+  }, [sekolahList, radiusKm]);
 
   if (loadingSekolah && !dapurInfo) {
     return (
@@ -347,12 +315,22 @@ export default function DapurSekolahProximityPage() {
 
             <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/20">
               <div>
-                <p className="text-white/70 text-xs font-medium">TOTAL SEKOLAH</p>
-                <p className="text-3xl font-bold mt-1">{sekolahList.length}</p>
+                <p className="text-white/70 text-xs font-medium">DALAM RADIUS</p>
+                <p className="text-3xl font-bold mt-1">{filteredSekolah.length}</p>
               </div>
               <div>
                 <p className="text-white/70 text-xs font-medium">RADIUS</p>
                 <p className="text-3xl font-bold mt-1">{radiusKm} km</p>
+              </div>
+              <div className="flex items-end justify-end">
+                <button
+                  onClick={handleRefresh}
+                  disabled={loadingSekolah}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh
+                </button>
               </div>
             </div>
           </div>
@@ -411,7 +389,7 @@ export default function DapurSekolahProximityPage() {
               </div>
             ))}
           </div>
-        ) : sekolahList.length === 0 ? (
+        ) : filteredSekolah.length === 0 ? (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
             <AlertCircle className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-yellow-900 mb-2">Tidak Ada Sekolah</h3>
@@ -421,7 +399,7 @@ export default function DapurSekolahProximityPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sekolahList.map(sekolah => {
+            {filteredSekolah.map(sekolah => {
               return (
                 <div
                   key={sekolah.id}

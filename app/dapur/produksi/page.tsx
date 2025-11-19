@@ -92,107 +92,21 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, trend }: any) => 
 
 export default function ProduksiHarianPage() {
   const router = useRouter();
-  const [batches, setBatches] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { batches, loading } = useProduksiCache({
+    pollingInterval: 30000 // Auto-refresh setiap 30 detik
+  });
   const [selectedBatch, setSelectedBatch] = useState<any>(null);
   const [filterStatus, setFilterStatus] = useState('semua');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
     const userData = localStorage.getItem('mbg_user');
     const token = localStorage.getItem('mbg_token');
-    
+
     if (!userData || !token) {
       router.push('/auth/login');
       return;
     }
   }, [router]);
-
-  useEffect(() => {
-    const loadProduction = async () => {
-      try {
-        setLoading(true);
-
-        // Optimize: Aggressive pagination untuk menu-planning (limit 20)
-        const planningRes = await apiCall<any>("/api/menu-planning?limit=20&page=1");
-        const plannings = extractArray(planningRes.data?.data || []);
-
-        // ✅ PERBAIKAN: Get today's date dalam local timezone (UTC+7)
-        // Jangan gunakan UTC langsung karena backend menyimpan dalam UTC
-        const now = new Date();
-        const todayLocalDate = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // +7 jam untuk Indonesia
-        const today = `${todayLocalDate.getUTCFullYear()}-${String(todayLocalDate.getUTCMonth() + 1).padStart(2, '0')}-${String(todayLocalDate.getUTCDate()).padStart(2, '0')}`;
-        console.log(`[PRODUKSI] Today's date (local): ${today}`);
-
-        // Parallel fetch menu-harian untuk semua planning (limit 20 per planning)
-        const menuPromises = plannings.map(planning =>
-          apiCall<any>(`/api/menu-planning/${planning.id}/menu-harian?limit=20&page=1&tanggal=${today}`)
-            .then(menuRes => {
-              const menus = extractArray(menuRes.data?.data || []);
-              return { planning, menus };
-            })
-            .catch(err => {
-              console.warn(`Gagal fetch menu untuk planning ${planning.id}:`, err);
-              return { planning, menus: [] };
-            })
-        );
-
-        const menuResults = await Promise.all(menuPromises);
-
-        // Flat all menus dan filter hanya untuk hari ini
-        const todayMenus: any[] = [];
-        menuResults.forEach(({ planning, menus }) => {
-          menus.forEach(menu => {
-            // ✅ PERBAIKAN: Gunakan normalizeDateString untuk handle timezone conversion
-            const menuDate = normalizeDateString(menu.tanggal);
-            console.log(`[PRODUKSI] Menu date: ${menuDate}, Today: ${today}, Match: ${menuDate === today}`);
-            if (menuDate === today) {
-              todayMenus.push({ planning, menu });
-            }
-          });
-        });
-
-        // Optimize: Skip sekolah API call, use planning.sekolah data yang sudah ada
-        // Parallel fetch checkpoint untuk semua menu hari ini
-        const batchPromises = todayMenus.map(({ planning, menu }) =>
-          apiCall<any>(`/api/menu-harian/${menu.id}/checkpoint?limit=10`).catch(() => ({ data: { data: [] }, isNew: false }))
-            .then((checkpointRes) => {
-              const checkpoints = extractArray(checkpointRes.data?.data || []);
-              const sekolahName = planning.sekolah?.nama || 'Unknown';
-              const targetTrays = menu.targetTray || 1200;
-
-              return {
-                id: `BATCH-${menu.id}`,
-                dailyMenu: menu,
-                menuId: menu.id,
-                sekolahId: planning.sekolahId,
-                sekolahName: sekolahName,
-                status: checkpoints.length >= 4 ? 'COMPLETED' : checkpoints.length >= 2 ? 'IN_PROGRESS' : 'PREPARING',
-                expectedTrays: targetTrays,
-                packedTrays: checkpoints.length >= 3 ? targetTrays : checkpoints.length >= 2 ? Math.round(targetTrays / 2) : 0,
-                checkpoints: checkpoints,
-                createdBy: 'System',
-                startTime: menu.jamMulaiMasak,
-                endTime: menu.jamSelesaiMasak
-              };
-            })
-            .catch(err => {
-              console.warn(`Gagal fetch batch data untuk menu ${menu.id}:`, err);
-              return null;
-            })
-        );
-
-        const batchesData = (await Promise.all(batchPromises)).filter(b => b !== null);
-        setBatches(batchesData);
-      } catch (err) {
-        console.error('Gagal load produksi:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProduction();
-  }, []);
 
   const filteredBatches = useMemo(() => {
     if (filterStatus === 'semua') return batches;

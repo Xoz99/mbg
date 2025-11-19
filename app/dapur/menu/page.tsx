@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { apiCache, generateCacheKey } from "@/lib/utils/cache"
 import DapurLayout from "@/components/layout/DapurLayout"
+import { useMenuCache, type MenuData } from "@/lib/hooks/useMenuCache"
 import {
   Calendar,
   ChefHat,
@@ -126,6 +127,36 @@ function normalizeDateString(dateString: string | null | undefined): string | nu
   return dateString
 }
 
+// Helper function untuk format periode tanggal (e.g., "1 Jan - 7 Jan 2024")
+function formatPeriode(tanggalMulai: string, tanggalSelesai: string): string {
+  try {
+    const start = new Date(tanggalMulai)
+    const end = new Date(tanggalSelesai)
+
+    const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+    const startFormatted = start.toLocaleDateString('id-ID', options)
+    const endFormatted = end.toLocaleDateString('id-ID', { month: 'short', day: 'numeric', year: 'numeric' })
+
+    return `${startFormatted} - ${endFormatted}`
+  } catch (e) {
+    return 'Periode tidak valid'
+  }
+}
+
+// Helper function untuk check apakah week sudah completed (tanggalSelesai sudah terlewat)
+function isWeekCompleted(tanggalSelesai: string): boolean {
+  try {
+    const endDate = new Date(tanggalSelesai)
+    const today = new Date()
+    // Set waktu ke midnight untuk perbandingan yang akurat
+    today.setHours(0, 0, 0, 0)
+    endDate.setHours(0, 0, 0, 0)
+    return endDate < today
+  } catch (e) {
+    return false
+  }
+}
+
 async function apiCall<T>(endpoint: string, options: RequestInit = {}, cacheKey?: string): Promise<T> {
   try {
     const key = cacheKey || generateCacheKey(endpoint)
@@ -169,6 +200,9 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}, cacheKey?
 
 function extractArray(data: any): any[] {
   if (Array.isArray(data)) return data
+  // Handle nested data structure: data.data.data
+  if (data?.data?.data && Array.isArray(data.data.data)) return data.data.data
+  // Handle data.data
   if (data?.data && Array.isArray(data.data)) return data.data
   if (typeof data === "object") {
     const arr = Object.values(data).find((v) => Array.isArray(v))
@@ -858,16 +892,29 @@ function ModalCreateMenuHarian({
 }
 
 export default function MenuPlanningPage() {
+  // ✅ Use custom hook untuk load menuPlannings dan sekolahList
   const [menuPlannings, setMenuPlannings] = useState<MenuPlanning[]>([])
-  const [menuHarianList, setMenuHarianList] = useState<MenuHarian[]>([])
   const [sekolahList, setSekolahList] = useState<Sekolah[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleCacheUpdate = useCallback((data: MenuData) => {
+    console.log("[MENU PAGE] handleCacheUpdate called with:", data)
+    console.log("[MENU PAGE] menuPlannings:", data.menuPlannings.length, "items")
+    console.log("[MENU PAGE] sekolahList:", data.sekolahList.length, "items")
+    setMenuPlannings(data.menuPlannings)
+    setSekolahList(data.sekolahList)
+  }, [])
+
+  const { loading: cacheLoading, error: cacheError, loadData: loadMenuData, refreshData: refreshMenuCache } = useMenuCache(handleCacheUpdate)
+
+  // Local states
+  const [menuHarianList, setMenuHarianList] = useState<MenuHarian[]>([])
   const [alergiList, setAlergiList] = useState<AlergiItem[]>([])
   const [holidays, setHolidays] = useState<Holiday[]>([])
   const [absensiAggregated, setAbsensiAggregated] = useState<AbsensiAggregated[]>([])
-  const [loading, setLoading] = useState(true)
   const [loadingMenuHarian, setLoadingMenuHarian] = useState(false)
   const [loadingAbersensiAndOthers, setLoadingAbersensiAndOthers] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const [selectedPlanningId, setSelectedPlanningId] = useState<string>("")
   const [selectedSekolahId, setSelectedSekolahId] = useState<string>("")
@@ -876,6 +923,7 @@ export default function MenuPlanningPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [displayMonth, setDisplayMonth] = useState<Date>(new Date())
+  const [showCompletedWeeks, setShowCompletedWeeks] = useState(false)
 
   const [formData, setFormData] = useState({
     mingguanKe: "1",
@@ -903,6 +951,11 @@ export default function MenuPlanningPage() {
     message: string
   }>({ hasWarning: false, conflicts: [], message: "" })
 
+  // Pagination for alergi dan hari libur
+  const [alergiPage, setAlergiPage] = useState(1)
+  const [holidayPage, setHolidayPage] = useState(1)
+  const ITEMS_PER_PAGE = 3
+
   // Map aggregated absensi data by date
   const absensiAggregatedMap: { [key: string]: AbsensiAggregated } = {}
   absensiAggregated.forEach(a => {
@@ -912,37 +965,41 @@ export default function MenuPlanningPage() {
     }
   })
 
-  // ✅ INITIAL LOAD: Parallel API calls
+  // ✅ Calculate paginated alergi
+  const paginatedAlergi = useMemo(() => {
+    const start = (alergiPage - 1) * ITEMS_PER_PAGE
+    const end = start + ITEMS_PER_PAGE
+    return alergiList.slice(start, end)
+  }, [alergiList, alergiPage])
+
+  const totalAlergiPages = Math.ceil(alergiList.length / ITEMS_PER_PAGE)
+
+  // ✅ Calculate paginated hari libur
+  const paginatedHolidays = useMemo(() => {
+    const start = (holidayPage - 1) * ITEMS_PER_PAGE
+    const end = start + ITEMS_PER_PAGE
+    return holidays.slice(start, end)
+  }, [holidays, holidayPage])
+
+  const totalHolidayPages = Math.ceil(holidays.length / ITEMS_PER_PAGE)
+
+  // ✅ INITIAL LOAD: Use custom hook untuk load menuPlannings dan sekolahList
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
+    loadMenuData()
+  }, [loadMenuData])
 
-        // ✅ Parallel load instead of sequential
-        const [planningRes, sekolahRes] = await Promise.all([
-          apiCall<any>("/api/menu-planning"),
-          apiCall<any>("/api/sekolah"),
-        ])
+  // ✅ Sync loading dan error state dari hook
+  useEffect(() => {
+    setLoading(cacheLoading)
+    if (cacheError) setError(cacheError)
+  }, [cacheLoading, cacheError])
 
-        const plannings = extractArray(planningRes?.data || [])
-        const sekolah = extractArray(sekolahRes?.data || [])
-
-        setMenuPlannings(plannings)
-        setSekolahList(sekolah)
-
-        if (sekolah.length > 0) {
-          setSelectedSekolahId(sekolah[0].id)
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Gagal memuat data")
-      } finally {
-        setLoading(false)
-      }
+  // ✅ Set default sekolah ketika sekolahList loaded
+  useEffect(() => {
+    if (sekolahList.length > 0 && !selectedSekolahId) {
+      setSelectedSekolahId(sekolahList[0].id)
     }
-
-    loadData()
-  }, [])
+  }, [sekolahList, selectedSekolahId])
 
   const filteredMenuPlannings = selectedSekolahId
     ? menuPlannings
@@ -950,13 +1007,45 @@ export default function MenuPlanningPage() {
         .sort((a, b) => a.mingguanKe - b.mingguanKe)
     : menuPlannings.sort((a, b) => a.mingguanKe - b.mingguanKe)
 
+  // ✅ Auto-select first planning when sekolah changes and planning not selected
   useEffect(() => {
-    if (filteredMenuPlannings.length === 0) {
+    console.log("[DEBUG] Planning Selection Effect - selectedSekolahId:", selectedSekolahId, "menuPlannings.length:", menuPlannings.length, "selectedPlanningId:", selectedPlanningId, "cacheLoading:", cacheLoading)
+
+    // Don't clear state while cache is still loading
+    if (cacheLoading) {
+      console.log("[DEBUG] Cache still loading, skipping planning selection")
+      return
+    }
+
+    // If sekolah list is empty after loading, clear selections
+    if (sekolahList.length === 0) {
+      console.log("[DEBUG] No sekolah in list after loading, clearing planning")
       setSelectedPlanningId("")
       setMenuHarianList([])
       setAlergiList([])
+      return
     }
-  }, [selectedSekolahId])
+
+    // If no sekolah is selected but we have sekolah list, don't clear - let effect below handle it
+    if (!selectedSekolahId) {
+      console.log("[DEBUG] No sekolah selected yet, waiting for sekolah selection")
+      return
+    }
+
+    // Filter plannings for selected sekolah
+    const filtered = menuPlannings.filter((p) => p.sekolahId === selectedSekolahId)
+
+    if (filtered.length === 0) {
+      console.log("[DEBUG] No filtered plannings for sekolah:", selectedSekolahId)
+      setSelectedPlanningId("")
+      setMenuHarianList([])
+      setAlergiList([])
+    } else if (!selectedPlanningId) {
+      // Auto-select first planning when sekolah is selected but no planning is selected
+      console.log("[DEBUG] Auto-selecting first planning:", filtered[0].id)
+      setSelectedPlanningId(filtered[0].id)
+    }
+  }, [selectedSekolahId, menuPlannings, selectedPlanningId, cacheLoading, sekolahList.length])
 
   // ✅ OPTIMIZED: Parallel load alergi, holidays, absensi
   useEffect(() => {
@@ -1082,6 +1171,11 @@ export default function MenuPlanningPage() {
       setMenuHarianList([])
 
       try {
+        // ✅ Clear cache saat load menu harian untuk planning yang berbeda
+        const cacheKeyMenuHarian = generateCacheKey(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
+        apiCache.remove(cacheKeyMenuHarian)
+        console.log("[DEBUG] Cleared menu-harian cache for planning:", selectedPlanningId)
+
         const res = await apiCall<any>(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
         const menus = extractArray(res?.data || [])
         console.log("[DEBUG] Menu Harian dari API:", menus)
@@ -1172,6 +1266,10 @@ export default function MenuPlanningPage() {
         body: JSON.stringify(requestBody),
       })
       console.log("[DEBUG CREATE PLANNING] API RESPONSE: SUCCESS")
+
+      // ✅ Invalidate cache agar data fresh
+      await refreshMenuCache()
+
       alert("Menu planning berhasil dibuat")
       setShowCreateModal(false)
       setFormData({
@@ -1180,7 +1278,6 @@ export default function MenuPlanningPage() {
         tanggalSelesai: "",
         sekolahId: "",
       })
-      window.location.reload()
     } catch (err) {
       alert(err instanceof Error ? err.message : "Gagal membuat menu planning")
     } finally {
@@ -1262,6 +1359,20 @@ export default function MenuPlanningPage() {
 
       setMenuHarianList(prev => [...prev, newMenu])
 
+      // ✅ Clear cache untuk menu-harian endpoint agar fetch dari API fresh
+      const cacheKeyMenuHarian = generateCacheKey(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
+      apiCache.remove(cacheKeyMenuHarian)
+      console.log("[DEBUG] Cleared cache for menu-harian endpoint:", cacheKeyMenuHarian)
+
+      // ✅ Force reload menu harian data dari API (bypass cache)
+      const reloadRes = await apiCall<any>(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
+      const reloadMenus = extractArray(reloadRes?.data || [])
+      console.log("[DEBUG] Force reload menu harian after create:", reloadMenus.length, "items")
+      setMenuHarianList(reloadMenus)
+
+      // ✅ Invalidate cache agar data fresh di navigate ulang
+      await refreshMenuCache()
+
       alert("Menu harian berhasil ditambahkan")
       setShowCreateMenuModal(false)
       setMenuFormData({
@@ -1290,8 +1401,17 @@ export default function MenuPlanningPage() {
       await apiCall(`/api/menu-harian/${menuId}`, {
         method: "DELETE",
       })
+
+      // ✅ Clear cache untuk menu-harian endpoint agar fetch dari API fresh
+      const cacheKeyMenuHarian = generateCacheKey(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
+      apiCache.remove(cacheKeyMenuHarian)
+      console.log("[DEBUG] Cleared cache for menu-harian endpoint after delete:", cacheKeyMenuHarian)
+
       alert("Menu berhasil dihapus")
       setMenuHarianList(menuHarianList.filter(m => m.id !== menuId))
+
+      // ✅ Refresh menu cache agar konsisten
+      await refreshMenuCache()
     } catch (err) {
       alert(err instanceof Error ? err.message : "Gagal menghapus menu")
     }
@@ -1365,7 +1485,7 @@ export default function MenuPlanningPage() {
             <Filter className="w-5 h-5 text-gray-600" />
             <label className="text-sm font-semibold text-gray-700">Filter per Sekolah:</label>
           </div>
-          {loading ? (
+          {cacheLoading ? (
             <div className="h-12 bg-gray-200 rounded-lg animate-pulse-fast"></div>
           ) : (
             <select
@@ -1377,18 +1497,22 @@ export default function MenuPlanningPage() {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent font-medium"
             >
               <option value="">Semua Sekolah</option>
-              {sekolahList.map((s: Sekolah) => (
-                <option key={s.id} value={s.id}>
-                  {s.nama}
-                </option>
-              ))}
+              {sekolahList && sekolahList.length > 0 ? (
+                sekolahList.map((s: Sekolah) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nama}
+                  </option>
+                ))
+              ) : (
+                <option disabled>Tidak ada sekolah</option>
+              )}
             </select>
           )}
         </div>
       </div>
 
-      {selectedSekolahId && (absensiAggregated.length > 0 || alergiList.length > 0 || holidays.length > 0 || loadingAbersensiAndOthers) && (
-        <div className="space-y-4 mb-6">
+      {selectedSekolahId && (alergiList.length > 0 || holidays.length > 0 || loadingAbersensiAndOthers) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           {loadingAbersensiAndOthers ? (
             <>
               <SkeletonAlergiCard />
@@ -1400,16 +1524,37 @@ export default function MenuPlanningPage() {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
-                    <div>
-                      <h3 className="font-bold text-blue-900 mb-2">Alergi Siswa di Sekolah Ini</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {alergiList.map((a, i) => (
-                          <div key={i} className="bg-white rounded p-2 text-sm">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-bold text-blue-900">Alergi Siswa di Sekolah Ini</h3>
+                        <span className="text-xs bg-blue-200 text-blue-900 px-2 py-1 rounded">{alergiPage}/{totalAlergiPages}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {paginatedAlergi.map((a, i) => (
+                          <div key={i} className="bg-gray-50 rounded p-2 text-sm">
                             <span className="font-medium text-blue-900">{a.nama}</span>
                             <span className="text-blue-600 ml-2">({a.jumlahSiswa} siswa)</span>
                           </div>
                         ))}
                       </div>
+                      {totalAlergiPages > 1 && (
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-blue-200">
+                          <button
+                            onClick={() => setAlergiPage(Math.max(1, alergiPage - 1))}
+                            disabled={alergiPage === 1}
+                            className="px-3 py-1 text-xs bg-blue-200 text-blue-900 rounded hover:bg-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            ← Sebelumnya
+                          </button>
+                          <button
+                            onClick={() => setAlergiPage(Math.min(totalAlergiPages, alergiPage + 1))}
+                            disabled={alergiPage === totalAlergiPages}
+                            className="px-3 py-1 text-xs bg-blue-200 text-blue-900 rounded hover:bg-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Selanjutnya →
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1419,14 +1564,17 @@ export default function MenuPlanningPage() {
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <Calendar className="w-5 h-5 text-purple-600 mt-1 flex-shrink-0" />
-                    <div>
-                      <h3 className="font-bold text-purple-900 mb-2">Hari Libur Sekolah</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {holidays.map((h, i) => {
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-bold text-purple-900">Hari Libur Sekolah</h3>
+                        <span className="text-xs bg-purple-200 text-purple-900 px-2 py-1 rounded">{holidayPage}/{totalHolidayPages}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {paginatedHolidays.map((h, i) => {
                           if (!h.tanggal) return null
-                          
+
                           return (
-                            <div key={i} className="bg-white rounded p-2 text-sm">
+                            <div key={i} className="text-gray-50 rounded p-2 text-sm">
                               <span className="font-medium text-purple-900">
                                 {formatDateSafe(h.tanggal)}
                               </span>
@@ -1437,6 +1585,24 @@ export default function MenuPlanningPage() {
                           )
                         }).filter(Boolean)}
                       </div>
+                      {totalHolidayPages > 1 && (
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-purple-200">
+                          <button
+                            onClick={() => setHolidayPage(Math.max(1, holidayPage - 1))}
+                            disabled={holidayPage === 1}
+                            className="px-3 py-1 text-xs bg-purple-200 text-purple-900 rounded hover:bg-purple-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            ← Sebelumnya
+                          </button>
+                          <button
+                            onClick={() => setHolidayPage(Math.min(totalHolidayPages, holidayPage + 1))}
+                            disabled={holidayPage === totalHolidayPages}
+                            className="px-3 py-1 text-xs bg-purple-200 text-purple-900 rounded hover:bg-purple-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Selanjutnya →
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1498,40 +1664,94 @@ export default function MenuPlanningPage() {
               </div>
             )}
 
-            <div className="flex flex-wrap gap-2">
-              {loading ? (
-                <>
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-10 bg-white/20 rounded-lg w-32 animate-pulse"></div>
-                  ))}
-                </>
-              ) : (
-                // 🎯 ✅ GANTI BAGIAN INI DENGAN CODE DI BAWAH
-                filteredMenuPlannings.map((planning) => (
-                  <div key={planning.id} className="group relative">
-                    <button
-                      onClick={() => {
-                        setSelectedPlanningId(planning.id)
-                        setDisplayMonth(new Date(planning.tanggalMulai))
-                      }}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                        planning.id === selectedPlanningId
-                          ? "bg-[#D0B064] text-white shadow-lg"
-                          : "bg-white/20 text-white hover:bg-white/30"
-                      }`}
-                    >
-                      Minggu {planning.mingguanKe}
-                    </button>
-                    {/* 🗑️ DELETE BUTTON */}
-                    <button
-                      onClick={() => handleDeleteMenuPlanning(planning.id)}
-                      className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg"
-                      title="Hapus menu planning"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))
+            <div className="space-y-4">
+              {/* ONGOING WEEKS */}
+              <div>
+                <h3 className="text-sm font-semibold text-white/80 mb-3">Minggu Berlangsung</h3>
+                <div className="flex flex-wrap gap-2">
+                  {loading ? (
+                    <>
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="h-10 bg-white/20 rounded-lg w-32 animate-pulse"></div>
+                      ))}
+                    </>
+                  ) : (
+                    filteredMenuPlannings
+                      .filter((p) => !isWeekCompleted(p.tanggalSelesai))
+                      .map((planning) => (
+                        <div key={planning.id} className="group relative">
+                          <button
+                            onClick={() => {
+                              setSelectedPlanningId(planning.id)
+                              setDisplayMonth(new Date(planning.tanggalMulai))
+                            }}
+                            className={`px-4 py-2 rounded-lg font-medium transition flex flex-col items-start gap-1 ${
+                              planning.id === selectedPlanningId
+                                ? "bg-[#D0B064] text-white shadow-lg"
+                                : "bg-white/20 text-white hover:bg-white/30"
+                            }`}
+                          >
+                            <span className="text-sm font-semibold">Minggu {planning.mingguanKe}</span>
+                            <span className="text-xs opacity-90">{formatPeriode(planning.tanggalMulai, planning.tanggalSelesai)}</span>
+                          </button>
+                          {/* 🗑️ DELETE BUTTON */}
+                          <button
+                            onClick={() => handleDeleteMenuPlanning(planning.id)}
+                            className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg"
+                            title="Hapus menu planning"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+
+              {/* COMPLETED WEEKS - COLLAPSIBLE */}
+              {filteredMenuPlannings.some((p) => isWeekCompleted(p.tanggalSelesai)) && (
+                <div>
+                  <button
+                    onClick={() => setShowCompletedWeeks(!showCompletedWeeks)}
+                    className="flex items-center gap-2 text-sm font-semibold text-white/70 hover:text-white transition mb-3"
+                  >
+                    <span>{showCompletedWeeks ? "▼" : "▶"}</span>
+                    <span>Minggu Selesai ({filteredMenuPlannings.filter((p) => isWeekCompleted(p.tanggalSelesai)).length})</span>
+                  </button>
+
+                  {showCompletedWeeks && (
+                    <div className="flex flex-wrap gap-2">
+                      {filteredMenuPlannings
+                        .filter((p) => isWeekCompleted(p.tanggalSelesai))
+                        .map((planning) => (
+                          <div key={planning.id} className="group relative">
+                            <button
+                              onClick={() => {
+                                setSelectedPlanningId(planning.id)
+                                setDisplayMonth(new Date(planning.tanggalMulai))
+                              }}
+                              className={`px-4 py-2 rounded-lg font-medium transition flex flex-col items-start gap-1 opacity-60 ${
+                                planning.id === selectedPlanningId
+                                  ? "bg-[#D0B064] text-white shadow-lg"
+                                  : "bg-white/10 text-white hover:bg-white/20"
+                              }`}
+                              title="Week selesai (untuk referensi/bukti)"
+                            >
+                              <span className="text-sm font-semibold">Minggu {planning.mingguanKe}</span>
+                              <span className="text-xs opacity-90">{formatPeriode(planning.tanggalMulai, planning.tanggalSelesai)}</span>
+                            </button>
+                            {/* ⚠️ INFO ICON - tidak bisa dihapus karena bukti */}
+                            <div
+                              className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition bg-blue-500 text-white rounded-full p-1 shadow-lg"
+                              title="Week selesai - tetap disimpan sebagai arsip/bukti"
+                            >
+                              <AlertCircle className="w-4 h-4" />
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>

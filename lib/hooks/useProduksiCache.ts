@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState, useEffect } from 'react';
+import { useDapurContext } from '@/lib/context/DapurContext';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://demombgv1.xyz';
 const CACHE_KEY = 'produksi_cache';
@@ -101,16 +102,25 @@ function normalizeDateString(dateString: string | null | undefined): string | nu
   return dateString;
 }
 
-export const useProduksiCache = () => {
+interface UseProduksiCacheOptions {
+  pollingInterval?: number; // milliseconds, default 30000 (30s), 0 to disable
+}
+
+export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [batches, setBatches] = useState<ProduksiBatch[]>([]);
 
   const hasInitialized = useRef(false);
   const fetchInProgress = useRef(false);
+  const pollingInterval = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalMs = options?.pollingInterval ?? 30000; // Default 30 detik
+
+  // Get menu plannings from global context
+  const { menuPlannings: contextPlannings, isLoading: contextLoading } = useDapurContext();
 
   // Fetch production data
-  const fetchProduksiData = useCallback(async (): Promise<ProduksiBatch[]> => {
+  const fetchProduksiData = useCallback(async (contextPlannings: any[]): Promise<ProduksiBatch[]> => {
     try {
       console.time('fetchProduksiData');
 
@@ -120,9 +130,9 @@ export const useProduksiCache = () => {
       const today = `${todayLocalDate.getUTCFullYear()}-${String(todayLocalDate.getUTCMonth() + 1).padStart(2, '0')}-${String(todayLocalDate.getUTCDate()).padStart(2, '0')}`;
       console.log(`[useProduksiCache] Today's date (local): ${today}`);
 
-      // Fetch menu-planning
-      const planningRes = await apiCall<any>('/api/menu-planning?limit=20&page=1');
-      const plannings = extractArray(planningRes?.data || []);
+      // Use menu-planning from context (global cache)
+      const plannings = contextPlannings;
+      console.log(`[useProduksiCache] Using ${plannings.length} plannings from context`);
 
       // Parallel fetch menu-harian untuk semua planning
       const menuPromises = plannings.map((planning) =>
@@ -211,7 +221,7 @@ export const useProduksiCache = () => {
       console.error('[useProduksiCache] Error fetching production data:', err);
       throw err;
     }
-  }, []);
+  }, [contextPlannings]);
 
   // Load data dengan cache
   const loadData = useCallback(async () => {
@@ -262,11 +272,17 @@ export const useProduksiCache = () => {
     // 3. No cache, need to fetch
     console.log('📥 [useProduksiCache] No cache found, fetching from API');
     return fetchAndUpdateCache(cacheId);
-  }, [fetchProduksiData]);
+  }, [fetchProduksiData, contextLoading]);
 
   // Fetch and update cache
   const fetchAndUpdateCache = useCallback(
     async (cacheId: string) => {
+      // Wait for context to load
+      if (contextLoading) {
+        console.log('[useProduksiCache] Waiting for context to load...');
+        return batches;
+      }
+
       if (fetchInProgress.current) {
         console.log('[useProduksiCache] Fetch already in progress, skipping');
         return batches;
@@ -277,7 +293,7 @@ export const useProduksiCache = () => {
         setLoading(true);
         setError(null);
 
-        const batchesData = await fetchProduksiData();
+        const batchesData = await fetchProduksiData(contextPlannings);
 
         const cachedData: CachedProduksiData = {
           batches: batchesData,
@@ -307,8 +323,60 @@ export const useProduksiCache = () => {
         setLoading(false);
       }
     },
-    [fetchProduksiData, batches]
+    [fetchProduksiData, batches, contextLoading, contextPlannings]
   );
+
+  // ✅ Setup polling untuk auto-refresh data
+  const setupPolling = useCallback(async (cacheId: string) => {
+    // Skip jika polling disabled
+    if (pollingIntervalMs <= 0) {
+      console.log('[useProduksiCache] Polling disabled');
+      return;
+    }
+
+    // Clear existing polling jika ada
+    if (pollingInterval.current) {
+      clearInterval(pollingInterval.current);
+    }
+
+    console.log(`[useProduksiCache] Starting polling every ${pollingIntervalMs}ms`);
+
+    // Fetch data immediately on first poll
+    try {
+      const freshData = await fetchProduksiData(contextPlannings);
+      const cachedData: CachedProduksiData = {
+        batches: freshData,
+        timestamp: Date.now(),
+      };
+      memoryCache.set(cacheId, cachedData);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cachedData));
+      }
+      setBatches(freshData);
+    } catch (err) {
+      console.warn('[useProduksiCache] Initial poll failed:', err);
+    }
+
+    // Setup interval for periodic refresh
+    pollingInterval.current = setInterval(async () => {
+      try {
+        console.log('[useProduksiCache] Polling refresh...');
+        const freshData = await fetchProduksiData(contextPlannings);
+        const cachedData: CachedProduksiData = {
+          batches: freshData,
+          timestamp: Date.now(),
+        };
+        memoryCache.set(cacheId, cachedData);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(cachedData));
+        }
+        setBatches(freshData);
+        console.log('✅ [useProduksiCache] Polling refresh complete');
+      } catch (err) {
+        console.error('[useProduksiCache] Polling refresh failed:', err);
+      }
+    }, pollingIntervalMs);
+  }, [pollingIntervalMs, fetchProduksiData, contextPlannings]);
 
   // Initialize hook dengan proper useEffect
   useEffect(() => {
@@ -331,6 +399,12 @@ export const useProduksiCache = () => {
         console.log('[useProduksiCache] Initializing...');
         const result = await loadData();
         console.log('[useProduksiCache] Initialize complete');
+
+        // ✅ Start polling after initial load
+        const cacheId = 'produksi_cache';
+        if (pollingIntervalMs > 0) {
+          setupPolling(cacheId);
+        }
       } catch (err) {
         console.error('[useProduksiCache] Error initializing:', err);
         setError('Gagal inisialisasi data produksi');
@@ -339,6 +413,15 @@ export const useProduksiCache = () => {
     };
 
     initializeProduksiData();
+
+    // ✅ Cleanup polling on unmount
+    return () => {
+      if (pollingInterval.current) {
+        console.log('[useProduksiCache] Clearing polling interval');
+        clearInterval(pollingInterval.current);
+        pollingInterval.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -358,11 +441,35 @@ export const useProduksiCache = () => {
     return fetchAndUpdateCache(cacheId);
   }, [clearCache, fetchAndUpdateCache]);
 
+  // Stop polling
+  const stopPolling = useCallback(() => {
+    if (pollingInterval.current) {
+      console.log('[useProduksiCache] Stopping polling');
+      clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
+    }
+  }, []);
+
+  // Start polling with optional new interval
+  const startPolling = useCallback(async (intervalMs?: number) => {
+    const cacheId = 'produksi_cache';
+    const interval = intervalMs ?? pollingIntervalMs;
+
+    if (interval <= 0) {
+      console.log('[useProduksiCache] Cannot start polling with interval <= 0');
+      return;
+    }
+
+    await setupPolling(cacheId);
+  }, [pollingIntervalMs, setupPolling]);
+
   return {
     loading,
     error,
     batches,
     clearCache,
     refreshData,
+    startPolling,
+    stopPolling,
   };
 };
