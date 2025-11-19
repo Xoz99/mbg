@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState, useEffect } from "react"
 import { cacheEmitter } from "@/lib/utils/cacheEmitter"
 import { useDapurContext } from "@/lib/context/DapurContext"
-import { normalizeDashboardData } from "@/lib/utils/apiResponseNormalizer"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz"
 const CACHE_KEY = "dapur_dashboard_cache"
@@ -56,28 +55,70 @@ function getDayOfWeekUTC(dateString: string): number {
   return utcDay === 0 ? 7 : utcDay
 }
 
-// ✅ Get today's date as YYYY-MM-DD in UTC-consistent format
-// This ensures consistent date comparison across all timezone contexts
+// ✅ Get today's date as YYYY-MM-DD using local browser time
+// This matches server time in Indonesia (UTC+7)
 function getTodayDateString(): string {
   const now = new Date()
-  // Get UTC time components
-  const year = now.getUTCFullYear()
-  const month = String(now.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(now.getUTCDate()).padStart(2, '0')
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
-// ✅ Extract date string from menu.tanggal in UTC-consistent format
+// ✅ Normalize time field that might have UTC+7 offset
+// Examples:
+// - "01:09" might actually be "08:09" (offset by 7 hours)
+// - "23:00" stays "23:00" (if no offset detected)
+function normalizeTimeField(timeString: string): string {
+  if (!timeString || typeof timeString !== 'string') return timeString
+
+  // If not in HH:MM or HH:MM:SS format, return as-is
+  if (!timeString.match(/^\d{1,2}:\d{2}(:\d{2})?$/)) {
+    return timeString
+  }
+
+  // Parse the time
+  const parts = timeString.split(':')
+  let hours = parseInt(parts[0], 10)
+  const minutes = parts[1]
+  const seconds = parts[2] || '00'
+
+  // Check if this looks like it has UTC+7 offset applied
+  // If hours are 0-6, it's likely the backend subtracted 7 hours
+  // Add 7 hours back to correct it
+  if (hours >= 0 && hours <= 6) {
+    hours = (hours + 7) % 24
+  }
+
+  // Reconstruct the time string
+  const normalizedHours = String(hours).padStart(2, '0')
+  return `${normalizedHours}:${minutes}:${seconds}`.slice(0, timeString.length)
+}
+
+// ✅ Extract date string from menu.tanggal using local time
 // Handles both YYYY-MM-DD and ISO datetime formats correctly
+// Note: If API returns ISO with T17:00:00, that's UTC+7 offset, extract date before T
 function extractMenuDateString(tanggalField: string): string | null {
   if (!tanggalField) return null
 
   // If it's ISO datetime format (has T), take only the date part
   if (tanggalField.includes("T")) {
-    // Parse as UTC to ensure consistent date extraction
-    const dateUTC = parseDateAsUTC(tanggalField)
-    if (!dateUTC) return null
-    return dateUTC.toISOString().split("T")[0]
+    // Check if this is the UTC+7 offset pattern (T17:00:00)
+    if (tanggalField.includes("T17:00:00")) {
+      // This date part IS correct - API encodes local date with UTC+7 offset
+      // "2025-11-19T17:00:00.000Z" means local date 2025-11-19
+      return tanggalField.split("T")[0]
+    } else {
+      // Parse as UTC and extract - will give us local date in UTC+7 context
+      const date = new Date(tanggalField)
+      if (isNaN(date.getTime())) {
+        return tanggalField.split("T")[0]
+      }
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
   }
 
   // If it's already YYYY-MM-DD format, return as-is
@@ -85,10 +126,13 @@ function extractMenuDateString(tanggalField: string): string | null {
     return tanggalField
   }
 
-  // Fallback: try to parse as regular date and extract
+  // Fallback: try to parse as regular date and extract using local time
   const date = new Date(tanggalField)
   if (isNaN(date.getTime())) return null
-  return date.toISOString().split("T")[0]
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 async function getAuthToken() {
@@ -156,13 +200,10 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
   // ✅ Fetch dapur dashboard data
   const fetchDapurDashboardData = useCallback(async (contextMenuPlannings: any[]) => {
     try {
-      console.time("fetchDapurDashboard")
-
       // Use menu plannings from context (global cache)
       const plannings = contextMenuPlannings
-      console.log(`[DAPUR DASHBOARD CACHE] Using ${plannings.length} plannings from context`)
 
-      // ✅ FIXED: Use UTC-consistent date format for "today"
+      // ✅ FIXED: Use local time date format for "today"
       const todayString = getTodayDateString()
 
       // ✅ FIXED: Don't hardcode week range - use each planning's own date range!
@@ -195,11 +236,15 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
             }
             allMenus = [...allMenus, ...menus]
 
-            // Parse planning dates
-            const planningStartDate = parseDateAsUTC(planningStart)
-            const planningEndDate = parseDateAsUTC(planningEnd)
+            // Parse planning dates using local time
+            // Extract date part only (handle ISO datetime format)
+            const planningStartStr = planningStart.includes('T') ? planningStart.split('T')[0] : planningStart
+            const planningEndStr = planningEnd.includes('T') ? planningEnd.split('T')[0] : planningEnd
 
-            if (!planningStartDate || !planningEndDate) {
+            const planningStartDate = new Date(planningStartStr + "T00:00:00")
+            const planningEndDate = new Date(planningEndStr + "T23:59:59")
+
+            if (isNaN(planningStartDate.getTime()) || isNaN(planningEndDate.getTime())) {
               return null
             }
 
@@ -239,9 +284,14 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
             const currentDate = new Date(planningStartDate)
 
             while (currentDate <= planningEndDate) {
-              const dateString = currentDate.toISOString().split("T")[0]
+              // Use local time to format date
+              const year = currentDate.getFullYear()
+              const month = String(currentDate.getMonth() + 1).padStart(2, '0')
+              const day = String(currentDate.getDate()).padStart(2, '0')
+              const dateString = `${year}-${month}-${day}`
+
               const isHoliday = holidayDateStrings.has(dateString)
-              const dayOfWeek = currentDate.getUTCDay()
+              const dayOfWeek = currentDate.getDay()
               const adjustedDay = dayOfWeek === 0 ? 7 : dayOfWeek // 1=Monday, 7=Sunday
 
               // Count all weekdays (Senin-Sabtu = 1-6) AND NOT holidays
@@ -260,20 +310,19 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
                 })
               }
 
-              currentDate.setUTCDate(currentDate.getUTCDate() + 1)
+              currentDate.setDate(currentDate.getDate() + 1)
             }
 
-            if (!foundTodayMenu) {
-              // ✅ FIXED: Use consistent UTC-based date extraction
-              const todayMenus = menus.filter((m: any) => {
-                const menuDateString = extractMenuDateString(m.tanggal)
-                return menuDateString === todayString
-              })
-              if (todayMenus.length > 0) {
-                foundTodayMenu = {
-                  ...todayMenus[0],
-                  sekolahNama: planning.sekolah?.nama || "Unknown",
-                }
+            // Extract today's menu from this planning
+            let planningTodayMenu: any = null
+            const todayMenus = menus.filter((m: any) => {
+              const menuDateString = extractMenuDateString(m.tanggal)
+              return menuDateString === todayString
+            })
+            if (todayMenus.length > 0) {
+              planningTodayMenu = {
+                ...todayMenus[0],
+                sekolahNama: planning.sekolah?.nama || "Unknown",
               }
             }
 
@@ -288,6 +337,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
               sekolahNama: planning.sekolah?.nama || "Unknown",
               tanggalMulai: planning.tanggalMulai,
               tanggalSelesai: planning.tanggalSelesai,
+              todayMenu: planningTodayMenu,
               daysStatus,
               completedDays,
               totalDays,
@@ -338,18 +388,25 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
         .map(([date, count]) => ({ hari: date, actual: count }))
         .slice(-6)
 
-      console.timeEnd("fetchDapurDashboard")
+      // Extract todayMenu dari hasil planning pertama yang punya menu hari ini
+      foundTodayMenu = validStats.find((s: any) => s.todayMenu)?.todayMenu || null
 
-      // ✅ NORMALIZE: Fix timezone offset in API response data before caching
-      const rawData = {
+      // Normalize times to match produksi page
+      if (foundTodayMenu && foundTodayMenu.jamMulaiMasak) {
+        foundTodayMenu.jamMulaiMasak = normalizeTimeField(foundTodayMenu.jamMulaiMasak)
+      }
+      if (foundTodayMenu && foundTodayMenu.jamSelesaiMasak) {
+        foundTodayMenu.jamSelesaiMasak = normalizeTimeField(foundTodayMenu.jamSelesaiMasak)
+      }
+
+      const data = {
         menuPlanningData: validStats,
         todayMenu: foundTodayMenu,
         stats: newStats,
         produksiMingguan: produksiData,
       }
 
-      const normalizedData = normalizeDashboardData(rawData)
-      return normalizedData
+      return data
     } catch (err) {
       console.error("Error fetching dapur dashboard data:", err)
       throw err
@@ -362,7 +419,6 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
 
     // Wait for context to finish loading
     if (contextLoading) {
-      console.log("[DAPUR DASHBOARD CACHE] Waiting for context to load...")
       return
     }
 
@@ -372,7 +428,6 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
       const age = Date.now() - cached.timestamp
 
       if (age < CACHE_EXPIRY) {
-        console.log("✅ [DAPUR DASHBOARD CACHE] Using memory cache (fresh)")
         setLoading(false)
         return cached
       }
@@ -387,25 +442,22 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
           const age = Date.now() - parsed.timestamp
 
           if (age < CACHE_EXPIRY) {
-            console.log("✅ [DAPUR DASHBOARD CACHE] Using localStorage cache (fresh)")
             globalMemoryCache.set(cacheId, parsed)
             setLoading(false)
             return parsed
           } else if (age < CACHE_EXPIRY * 2) {
-            console.log("⚠️ [DAPUR DASHBOARD CACHE] Using stale cache, refetching in background")
             setLoading(false)
             globalMemoryCache.set(cacheId, parsed)
             fetchAndUpdateCache(cacheId)
             return parsed
           }
         } catch (e) {
-          console.warn("[DAPUR DASHBOARD CACHE] Failed to parse localStorage cache")
+          // Failed to parse cache
         }
       }
     }
 
     // 3. No cache, need to fetch
-    console.log("📥 [DAPUR DASHBOARD CACHE] No cache found, fetching from API")
     return fetchAndUpdateCache(cacheId)
   }, [fetchDapurDashboardData, contextLoading])
 
@@ -414,12 +466,10 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
     async (cacheId: string) => {
       // Wait for context to load
       if (contextLoading) {
-        console.log("[DAPUR DASHBOARD CACHE] Waiting for context to load...")
         return
       }
 
       if (fetchInProgress.current) {
-        console.log("[DAPUR DASHBOARD] Fetch already in progress, skipping")
         return
       }
 
@@ -447,10 +497,8 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
           localStorage.setItem(CACHE_KEY, JSON.stringify(validData))
         }
 
-        console.log("✅ [DAPUR DASHBOARD CACHE] Data updated and cached")
         return validData
       } catch (err) {
-        console.error("❌ [DAPUR DASHBOARD] Error:", err)
         setError(err instanceof Error ? err.message : "Gagal memuat data")
         throw err
       } finally {
@@ -467,7 +515,6 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
     if (typeof window !== "undefined") {
       localStorage.removeItem(CACHE_KEY)
     }
-    console.log("✅ [DAPUR DASHBOARD CACHE] Cleared")
   }, [])
 
   // ✅ Force refresh
@@ -481,7 +528,6 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
   const backgroundRefresh = useCallback(
     async (cacheId: string, onSuccess?: (data: DapurDashboardData) => void) => {
       try {
-        console.log("🔄 [DAPUR DASHBOARD] Starting background refresh...")
         const freshData = await fetchDapurDashboardData(contextPlannings)
 
         // Safety checks
@@ -502,21 +548,18 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
           localStorage.setItem(CACHE_KEY, JSON.stringify(cachedData))
         }
 
-        console.log("✅ [DAPUR DASHBOARD] Background refresh completed successfully")
-
         // Trigger callback
         if (onSuccess && typeof onSuccess === "function") {
           try {
             onSuccess(cachedData)
           } catch (callbackErr) {
-            console.error("⚠️ [DAPUR DASHBOARD] Error in onSuccess callback:", callbackErr)
+            // Error in callback
           }
         }
 
         return cachedData
       } catch (err) {
-        console.error("⚠️ [DAPUR DASHBOARD] Background refresh failed:", err)
-        // Don't throw - let UI continue with optimistic data
+        // Background refresh failed - don't throw
       }
     },
     [fetchDapurDashboardData, contextPlannings]
@@ -558,9 +601,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
         localStorage.setItem(CACHE_KEY, JSON.stringify(updatedData))
       }
 
-      console.log("✅ [DAPUR DASHBOARD CACHE] Updated with optimistic data - AUTO SYNC to all pages!")
-
-      // 📢 Emit instant update ke semua components yang subscribe
+      // Emit instant update ke semua components yang subscribe
       const validUpdatedData: DapurDashboardData = {
         menuPlanningData: Array.isArray(updatedData.menuPlanningData) ? updatedData.menuPlanningData : [],
         todayMenu: updatedData.todayMenu || null,
@@ -571,9 +612,9 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
       }
       cacheEmitter.emit(CACHE_EMIT_KEY, validUpdatedData)
 
-      // 🔄 Background refresh: Fetch latest data dari API tanpa blocking UI
+      // Background refresh: Fetch latest data dari API tanpa blocking UI
       backgroundRefresh("dapur_dashboard", (freshData) => {
-        // 📢 Emit fresh data juga
+        // Emit fresh data juga
         if (freshData) {
           const validFreshData: DapurDashboardData = {
             menuPlanningData: Array.isArray(freshData.menuPlanningData) ? freshData.menuPlanningData : [],
@@ -589,7 +630,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
           try {
             onSuccess(freshData)
           } catch (err) {
-            console.error("⚠️ [DAPUR DASHBOARD] Error in onSuccess callback:", err)
+            // Error in callback
           }
         }
       })

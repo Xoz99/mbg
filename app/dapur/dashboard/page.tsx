@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import DapurLayout from "@/components/layout/DapurLayout"
 import { useDapurDashboardCache } from "@/lib/hooks/useDapurDashboardCache"
+import { useProduksiCache } from "@/lib/hooks/useProduksiCache"
 import {
   ChefHat,
   CheckCircle,
@@ -86,15 +87,38 @@ const DashboardDapur = () => {
 
   // ✅ Callback untuk update state ketika data di-fetch dari background
   const handleCacheUpdate = useCallback((data: any) => {
-    console.log("[Dashboard] Cache updated from background")
     setMenuPlanningData(data.menuPlanningData || [])
-    setTodayMenu(data.todayMenu || null)
     setStats(data.stats || { targetHariIni: 0, totalSekolah: 0 })
     setProduksiMingguan(data.produksiMingguan || [])
   }, [])
 
-  // ✅ Use custom hook dengan callback untuk handle background fetch
-  const { loading, error, loadData, refreshData } = useDapurDashboardCache(handleCacheUpdate)
+  // ✅ Use custom hook untuk fetch menu planning data dan stats
+  const { loading, loadData, refreshData } = useDapurDashboardCache(handleCacheUpdate)
+
+  // ✅ Use produksi cache for menu hari ini times (correct time display)
+  const { batches } = useProduksiCache()
+
+  // ✅ Extract today's menu from first batch with correct times
+  useEffect(() => {
+    if (batches && batches.length > 0) {
+      const firstBatch = batches.find((b) => b.dailyMenu)
+      if (firstBatch && firstBatch.dailyMenu) {
+        setTodayMenu({
+          namaMenu: firstBatch.dailyMenu.namaMenu || "Menu",
+          sekolahNama: firstBatch.sekolahName,
+          kalori: firstBatch.dailyMenu.kalori || 0,
+          protein: firstBatch.dailyMenu.protein || 0,
+          biayaPerTray: firstBatch.dailyMenu.biayaPerTray || 0,
+          jamMulaiMasak: firstBatch.startTime || "",
+          jamSelesaiMasak: firstBatch.endTime || "",
+        })
+      } else {
+        setTodayMenu(null)
+      }
+    } else {
+      setTodayMenu(null)
+    }
+  }, [batches])
 
   useEffect(() => {
     const userData = localStorage.getItem("mbg_user")
@@ -125,7 +149,6 @@ const DashboardDapur = () => {
         const data = await loadData()
         if (data) {
           setMenuPlanningData(data.menuPlanningData || [])
-          setTodayMenu(data.todayMenu || null)
           setStats(data.stats || { targetHariIni: 0, totalSekolah: 0 })
           setProduksiMingguan(data.produksiMingguan || [])
         }
@@ -166,26 +189,12 @@ const DashboardDapur = () => {
             <h1 className="text-3xl font-bold text-[#1B263A]">Dashboard Dapur</h1>
             <p className="text-sm text-[#1B263A]/60 mt-2">Selamat datang, {userInfo.dapurName}</p>
           </div>
-          <div className="flex items-center gap-3">
-          </div>
         </div>
 
         {loading ? (
           <SkeletonLoader />
         ) : (
           <>
-            {error && (
-              <div className="rounded-xl border border-[#D0B064]/30 bg-gradient-to-br from-[#1B263A]/10 to-[#D0B064]/10 p-4 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-[#D0B064] flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-[#1B263A]">Error Memuat Data</p>
-                    <p className="text-sm text-[#1B263A]/70 mt-1">{error}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {menuPlanningStats.incomplete > 0 && (
               <div className="rounded-xl border border-[#D0B064]/40 bg-gradient-to-br from-[#1B263A]/5 via-[#D0B064]/5 to-[#1B263A]/10 p-6 shadow-sm">
                 <div className="flex items-start gap-4 mb-4">
