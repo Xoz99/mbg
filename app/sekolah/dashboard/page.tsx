@@ -30,6 +30,8 @@ import {
   Legend,
 } from "recharts"
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
+
 const SkeletonStatCard = () => (
   <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 shadow-sm border border-slate-200 animate-pulse">
     <div className="h-10 w-10 bg-slate-300 rounded-xl mb-3"></div>
@@ -588,6 +590,81 @@ const DashboardSekolah = () => {
     }
 
     fetchAllData()
+
+    // ✅ Function to fetch and update reminder data
+    const fetchReminderUpdate = async () => {
+      try {
+        console.log("[REMINDER POLLING] Fetching fresh reminder data from kalender akademik...")
+        const reminderResponse = await fetch(`${API_BASE_URL}/api/kalender-akademik`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (reminderResponse.ok) {
+          const kalenderData = await reminderResponse.json()
+
+          // Parse kalender data (same logic as in useSekolahDataCache)
+          let kalenders = []
+          if (kalenderData.data?.kalenders && Array.isArray(kalenderData.data.kalenders)) {
+            kalenders = kalenderData.data.kalenders
+          } else if (kalenderData.kalenders && Array.isArray(kalenderData.kalenders)) {
+            kalenders = kalenderData.kalenders
+          } else if (Array.isArray(kalenderData.data)) {
+            kalenders = kalenderData.data
+          } else if (Array.isArray(kalenderData)) {
+            kalenders = kalenderData
+          }
+
+          // Find upcoming event (same logic as in useSekolahDataCache)
+          const sortedKalenders = kalenders.sort((a: any, b: any) => {
+            const dateA = new Date(a.tanggalMulai).getTime()
+            const dateB = new Date(b.tanggalMulai).getTime()
+            return dateA - dateB
+          })
+
+          let updatedReminder = null
+          if (sortedKalenders.length > 0) {
+            const upcomingEvent =
+              sortedKalenders.find((k: any) => {
+                const eventDate = new Date(k.tanggalMulai)
+                return eventDate >= new Date()
+              }) || sortedKalenders[0]
+
+            if (upcomingEvent) {
+              updatedReminder = {
+                tanggalMulai: upcomingEvent.tanggalMulai,
+                deskripsi: upcomingEvent.deskripsi || "Kegiatan akademik",
+                status: "scheduled",
+                events: sortedKalenders.slice(0, 10), // Include upcoming events
+              }
+            }
+          }
+
+          if (updatedReminder) {
+            setKalenderReminder(updatedReminder)
+            console.log("[REMINDER POLLING] ✅ Reminder updated:", updatedReminder)
+          } else {
+            console.log("[REMINDER POLLING] ℹ️ No upcoming events found")
+          }
+        }
+      } catch (err) {
+        console.warn("[REMINDER POLLING] ⚠️ Failed to fetch reminder:", err)
+      }
+    }
+
+    // ✅ Fetch reminder immediately first
+    setTimeout(() => {
+      fetchReminderUpdate()
+    }, 500) // Small delay to ensure initial data is loaded
+
+    // ✅ Setup polling for reminder data (every 15 seconds) for faster realtime updates
+    const pollReminderData = setInterval(fetchReminderUpdate, 15 * 1000) // Poll every 15 seconds
+
+    return () => {
+      clearInterval(pollReminderData)
+    }
   }, [credentialsReady, loadData, handleCacheUpdate]) // Re-run when credentialsReady changes
 
   if (loading) {

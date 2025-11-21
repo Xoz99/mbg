@@ -4,7 +4,7 @@ import { useDapurContext } from "@/lib/context/DapurContext"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
 const CACHE_KEY = "dapur_menu_cache"
-const CACHE_EXPIRY = 2 * 60 * 1000 // 2 minutes
+const CACHE_EXPIRY = 10 * 60 * 1000 // 10 minutes - Longer cache to avoid unnecessary refetch when navigating back
 const CACHE_EMIT_KEY = "dapur_menu_cache_update"
 
 function simpleHash(str: string): string {

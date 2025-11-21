@@ -21,7 +21,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import Link from "next/link"
 
-const REFRESH_INTERVAL = 300000
+const REFRESH_INTERVAL = 120000 // 🔥 OPTIMIZATION: Reduced from 5min (300s) to 2min (120s) for faster updates
 
 const SkeletonLoader = () => (
   <div className="space-y-6 animate-pulse">
@@ -138,7 +138,7 @@ const DashboardDapur = () => {
     }
   }, [batches])
 
-  // ✅ Setup auto-play carousel
+  // 🔥 OPTIMIZATION: Setup auto-play carousel with better cleanup
   useEffect(() => {
     if (todayMenus.length <= 1) {
       // No need for carousel if 0 or 1 menu
@@ -155,12 +155,13 @@ const DashboardDapur = () => {
     }, 5000)
 
     return () => {
+      // 🔥 Ensure proper cleanup to prevent memory leaks
       if (autoPlayIntervalRef.current) {
         clearInterval(autoPlayIntervalRef.current)
         autoPlayIntervalRef.current = null
       }
     }
-  }, [todayMenus])
+  }, [todayMenus.length])
 
   // Helper to get current menu
   const currentMenu = todayMenus.length > 0 ? todayMenus[currentMenuIndex] : null
@@ -218,13 +219,13 @@ const DashboardDapur = () => {
     }
   }, [refreshData])
 
-  // ✅ Show page only when ALL data is loaded
+  // 🔥 OPTIMIZATION: Show dashboard as soon as dashboard data loads (don't wait for produksi)
   useEffect(() => {
-    // Wait for both dashboard and produksi data to load
-    if (!dashboardLoading && !produksiLoading && menuPlanningData.length > 0) {
+    // Dashboard can render with just dashboard data, produksi batches will update carousel separately
+    if (!dashboardLoading && menuPlanningData.length > 0) {
       setIsLoadingComplete(true)
     }
-  }, [dashboardLoading, produksiLoading, menuPlanningData])
+  }, [dashboardLoading, menuPlanningData])
 
   const menuPlanningStats = useMemo(() => {
     const total = menuPlanningData.length || 1
@@ -405,9 +406,10 @@ const DashboardDapur = () => {
                           key={index}
                           onClick={() => {
                             setCurrentMenuIndex(index)
-                            // Reset auto-play when user clicks
+                            // 🔥 Reset auto-play when user clicks - with proper cleanup
                             if (autoPlayIntervalRef.current) {
                               clearInterval(autoPlayIntervalRef.current)
+                              autoPlayIntervalRef.current = null
                             }
                             autoPlayIntervalRef.current = setInterval(() => {
                               setCurrentMenuIndex((prev) => (prev + 1) % todayMenus.length)

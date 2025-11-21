@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { apiCache, generateCacheKey } from "@/lib/utils/cache"
 import DapurLayout from "@/components/layout/DapurLayout"
 import { useMenuCache, type MenuData } from "@/lib/hooks/useMenuCache"
+import { useMenuPlanningRealtime } from "@/lib/hooks/useMenuPlanningRealtime"
 import {
   Calendar,
   ChefHat,
@@ -916,20 +917,21 @@ function ModalCreateMenuHarian({
 
 export default function MenuPlanningPage() {
   // ✅ Use custom hook untuk load menuPlannings dan sekolahList
-  const [menuPlannings, setMenuPlannings] = useState<MenuPlanning[]>([])
   const [sekolahList, setSekolahList] = useState<Sekolah[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const handleCacheUpdate = useCallback((data: MenuData) => {
     console.log("[MENU PAGE] handleCacheUpdate called with:", data)
-    console.log("[MENU PAGE] menuPlannings:", data.menuPlannings.length, "items")
     console.log("[MENU PAGE] sekolahList:", data.sekolahList.length, "items")
-    setMenuPlannings(data.menuPlannings)
     setSekolahList(data.sekolahList)
   }, [])
 
-  const { loading: cacheLoading, error: cacheError, loadData: loadMenuData, refreshData: refreshMenuCache } = useMenuCache(handleCacheUpdate)
+  const { loading: cacheLoading, error: cacheError, loadData: loadMenuData, refreshData: refreshMenuCache, updateCache } = useMenuCache(handleCacheUpdate)
+
+  // 🔥 REALTIME HOOK - untuk add/delete dengan instant update + cache sync
+  // menuPlannings dari hook ini langsung sync dengan context saat add/delete
+  const { menuPlannings, addMenuPlanning, deleteMenuPlanning } = useMenuPlanningRealtime()
 
   // Local states
   const [menuHarianList, setMenuHarianList] = useState<MenuHarian[]>([])
@@ -944,6 +946,8 @@ export default function MenuPlanningPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showCreateMenuModal, setShowCreateMenuModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null) // 🔥 Track which planning is being deleted
+  const [isDeletingMenu, setIsDeletingMenu] = useState<string | null>(null) // 🔥 Track which menu harian is being deleted
 
   const [displayMonth, setDisplayMonth] = useState<Date>(new Date())
   const [showCompletedWeeks, setShowCompletedWeeks] = useState(false)
@@ -1011,8 +1015,9 @@ export default function MenuPlanningPage() {
     loadMenuData()
   }, [loadMenuData])
 
-  // ✅ Sync loading dan error state dari hook
+  // ✅ Sync loading dan error state dari both hooks
   useEffect(() => {
+    // Show loading hanya jika cache masih loading (realtime hook loading itu normal)
     setLoading(cacheLoading)
     if (cacheError) setError(cacheError)
   }, [cacheLoading, cacheError])
@@ -1284,16 +1289,11 @@ export default function MenuPlanningPage() {
 
       console.log("[DEBUG CREATE PLANNING] REQUEST BODY:", JSON.stringify(requestBody, null, 2))
 
-      await apiCall("/api/menu-planning", {
-        method: "POST",
-        body: JSON.stringify(requestBody),
-      })
-      console.log("[DEBUG CREATE PLANNING] API RESPONSE: SUCCESS")
+      // 🔥 USE REALTIME HOOK - Automatic optimistic add + temp ID handling!
+      const newPlanning = await addMenuPlanning(requestBody)
+      console.log("[CREATE PLANNING] ✅ Added planning:", newPlanning.id)
 
-      // ✅ Invalidate cache agar data fresh
-      await refreshMenuCache()
-
-      alert("Menu planning berhasil dibuat")
+      alert("✅ Menu planning berhasil dibuat")
       setShowCreateModal(false)
       setFormData({
         mingguanKe: "1",
@@ -1420,6 +1420,8 @@ export default function MenuPlanningPage() {
   const handleDeleteMenuHarian = async (menuId: string) => {
     if (!confirm("Apakah kamu yakin ingin menghapus menu ini?")) return
 
+    setIsDeletingMenu(menuId) // 🔥 Set loading state
+
     try {
       await apiCall(`/api/menu-harian/${menuId}`, {
         method: "DELETE",
@@ -1430,30 +1432,51 @@ export default function MenuPlanningPage() {
       apiCache.remove(cacheKeyMenuHarian)
       console.log("[DEBUG] Cleared cache for menu-harian endpoint after delete:", cacheKeyMenuHarian)
 
-      alert("Menu berhasil dihapus")
+      // 🔥 Show success with animation
       setMenuHarianList(menuHarianList.filter(m => m.id !== menuId))
 
       // ✅ Refresh menu cache agar konsisten
       await refreshMenuCache()
+
+      alert("✅ Menu berhasil dihapus")
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Gagal menghapus menu")
+      alert("❌ " + (err instanceof Error ? err.message : "Gagal menghapus menu"))
+    } finally {
+      setIsDeletingMenu(null) // 🔥 Clear loading state
     }
   }
 
-  // 🎯 ✅ TAMBAH FUNGSI DELETE MENU PLANNING INI
+  // 🎯 ✅ DELETE MENU PLANNING - REALTIME dengan rollback otomatis
   const handleDeleteMenuPlanning = async (planningId: string) => {
+    // 🔥 PREVENT DOUBLE-CLICK
+    if (isDeleting) {
+      console.log("[DELETE] Sedang menghapus planning lain, tunggu sebentar...")
+      return
+    }
+
     if (!confirm("Apakah kamu yakin ingin menghapus menu planning ini? Data menu harian akan ikut terhapus.")) return
 
+    setIsDeleting(planningId)
+
     try {
-      await apiCall(`/api/menu-planning/${planningId}`, {
-        method: "DELETE",
-      })
-      alert("Menu planning berhasil dihapus")
-      setMenuPlannings(menuPlannings.filter(p => p.id !== planningId))
-      setSelectedPlanningId("")
-      setMenuHarianList([])
+      console.log(`[DELETE] Menghapus planning: ${planningId}`)
+
+      // 🔥 USE REALTIME HOOK - Automatic optimistic remove + rollback on error!
+      await deleteMenuPlanning(planningId)
+
+      // Jika planning ini yang currently selected, clear selection
+      if (selectedPlanningId === planningId) {
+        setSelectedPlanningId("")
+        setMenuHarianList([])
+      }
+
+      alert("✅ Menu planning berhasil dihapus")
+
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Gagal menghapus menu planning")
+      console.error(`[DELETE] ❌ Error: ${err}`)
+      alert("❌ " + (err instanceof Error ? err.message : "Gagal menghapus menu planning"))
+    } finally {
+      setIsDeleting(null)
     }
   }
 
@@ -1717,13 +1740,22 @@ export default function MenuPlanningPage() {
                             <span className="text-sm font-semibold">Minggu {planning.mingguanKe}</span>
                             <span className="text-xs opacity-90">{formatPeriode(planning.tanggalMulai, planning.tanggalSelesai)}</span>
                           </button>
-                          {/* 🗑️ DELETE BUTTON */}
+                          {/* 🗑️ DELETE BUTTON WITH LOADING ANIMATION */}
                           <button
                             onClick={() => handleDeleteMenuPlanning(planning.id)}
-                            className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg"
-                            title="Hapus menu planning"
+                            disabled={isDeleting === planning.id}
+                            className={`absolute -top-2 -right-2 transition rounded-full p-1 shadow-lg flex items-center justify-center ${
+                              isDeleting === planning.id
+                                ? "opacity-100 bg-orange-500 cursor-wait"
+                                : "opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600"
+                            }`}
+                            title={isDeleting === planning.id ? "Menghapus..." : "Hapus menu planning"}
                           >
-                            <X className="w-4 h-4" />
+                            {isDeleting === planning.id ? (
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <X className="w-4 h-4" />
+                            )}
                           </button>
                         </div>
                       ))
@@ -1864,9 +1896,19 @@ export default function MenuPlanningPage() {
                       </div>
                       <button
                         onClick={() => handleDeleteMenuHarian(menu.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                        disabled={isDeletingMenu === menu.id}
+                        className={`p-2 rounded-lg transition flex items-center justify-center ${
+                          isDeletingMenu === menu.id
+                            ? "bg-orange-100 text-orange-600 cursor-wait"
+                            : "text-red-600 hover:bg-red-50"
+                        }`}
+                        title={isDeletingMenu === menu.id ? "Menghapus..." : "Hapus menu"}
                       >
-                        <Trash2 className="w-5 h-5" />
+                        {isDeletingMenu === menu.id ? (
+                          <div className="w-5 h-5 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <Trash2 className="w-5 h-5" />
+                        )}
                       </button>
                     </div>
 

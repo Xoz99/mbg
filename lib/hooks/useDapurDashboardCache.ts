@@ -4,7 +4,7 @@ import { useDapurContext } from "@/lib/context/DapurContext"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz"
 const CACHE_KEY = "dapur_dashboard_cache"
-const CACHE_EXPIRY = 1 * 60 * 1000 // 1 minute
+const CACHE_EXPIRY = 10 * 60 * 1000 // 10 minutes - Longer cache to avoid unnecessary refetch when navigating back
 const CACHE_EMIT_KEY = "dapur_dashboard_cache_update"
 
 // ✅ Simple hash function untuk compare data changes
@@ -210,22 +210,61 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
       let foundTodayMenu: any = null
       let allMenus: any[] = []
 
-      const weeklyStats = await Promise.all(
+      // 🔥 OPTIMIZATION: Batch API calls with queue to limit concurrent requests (max 3)
+      class RequestQueue {
+        private queue: Array<() => Promise<any>> = [];
+        private running = 0;
+        private maxConcurrent = 3;
+
+        async add<T>(fn: () => Promise<T>): Promise<T> {
+          return new Promise((resolve, reject) => {
+            this.queue.push(async () => {
+              try {
+                const result = await fn();
+                resolve(result);
+              } catch (error) {
+                reject(error);
+              }
+            });
+            this.process();
+          });
+        }
+
+        private async process() {
+          if (this.running >= this.maxConcurrent || this.queue.length === 0) return;
+          this.running++;
+          const fn = this.queue.shift();
+          if (fn) {
+            await fn();
+            this.running--;
+            this.process();
+          }
+        }
+      }
+
+      const requestQueue = new RequestQueue();
+
+      const weeklyStats = await Promise.allSettled(
         plannings.map(async (planning: any) => {
           try {
             // ✅ Use planning's date range, not current week!
             const planningStart = planning.tanggalMulai
             const planningEnd = planning.tanggalSelesai
 
-            const menuRes = await apiCall<any>(
-              `/api/menu-planning/${planning.id}/menu-harian?limit=20&page=1&startDate=${planningStart}&endDate=${planningEnd}`
-            )
+            // 🔥 OPTIMIZATION: Queue menu fetch to limit concurrent requests
+            const menuRes = await requestQueue.add(() =>
+              apiCall<any>(
+                `/api/menu-planning/${planning.id}/menu-harian?limit=20&page=1&startDate=${planningStart}&endDate=${planningEnd}`
+              )
+            );
             let menus = extractArray(menuRes?.data || [])
 
-            // ✅ FIXED: Fetch calendar akademik per sekolah (sekolahId required!)
+            // 🔥 OPTIMIZATION: Batch kalender akademik calls with request queue
             let holidays: string[] = []
             try {
-              const calendarRes = await apiCall<any>(`/api/kalender-akademik?sekolahId=${planning.sekolahId}&limit=100`)
+              const calendarRes = await requestQueue.add(() =>
+                apiCall<any>(`/api/kalender-akademik?sekolahId=${planning.sekolahId}&limit=100`)
+              );
               // API returns: { data: { kalenders: [...], pagination: {...} } }
               const calendarList = calendarRes?.data?.kalenders || []
               holidays = calendarList
@@ -351,8 +390,10 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
         }),
       )
 
+      // 🔥 Handle Promise.allSettled results
       const validStats = weeklyStats
-        .filter((s) => s !== null)
+        .filter((result: any) => result.status === 'fulfilled' && result.value !== null)
+        .map((result: any) => result.value)
         .sort((a, b) => {
           if (a.status === b.status) return 0
           return a.status === "COMPLETE" ? -1 : 1

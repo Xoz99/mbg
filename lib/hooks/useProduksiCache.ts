@@ -110,7 +110,42 @@ function normalizeDateString(dateString: string | null | undefined): string | nu
 
 interface UseProduksiCacheOptions {
   pollingInterval?: number;
+  menuDataProvider?: () => Promise<any>; // 🔥 OPTIMIZATION: Accept menu data from parent instead of fetching
 }
+
+// 🔥 OPTIMIZATION: Simple request queue to limit concurrent API calls (max 3)
+class RequestQueue {
+  private queue: Array<() => Promise<any>> = [];
+  private running = 0;
+  private maxConcurrent = 3;
+
+  async add<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await fn();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      this.process();
+    });
+  }
+
+  private async process() {
+    if (this.running >= this.maxConcurrent || this.queue.length === 0) return;
+    this.running++;
+    const fn = this.queue.shift();
+    if (fn) {
+      await fn();
+      this.running--;
+      this.process();
+    }
+  }
+}
+
+const requestQueue = new RequestQueue();
 
 export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
   const [loading, setLoading] = useState(true);
@@ -130,107 +165,174 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
     try {
       const fetchStartTime = performance.now();
 
-      // Get today's date in UTC first (what backend uses)
+      // Get today's date in local browser time (Indonesia UTC+7)
+      // This matches the date that users see on their calendar
       const now = new Date();
-      const utcDate = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const today = `${year}-${month}-${day}`;
 
-      // Also get local date (timezone +7) for fallback
-      const todayLocalDate = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-      const localDate = `${todayLocalDate.getUTCFullYear()}-${String(todayLocalDate.getUTCMonth() + 1).padStart(2, '0')}-${String(todayLocalDate.getUTCDate()).padStart(2, '0')}`;
-
-      // Use local date since API likely filters by local date
-      let today = localDate;
-
-      console.log(`[useProduksiCache] UTC date: ${utcDate}, Local date (UTC+7): ${localDate}, Using: ${today}`);
+      console.log(`[useProduksiCache] 🔍 Today's date (browser local): ${today}, current time: ${now.toLocaleString('id-ID')}`);
 
       console.log(`[useProduksiCache] Using ${plannings.length} plannings from context`);
 
-      // Parallel fetch menu-harian (fetch multiple to ensure we get today's menu)
-      const menuPromises = plannings.map((planning) =>
-        apiCall<any>(
-          `/api/menu-planning/${planning.id}/menu-harian?limit=30&page=1`,
-          {},
-          20000
-        )
-          .then((menuRes) => {
-            const menus = extractArray(menuRes?.data || []);
-            return { planning, menus };
-          })
-          .catch((err) => {
-            console.warn(`[useProduksiCache] Gagal fetch menu untuk planning ${planning.id}:`, err);
-            return { planning, menus: [] };
-          })
-      );
+      // 🔥 OPTIMIZATION: Try to use unified `/api/menu-harian/today` endpoint first (SINGLE API CALL!)
+      let menuResults: any[] = [];
 
-      const menuStartTime = performance.now();
-      const menuResults = await Promise.all(menuPromises);
-      const menuEndTime = performance.now();
-      console.log(`[useProduksiCache] Fetch menus took ${(menuEndTime - menuStartTime).toFixed(2)}ms`);
+      try {
+        console.log(`[useProduksiCache] 🎯 Attempting to fetch from unified /api/menu-harian/today endpoint...`);
+        const todayMenuResponse = await apiCall<any>(
+          `/api/menu-harian/today`,
+          {},
+          15000
+        );
+
+        const todayMenusList = extractArray(todayMenuResponse?.data || []);
+
+        if (todayMenusList && todayMenusList.length > 0) {
+          console.log(`[useProduksiCache] ✅ Got ${todayMenusList.length} menus from /api/menu-harian/today endpoint!`);
+
+          // Group menus by planning for compatibility with existing code
+          const menusByPlanning = new Map<string, any[]>();
+
+          todayMenusList.forEach((menu: any) => {
+            const planningId = menu.planningId || menu.menuPlanningId;
+            if (planningId) {
+              if (!menusByPlanning.has(planningId)) {
+                menusByPlanning.set(planningId, []);
+              }
+              menusByPlanning.get(planningId)?.push(menu);
+            }
+          });
+
+          // Convert to menuResults format
+          menuResults = Array.from(menusByPlanning.entries()).map(([planningId, menus]) => ({
+            planning: plannings.find(p => p.id === planningId),
+            menus
+          })).filter(item => item.planning);
+
+          console.log(`[useProduksiCache] ✨ Grouped into ${menuResults.length} planning groups`);
+        } else {
+          console.log(`[useProduksiCache] ℹ️ /api/menu-harian/today returned empty, will try fallback`);
+          throw new Error('Empty response');
+        }
+      } catch (err) {
+        console.warn(`[useProduksiCache] ⚠️ Unified endpoint failed, falling back to per-planning fetch:`, err);
+
+        // Fallback: fetch menus per planning via request queue (max 3 concurrent)
+        const menuStartTime = performance.now();
+
+        const menuResults_temp: any = await Promise.allSettled(
+          plannings.map((planning) =>
+            requestQueue.add(() =>
+              apiCall<any>(
+                `/api/menu-planning/${planning.id}/menu-harian?limit=30&page=1`,
+                {},
+                20000
+              )
+                .then((menuRes) => {
+                  const menus = extractArray(menuRes?.data || []);
+                  return { planning, menus };
+                })
+            )
+          )
+        );
+
+        menuResults = menuResults_temp
+          .filter((result: any) => result.status === 'fulfilled')
+          .map((result: any) => result.value)
+          .filter((item: any) => item);
+
+        const menuEndTime = performance.now();
+        console.log(`[useProduksiCache] 📦 Fallback: Fetch menus took ${(menuEndTime - menuStartTime).toFixed(2)}ms (with request queue, max 3 concurrent)`);
+      }
 
       // Filter menus - hanya ambil yang tanggalnya sama dengan TODAY
-      const todayMenus: any[] = [];
-      menuResults.forEach(({ planning, menus }) => {
-        console.log(`[useProduksiCache] Planning ${planning.id} returned ${menus.length} menus`);
-        menus.forEach((menu) => {
+      let todayMenusList: any[] = [];
+      console.log(`[useProduksiCache] 📋 Starting to filter menus from ${menuResults.length} planning results...`);
+
+      menuResults.forEach(({ planning, menus }: any) => {
+        if (!planning) {
+          console.warn(`[useProduksiCache] ⚠️ Planning is null for some menu results`);
+          return;
+        }
+        console.log(`[useProduksiCache] 📚 Planning "${planning.sekolah?.nama || planning.id}" returned ${menus?.length || 0} menus`);
+
+        if (!menus || menus.length === 0) {
+          console.log(`[useProduksiCache] ℹ️ No menus returned for this planning`);
+          return;
+        }
+
+        menus.forEach((menu: any) => {
           const menuDate = normalizeDateString(menu.tanggal);
-          console.log(`[useProduksiCache] Menu ${menu.id}: stored as ${menu.tanggal}, normalized to ${menuDate}, comparing with ${today}`);
-          if (menuDate === today) {
-            console.log(`[useProduksiCache] ✅ MATCH! Found menu for today: ${menuDate}`);
-            todayMenus.push({ planning, menu });
+          const isMatch = menuDate === today;
+
+          if (!isMatch) {
+            console.log(`[useProduksiCache] ❌ Menu "${menu.namaMenu || menu.id}": tanggal=${menu.tanggal}, normalized=${menuDate}, expected=${today}`);
+          } else {
+            console.log(`[useProduksiCache] ✅ MATCH! Menu "${menu.namaMenu}": ${menuDate}`);
+            todayMenusList.push({ planning, menu });
           }
         });
       });
 
-      console.log(`[useProduksiCache] Found ${todayMenus.length} menus for today (target date: ${today})`);
+      console.log(`[useProduksiCache] ✨ Summary: Found ${todayMenusList.length} menus for today (target: ${today})`);
 
-      // Parallel fetch checkpoint
+      // 🔥 OPTIMIZATION: Fetch checkpoints via request queue (max 3 concurrent)
       const checkpointStartTime = performance.now();
-      const batchPromises = todayMenus.map(({ planning, menu }) =>
-        apiCall<any>(
-          `/api/menu-harian/${menu.id}/checkpoint?limit=10`,
-          {},
-          15000
-        )
-          .catch(() => ({ data: { data: [] } }))
-          .then((checkpointRes) => {
-            const checkpoints = extractArray(checkpointRes?.data || []);
-            const sekolahName = planning.sekolah?.nama || 'Unknown';
-            const targetTrays = menu.targetTray || 1200;
+      const batchPromises = todayMenusList.map(({ planning, menu }) =>
+        requestQueue.add(() =>
+          apiCall<any>(
+            `/api/menu-harian/${menu.id}/checkpoint?limit=10`,
+            {},
+            15000
+          )
+            .catch(() => ({ data: { data: [] } }))
+            .then((checkpointRes) => {
+              const checkpoints = extractArray(checkpointRes?.data || []);
+              const sekolahName = planning.sekolah?.nama || 'Unknown';
+              const targetTrays = menu.targetTray || 1200;
 
-            return {
-              id: `BATCH-${menu.id}`,
-              dailyMenu: menu,
-              menuId: menu.id,
-              sekolahId: planning.sekolahId,
-              sekolahName: sekolahName,
-              status:
-                checkpoints.length >= 4
-                  ? 'COMPLETED'
-                  : checkpoints.length >= 2
-                    ? 'IN_PROGRESS'
-                    : 'PREPARING',
-              expectedTrays: targetTrays,
-              packedTrays:
-                checkpoints.length >= 3
-                  ? targetTrays
-                  : checkpoints.length >= 2
-                    ? Math.round(targetTrays / 2)
-                    : 0,
-              checkpoints: checkpoints,
-              createdBy: 'System',
-              startTime: menu.jamMulaiMasak,
-              endTime: menu.jamSelesaiMasak,
-            } as ProduksiBatch;
-          })
-          .catch((err) => {
-            console.warn(`[useProduksiCache] Gagal fetch batch data untuk menu ${menu.id}:`, err);
-            return null;
-          })
+              return {
+                id: `BATCH-${menu.id}`,
+                dailyMenu: menu,
+                menuId: menu.id,
+                sekolahId: planning.sekolahId,
+                sekolahName: sekolahName,
+                status:
+                  checkpoints.length >= 4
+                    ? 'COMPLETED'
+                    : checkpoints.length >= 2
+                      ? 'IN_PROGRESS'
+                      : 'PREPARING',
+                expectedTrays: targetTrays,
+                packedTrays:
+                  checkpoints.length >= 3
+                    ? targetTrays
+                    : checkpoints.length >= 2
+                      ? Math.round(targetTrays / 2)
+                      : 0,
+                checkpoints: checkpoints,
+                createdBy: 'System',
+                startTime: menu.jamMulaiMasak,
+                endTime: menu.jamSelesaiMasak,
+              } as ProduksiBatch;
+            })
+            .catch((err) => {
+              console.warn(`[useProduksiCache] Gagal fetch batch data untuk menu ${menu.id}:`, err);
+              return null;
+            })
+        )
       );
 
-      const batchesData = (await Promise.all(batchPromises)).filter((b) => b !== null);
+      const batchesData = (await Promise.allSettled(batchPromises))
+        .filter((result: any) => result.status === 'fulfilled')
+        .map((result: any) => result.value)
+        .filter((b: any) => b !== null);
+
       const checkpointEndTime = performance.now();
-      console.log(`[useProduksiCache] Fetch checkpoints took ${(checkpointEndTime - checkpointStartTime).toFixed(2)}ms`);
+      console.log(`[useProduksiCache] Fetch checkpoints took ${(checkpointEndTime - checkpointStartTime).toFixed(2)}ms (with request queue, max 3 concurrent)`);
 
       console.log(`[useProduksiCache] Created ${batchesData.length} batches`);
       const fetchEndTime = performance.now();
@@ -395,15 +497,27 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
 
   // ✅ FIXED: Initialize when context plannings are ready
   useEffect(() => {
-    if (hasInitialized.current) return;
-    if (typeof window === 'undefined') return;
-    if (contextLoading) return; // ✅ Wait for context loading to finish
+    if (hasInitialized.current) {
+      console.log('[useProduksiCache] ℹ️ Already initialized, skipping');
+      return;
+    }
+    if (typeof window === 'undefined') {
+      console.log('[useProduksiCache] ℹ️ Server-side rendering, skipping');
+      return;
+    }
+
+    if (contextLoading) {
+      console.log('[useProduksiCache] ⏳ Context still loading, waiting...');
+      return; // ✅ Wait for context loading to finish
+    }
+
     if (!menuPlannings || menuPlannings.length === 0) {
-      console.log('[useProduksiCache] No menu plannings from context');
+      console.log('[useProduksiCache] ⚠️ No menu plannings from context (yet)');
       setLoading(false);
       return;
     }
 
+    console.log(`[useProduksiCache] 🚀 Starting initialization with ${menuPlannings.length} plannings from context`);
     hasInitialized.current = true;
 
     const initializeProduksiData = async () => {
@@ -411,15 +525,15 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
       const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
 
       if (!userData || !token) {
-        console.log('[useProduksiCache] No user data or token found');
+        console.log('[useProduksiCache] ❌ No user data or token found');
         setLoading(false);
         return;
       }
 
       try {
-        console.log('[useProduksiCache] Initializing...');
-        const result = await loadData(menuPlannings);
-        console.log('[useProduksiCache] Initialize complete');
+        console.log('[useProduksiCache] 🔄 Fetching produksi data...');
+        await loadData(menuPlannings);
+        console.log('[useProduksiCache] ✅ Initialize complete');
 
         const cacheId = 'produksi_cache';
         if (pollingIntervalMs > 0) {

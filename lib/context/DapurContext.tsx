@@ -26,6 +26,8 @@ interface DapurContextType {
 
   // Methods
   refetchMenuPlannings: () => Promise<void>
+  addPlanning: (planning: MenuPlanning) => void
+  removePlanning: (planningId: string) => void
 }
 
 const DapurContext = createContext<DapurContextType | undefined>(undefined)
@@ -73,6 +75,7 @@ export function DapurProvider({ children }: { children: ReactNode }) {
   // Fetch menu plannings sekali saja
   const fetchMenuPlannings = useCallback(async () => {
     try {
+      console.log('🔄 [DapurContext] Starting fetch menu plannings...');
       setIsLoading(true)
       setError(null)
 
@@ -80,11 +83,20 @@ export function DapurProvider({ children }: { children: ReactNode }) {
       const plannings = extractArray(planningRes.data || [])
       setMenuPlannings(plannings)
 
-      console.log('✅ [DapurContext] Menu plannings loaded:', plannings.length)
+      if (plannings.length > 0) {
+        console.log(`✅ [DapurContext] Menu plannings loaded: ${plannings.length} items`)
+        console.log('[DapurContext] Sample planning:', {
+          id: plannings[0].id,
+          sekolah: plannings[0].sekolah?.nama,
+          mingguanKe: plannings[0].mingguanKe
+        })
+      } else {
+        console.warn('⚠️ [DapurContext] No menu plannings returned from API')
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load menu plannings'
       setError(message)
-      console.error('❌ [DapurContext] Error:', err)
+      console.error('❌ [DapurContext] Error fetching menu plannings:', err)
     } finally {
       setIsLoading(false)
     }
@@ -102,11 +114,25 @@ export function DapurProvider({ children }: { children: ReactNode }) {
     await fetchMenuPlannings()
   }, [fetchMenuPlannings])
 
+  // 🔥 Add planning ke context (for realtime updates)
+  const addPlanning = useCallback((planning: MenuPlanning) => {
+    setMenuPlannings(prev => [...prev, planning])
+    console.log('[DapurContext] ✅ Added planning:', planning.id)
+  }, [])
+
+  // 🔥 Remove planning dari context (for realtime updates)
+  const removePlanning = useCallback((planningId: string) => {
+    setMenuPlannings(prev => prev.filter(p => p.id !== planningId))
+    console.log('[DapurContext] ✅ Removed planning:', planningId)
+  }, [])
+
   const value: DapurContextType = {
     menuPlannings,
     isLoading,
     error,
     refetchMenuPlannings,
+    addPlanning,
+    removePlanning,
   }
 
   return <DapurContext.Provider value={value}>{children}</DapurContext.Provider>
