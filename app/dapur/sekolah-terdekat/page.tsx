@@ -59,7 +59,11 @@ export default function DapurSekolahProximityPage() {
   }, [router]);
 
   // 🔥 REALTIME HOOK - Load dapur + sekolah dengan auto refresh
-  const { dapurInfo, sekolahList, loading, error, refreshData } = useSekolahTerdekatRealtime(authToken, dapurId);
+  // Only initialize hook once we have both token and dapurId
+  const { dapurInfo, sekolahList, loading, error, refreshData } = useSekolahTerdekatRealtime(
+    authToken || '',
+    dapurId || ''
+  );
 
   // 🔥 Auto-filter sekolah by radius
   const filteredSekolah = useMemo(() => {

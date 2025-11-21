@@ -246,9 +246,15 @@ export const useSekolahTerdekatRealtime = (token: string, dapurId: string) => {
     }
   }, [token, dapurId])
 
-  // 🔥 Initialize on mount
+  // 🔥 Initialize on mount - wait until token and dapurId are ready
   useEffect(() => {
-    if (!hasInitialized.current && token && dapurId) {
+    // If token or dapurId is empty, don't initialize yet
+    if (!token || !dapurId) {
+      console.log('[SEKOLAH TERDEKAT] Waiting for token or dapurId...')
+      return
+    }
+
+    if (!hasInitialized.current) {
       hasInitialized.current = true
       fetchData()
     }
