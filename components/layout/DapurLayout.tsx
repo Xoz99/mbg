@@ -309,6 +309,17 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
       localStorage.removeItem('mbg_token');
       localStorage.removeItem('authToken');
       localStorage.removeItem('userDapurId');
+
+      // 🔥 Clear ALL dashboard cache keys (untuk multi-account safety)
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('dapur_dashboard_cache') ||
+            key.startsWith('dapur_menu_cache') ||
+            key.startsWith('dapur_produksi_cache') ||
+            key.startsWith('dapur_sekolah_terdekat_cache')) {
+          localStorage.removeItem(key);
+        }
+      });
+
       document.cookie = 'mbg_user=; path=/; max-age=0';
       document.cookie = 'mbg_token=; path=/; max-age=0';
     }

@@ -70,6 +70,7 @@ const ProductionChart = ({ data }: { data: any[] }) => (
 const DashboardDapur = () => {
   const router = useRouter()
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [dapurId, setDapurId] = useState<string>("")
 
   const [userInfo, setUserInfo] = useState({
     name: "Loading...",
@@ -97,7 +98,8 @@ const DashboardDapur = () => {
   }, [])
 
   // ✅ Use custom hook untuk fetch menu planning data dan stats
-  const { loading: dashboardLoading, loadData, refreshData } = useDapurDashboardCache(handleCacheUpdate)
+  // Pass dapurId sehingga cache terpisah per akun/dapur
+  const { loading: dashboardLoading, loadData, refreshData } = useDapurDashboardCache(handleCacheUpdate, dapurId)
 
   // ✅ Use produksi cache for menu hari ini times (correct time display)
   const { batches, loading: produksiLoading } = useProduksiCache()
@@ -169,6 +171,7 @@ const DashboardDapur = () => {
   useEffect(() => {
     const userData = localStorage.getItem("mbg_user")
     const token = localStorage.getItem("mbg_token")
+    const dapurIdFromStorage = localStorage.getItem("userDapurId")
 
     if (!userData || !token) {
       router.push("/auth/login")
@@ -183,6 +186,11 @@ const DashboardDapur = () => {
         phone: user.phone || "",
         dapurName: user.name || "Dapur MBG",
       })
+
+      // 🔥 Set dapurId dari localStorage untuk cache key
+      if (dapurIdFromStorage) {
+        setDapurId(dapurIdFromStorage)
+      }
     } catch (error) {
       router.push("/auth/login")
     }

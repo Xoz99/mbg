@@ -2,10 +2,17 @@ import { useCallback, useRef, useState, useEffect } from "react"
 import { cacheEmitter } from "@/lib/utils/cacheEmitter"
 import { useDapurContext } from "@/lib/context/DapurContext"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz"
-const CACHE_KEY = "dapur_dashboard_cache"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
 const CACHE_EXPIRY = 10 * 60 * 1000 // 10 minutes - Longer cache to avoid unnecessary refetch when navigating back
-const CACHE_EMIT_KEY = "dapur_dashboard_cache_update"
+
+// 🔥 Helper to generate cache key dengan dapur ID (jadi berbeda akun nggak share cache)
+function getCacheKey(dapurId?: string): string {
+  return dapurId ? `dapur_dashboard_cache_${dapurId}` : "dapur_dashboard_cache"
+}
+
+function getCacheEmitKey(dapurId?: string): string {
+  return dapurId ? `dapur_dashboard_cache_update_${dapurId}` : "dapur_dashboard_cache_update"
+}
 
 // ✅ Simple hash function untuk compare data changes
 function simpleHash(str: string): string {
@@ -177,10 +184,13 @@ interface DapurDashboardData {
 // ✅ Global memory cache (persists during session)
 const globalMemoryCache = new Map<string, DapurDashboardData>()
 
-export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData) => void) => {
+export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData) => void, dapurId?: string) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fetchInProgress = useRef(false)
+  const lastDapurIdRef = useRef<string>("")
+  const CACHE_KEY = getCacheKey(dapurId)
+  const CACHE_EMIT_KEY = getCacheEmitKey(dapurId)
 
   // Get menu plannings from global context
   const { menuPlannings: contextPlannings, isLoading: contextLoading } = useDapurContext()
@@ -195,7 +205,24 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
     })
 
     return () => unsubscribe()
-  }, [onCacheUpdate])
+  }, [onCacheUpdate, CACHE_EMIT_KEY])
+
+  // 🔥 Force fetch ketika dapurId berubah (login akun baru)
+  // Skip cache dan langsung fetch from API untuk akun baru
+  useEffect(() => {
+    if (!dapurId) return
+
+    // Jika dapurId berubah (login akun baru), force fresh fetch
+    if (lastDapurIdRef.current && lastDapurIdRef.current !== dapurId) {
+      console.log("[DAPUR DASHBOARD CACHE] 🔄 DapurId changed - forcing fresh fetch:", dapurId)
+      // Force clear memory cache untuk dapur ID ini
+      globalMemoryCache.delete("dapur_dashboard")
+      setLoading(true)
+    }
+
+    lastDapurIdRef.current = dapurId
+  }, [dapurId])
+
 
   // ✅ Fetch dapur dashboard data
   const fetchDapurDashboardData = useCallback(async (contextMenuPlannings: any[]) => {

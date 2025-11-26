@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef, memo } from 'react';
 import DapurLayout from '@/components/layout/DapurLayout';
-import { 
+import {
   Package,
   Plus,
   Edit,
@@ -29,7 +29,7 @@ import {
   Truck,
   Loader2
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend, PieChart, Pie } from 'recharts';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
 
@@ -194,6 +194,34 @@ const UsageHistoryChart = memo(({ data }: { data: any[] }) => (
 
 UsageHistoryChart.displayName = 'UsageHistoryChart';
 
+// Stock Status Overview Chart
+const StockStatusChart = memo(({ data }: { data: any[] }) => (
+  <ResponsiveContainer width="100%" height={250}>
+    <PieChart>
+      <Pie
+        data={data}
+        cx="50%"
+        cy="50%"
+        innerRadius={60}
+        outerRadius={90}
+        paddingAngle={2}
+        dataKey="value"
+        label={({ name, value, percent }) => `${name}: ${value}`}
+      >
+        {data.map((entry, index) => (
+          <Cell key={`cell-${index}`} fill={entry.color} />
+        ))}
+      </Pie>
+      <Tooltip
+        formatter={(value) => `${value} item`}
+        contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+      />
+    </PieChart>
+  </ResponsiveContainer>
+));
+
+StockStatusChart.displayName = 'StockStatusChart';
+
 const StokBahanBaku = () => {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [filterStatus, setFilterStatus] = useState('semua');
@@ -221,6 +249,13 @@ const StokBahanBaku = () => {
 
   const isFetchingRef = useRef(false);
 
+  // Calculate status based on stok level
+  const calculateStatus = (stokKg: number): 'CRITICAL' | 'LOW' | 'GOOD' => {
+    if (stokKg < 5) return 'CRITICAL';
+    if (stokKg < 10) return 'LOW';
+    return 'GOOD';
+  };
+
   // Fetch stok data from API
   const fetchStok = useCallback(async () => {
     if (!dapurId || !authToken || isFetchingRef.current) {
@@ -239,9 +274,6 @@ const StokBahanBaku = () => {
         filterCategory !== "semua" ? `&kategori=${filterCategory}` : ""
       }`;
 
-      console.log("[FETCH STOK] URL:", url);
-      console.log("[FETCH STOK] DapurId:", dapurId);
-
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -249,14 +281,11 @@ const StokBahanBaku = () => {
         },
       });
 
-      console.log("[FETCH STOK] Response status:", response.status);
-
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log("[FETCH STOK] Response data:", data);
 
       // Extract stok list dengan berbagai kemungkinan struktur
       let stokList = [];
@@ -268,8 +297,13 @@ const StokBahanBaku = () => {
         stokList = data;
       }
 
-      console.log("[FETCH STOK] Total items:", stokList.length);
-      setStokItems(stokList);
+      // Add status to each item based on stokKg
+      const stokItemsWithStatus = stokList.map((item: any) => ({
+        ...item,
+        status: calculateStatus(item.stokKg || 0)
+      }));
+
+      setStokItems(stokItemsWithStatus);
     } catch (err: any) {
       setError(err.message || "Gagal mengambil data stok");
       console.error("[FETCH STOK] Error:", err);
@@ -474,7 +508,7 @@ const StokBahanBaku = () => {
   }, [stokItems]);
 
   // Chart data
-  const chartData = useMemo(() => 
+  const chartData = useMemo(() =>
     stokItems.slice(0, 8).map(item => ({
       name: item.nama,
       stock: item.stokKg || 0,
@@ -482,15 +516,23 @@ const StokBahanBaku = () => {
     }))
   , [stokItems]);
 
-  const usageHistory = useMemo(() => [
-    { date: '08/01', in: 100, out: 50 },
-    { date: '09/01', in: 120, out: 60 },
-    { date: '10/01', in: 150, out: 80 },
-    { date: '11/01', in: 100, out: 90 },
-    { date: '12/01', in: 110, out: 85 },
-    { date: '13/01', in: 140, out: 95 },
-    { date: 'Today', in: 0, out: 70 }
-  ], []);
+  // Stock Status Overview data
+  const stockStatusData = useMemo(() => {
+    if (stokItems.length === 0) {
+      return [{ name: 'Tidak ada data', value: 1, color: '#e5e7eb' }];
+    }
+
+    const critical = stokItems.filter(i => i.status === 'CRITICAL').length;
+    const low = stokItems.filter(i => i.status === 'LOW').length;
+    const good = stokItems.filter(i => i.status === 'GOOD').length;
+
+    const data = [];
+    if (good > 0) data.push({ name: 'Aman', value: good, color: '#22c55e' });
+    if (low > 0) data.push({ name: 'Rendah', value: low, color: '#f59e0b' });
+    if (critical > 0) data.push({ name: 'Kritis', value: critical, color: '#ef4444' });
+
+    return data;
+  }, [stokItems]);
 
   const getStatusConfig = (status: string) => {
     const configs = {
@@ -648,8 +690,8 @@ const StokBahanBaku = () => {
         </div>
 
         <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Riwayat Penggunaan (7 Hari)</h3>
-          <UsageHistoryChart data={usageHistory} />
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Status Stok Overview</h3>
+          <StockStatusChart data={stockStatusData} />
         </div>
       </div>
 

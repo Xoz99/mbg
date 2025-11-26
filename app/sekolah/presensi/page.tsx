@@ -6,18 +6,15 @@ import { useSekolahDataCache } from "@/lib/hooks/useSekolahDataCache"
 import {
   Users,
   Loader,
-  Camera,
   CheckCircle,
-  School,
   X,
   CheckCircle2,
   XCircle,
   Sparkles,
   Zap,
-  AlertTriangle,
   User,
   Users2,
-  Clock,
+  AlertTriangle,
 } from "lucide-react"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
@@ -51,7 +48,7 @@ const SkeletonKelasCard = () => (
 
 const Presensi = () => {
   const [step, setStep] = useState<
-    "kelas-selection" | "camera-face" | "processing-face" | "confirm" | "submitting" | "result" | "duplicate-warning"
+    "kelas-selection" | "camera-face" | "processing-face" | "confirm" | "submitting" | "result"
   >("kelas-selection")
 
   const [faceDetected, setFaceDetected] = useState(false)
@@ -67,8 +64,6 @@ const Presensi = () => {
   const [selectedSiswa, setSelectedSiswa] = useState<any>(null)
   const [facePhoto, setFacePhoto] = useState<string | null>(null)
 
-  const [presensiData, setPresensiData] = useState<Array<any>>([])
-  const [duplicateSiswaInfo, setDuplicateSiswaInfo] = useState<any>(null)
   const [validationResult, setValidationResult] = useState<any>(null)
   const [loadingSelectedKelas, setLoadingSelectedKelas] = useState(false)
 
@@ -79,7 +74,7 @@ const Presensi = () => {
   const handleCacheUpdate = useCallback((data: any) => {
     setCachedData(data)
   }, [])
-  const { loading: loadingCache, loadData, refreshData } = useSekolahDataCache(handleCacheUpdate)
+  const { loading: loadingCache, loadData } = useSekolahDataCache(handleCacheUpdate)
 
   const isFetchingRef = useRef(false)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -135,84 +130,26 @@ const Presensi = () => {
   }, [step])
 
   const stats = useMemo(() => {
-    if (!selectedKelas || !cachedData) return { total: 0, sudahPresensi: 0, persentase: 0, lakiLaki: 0, perempuan: 0 }
+    if (!selectedKelas || !cachedData) return { total: 0, lakiLaki: 0, perempuan: 0 }
 
     const siswaDataToUse = Array.isArray(cachedData.siswaData) ? cachedData.siswaData : []
     const kelassiswa = siswaDataToUse.filter((siswa: any) => String(siswa.kelasId) === String(selectedKelas.id))
     const total = kelassiswa.length
-    const sudahPresensi = presensiData.length
-    const persentase = total > 0 ? Math.round((sudahPresensi / total) * 100) : 0
     const lakiLaki = kelassiswa.filter((siswa: any) => siswa.jenisKelamin === "LAKI_LAKI").length
     const perempuan = kelassiswa.filter((siswa: any) => siswa.jenisKelamin === "PEREMPUAN").length
 
-    return { total, sudahPresensi, persentase, lakiLaki, perempuan }
-  }, [cachedData, presensiData, selectedKelas])
+    return { total, lakiLaki, perempuan }
+  }, [cachedData, selectedKelas])
 
 
-  const fetchPresensiToday = useCallback(async (kelasId: string) => {
-    if (!authToken) return
-
-    try {
-      // Try the standard endpoint first
-      const response = await fetch(`${API_BASE_URL}/api/kelas/${kelasId}/absensi?date=today`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      console.log("[FETCH PRESENSI] Response status:", response.status, response.ok)
-
-      if (response.ok) {
-        const data = await response.json()
-        console.log("[FETCH PRESENSI] Full response data:", data)
-
-        let presensiList: any[] = []
-
-        // Extract array dari structure: { data: [...], pagination: {...} }
-        const absensiRecords = Array.isArray(data.data?.data) ? data.data.data : Array.isArray(data.data) ? data.data : []
-        console.log("[FETCH PRESENSI] All absensi records:", absensiRecords.length)
-
-        // Ambil detailAbsensi dari record yang paling recent (sort by tanggal descending)
-        if (absensiRecords.length > 0) {
-          const sorted = [...absensiRecords].sort((a: any, b: any) => {
-            const dateA = new Date(a.tanggal || 0).getTime()
-            const dateB = new Date(b.tanggal || 0).getTime()
-            return dateB - dateA // Descending: newest first
-          })
-
-          const mostRecent = sorted[0]
-          console.log("[FETCH PRESENSI] Most recent record tanggal:", mostRecent?.tanggal)
-
-          if (mostRecent && Array.isArray(mostRecent.detailAbsensi)) {
-            presensiList = mostRecent.detailAbsensi
-            console.log("[FETCH PRESENSI] Using most recent record's detailAbsensi:", presensiList.length)
-          }
-        }
-
-        console.log("[FETCH PRESENSI] Final presensiList:", presensiList)
-        console.log("[FETCH PRESENSI] List length:", presensiList.length)
-        setPresensiData(presensiList)
-      } else {
-        console.error("[FETCH PRESENSI] Response not ok")
-        // Fallback to empty array if endpoint fails
-        setPresensiData([])
-      }
-    } catch (err) {
-      console.error("[FETCH PRESENSI] Error:", err)
-      // Don't show error, just use empty data
-      setPresensiData([])
-    }
-  }, [authToken])
 
   const handleKelasSelect = async (kelas: any) => {
     setSelectedKelas(kelas)
-    setPresensiData([])
     setLoadingSelectedKelas(true)
 
     try {
-      // Fetch presensi today for this kelas
-      await fetchPresensiToday(kelas.id)
+      // Just move to camera step
+      await new Promise(resolve => setTimeout(resolve, 500))
     } finally {
       setLoadingSelectedKelas(false)
       setStep("camera-face")
@@ -354,12 +291,6 @@ const Presensi = () => {
     }
   }
 
-  const checkDuplicate = (siswaId: string): boolean => {
-    return presensiData.some((record: any) => {
-      const recordSiswaId = String(record.siswaId || record.siswa?.id || "")
-      return recordSiswaId === String(siswaId)
-    })
-  }
 
   const validateFace = async (facePhotoData: string) => {
     setStep("processing-face")
@@ -424,19 +355,12 @@ const Presensi = () => {
           fotoUrl: fotoUrl,
         }
 
-        const isDuplicatePresensi = checkDuplicate(normalizedSiswa.id)
         const siswaDataToFind = cachedData?.siswaData || []
         const siswaFromList = siswaDataToFind.find((s: any) => String(s.id) === String(normalizedSiswa.id))
         const siswaToUse = siswaFromList ? { ...normalizedSiswa, ...siswaFromList } : normalizedSiswa
 
-        if (isDuplicatePresensi) {
-          setSelectedSiswa(siswaToUse)
-          setDuplicateSiswaInfo(siswaToUse)
-          setStep("duplicate-warning")
-        } else {
-          setSelectedSiswa(siswaToUse)
-          setStep("confirm")
-        }
+        setSelectedSiswa(siswaToUse)
+        setStep("confirm")
       } else {
         throw new Error("Data siswa tidak ditemukan")
       }
@@ -471,7 +395,7 @@ const Presensi = () => {
       }
 
       console.log("[PRESENSI] Submitting to endpoint:", url)
-      console.log("[PRESENSI] With payload:", payload)
+      console.log("[PRESENSI] With payload:", JSON.stringify(payload))
 
       const response = await fetch(url, {
         method: "POST",
@@ -500,23 +424,26 @@ const Presensi = () => {
       setStep("result")
 
       setTimeout(() => {
-        fetchPresensiToday(selectedKelas.id)
-      }, 500)
-
-      setTimeout(() => {
         handleReset()
       }, 5000)
     } catch (err) {
       console.error("Error submitting presensi:", err)
+      const errorMessage = err instanceof Error ? err.message : "Terjadi kesalahan"
+
+      // Check if it's a duplicate attendance error
+      const isDuplicate = errorMessage.includes("sudah melakukan absensi")
+
       setValidationResult({
         success: false,
-        message: err instanceof Error ? err.message : "Terjadi kesalahan",
+        message: isDuplicate
+          ? "⚠️ Siswa sudah presensi hari ini. Coba scan siswa yang lain atau ubah tanggal untuk test."
+          : errorMessage,
       })
       setStep("result")
 
       setTimeout(() => {
         handleReset()
-      }, 5000)
+      }, isDuplicate ? 7000 : 5000)
     }
   }
 
@@ -525,7 +452,6 @@ const Presensi = () => {
     setFacePhoto(null)
     setSelectedSiswa(null)
     setValidationResult(null)
-    setDuplicateSiswaInfo(null)
     setStep("camera-face")
   }
 
@@ -686,13 +612,6 @@ const Presensi = () => {
                   color="bg-gradient-to-br from-blue-500 to-blue-600"
                 />
                 <StatCard
-                  title="Sudah Presensi"
-                  value={stats.sudahPresensi}
-                  subtitle={`${stats.persentase}%`}
-                  icon={CheckCircle}
-                  color="bg-gradient-to-br from-emerald-500 to-teal-600"
-                />
-                <StatCard
                   title="Laki-laki"
                   value={stats.lakiLaki}
                   subtitle="Siswa"
@@ -705,13 +624,6 @@ const Presensi = () => {
                   subtitle="Siswa"
                   icon={Users}
                   color="bg-gradient-to-br from-rose-500 to-rose-600"
-                />
-                <StatCard
-                  title="Belum Presensi"
-                  value={stats.total - stats.sudahPresensi}
-                  subtitle="Siswa"
-                  icon={Clock}
-                  color="bg-gradient-to-br from-amber-500 to-amber-600"
                 />
               </>
             )}
@@ -804,94 +716,6 @@ const Presensi = () => {
                 <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"></div>
                 <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
                 <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP: DUPLICATE WARNING */}
-          {step === "duplicate-warning" && duplicateSiswaInfo && (
-            <div className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-2xl border-2 border-red-500 overflow-hidden">
-                <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <XCircle className="w-6 h-6 text-white flex-shrink-0" />
-                    <div>
-                      <span className="text-sm font-bold text-white block">⚠️ SISWA SUDAH PRESENSI</span>
-                      <p className="text-xs text-red-100 mt-1">Siswa ini telah mencatat kehadiran hari ini</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-8">
-                  <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl p-6 mb-8 border-2 border-red-200">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{duplicateSiswaInfo.nama}</h3>
-                    <p className="text-sm text-gray-600 mb-1">{duplicateSiswaInfo.kelas}</p>
-                    <p className="text-xs text-gray-500 mb-4">NIS: {duplicateSiswaInfo.nis}</p>
-
-                    <div className="flex items-center justify-center gap-4 mb-4">
-                      <div className="text-center">
-                        <p className="text-xs font-bold text-gray-600 mb-2">👤 Foto Siswa</p>
-                        {duplicateSiswaInfo.fotoUrl ? (
-                          <img
-                            src={duplicateSiswaInfo.fotoUrl || "/placeholder.svg"}
-                            alt="Foto Siswa"
-                            className="w-24 h-24 rounded-full object-cover border-4 border-red-400 shadow-lg"
-                          />
-                        ) : (
-                          <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-red-400 flex items-center justify-center">
-                            {duplicateSiswaInfo.jenisKelamin === "LAKI_LAKI" ? (
-                              <Users2 className="w-12 h-12 text-gray-500" />
-                            ) : (
-                              <User className="w-12 h-12 text-gray-500" />
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <AlertTriangle className="w-8 h-8 text-red-500 animate-pulse" />
-                      </div>
-
-                      <div className="text-center">
-                        <p className="text-xs font-bold text-gray-600 mb-2">📷 Foto Deteksi</p>
-                        {facePhoto && (
-                          <img
-                            src={facePhoto || "/placeholder.svg"}
-                            alt="Foto Validasi"
-                            className="w-24 h-24 rounded-full object-cover border-4 border-red-400 shadow-lg"
-                          />
-                        )}
-                      </div>
-                    </div>
-
-                    {duplicateSiswaInfo.alergi && duplicateSiswaInfo.alergi.length > 0 && (
-                      <div className="mt-4 bg-red-50 rounded-lg p-3 border-l-4 border-red-500">
-                        <p className="text-xs text-red-700 font-bold">ALERGI TERDAFTAR</p>
-                        <p className="text-sm text-red-800 font-semibold mt-1">{duplicateSiswaInfo.alergi.join(", ")}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => handleReset()}
-                      className="px-6 py-3 bg-gray-200 text-gray-900 rounded-xl hover:bg-gray-300 transition-colors font-bold flex items-center justify-center gap-2"
-                    >
-                      <X className="w-5 h-5" />
-                      Mulai Ulang
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedSiswa(duplicateSiswaInfo)
-                        submitPresensi()
-                      }}
-                      className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:shadow-lg text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                      Lanjutkan Anyway
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
           )}

@@ -405,85 +405,106 @@ const CheckpointViewPage = () => {
 
       {hasSearched && !loading && (
         <>
-          <h2 className="text-xl font-bold text-[#1B263A] mb-6">Status Checkpoint</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {checkpointTypes.map((checkpoint) => {
-              const data = checkpointStatus[checkpoint.id];
-              const isCompleted = data !== null;
-              const Icon = checkpoint.icon;
+          <h2 className="text-xl font-bold text-[#1B263A] mb-8">Progress Timeline Checkpoint</h2>
+          <div className="relative">
+            {/* Vertical Timeline */}
+            <div className="space-y-0">
+              {checkpointTypes.map((checkpoint, index) => {
+                const data = checkpointStatus[checkpoint.id];
+                const isCompleted = data !== null;
+                const Icon = checkpoint.icon;
+                const isLastItem = index === checkpointTypes.length - 1;
 
-              return (
-                <div
-                  key={checkpoint.id}
-                  className={`rounded-2xl border-2 p-6 transition-all ${
-                    isCompleted
-                      ? 'bg-white border-[#D0B064] shadow-sm'
-                      : 'bg-white border-gray-200 opacity-70'
-                  }`}
-                >
-                  <div className="flex items-start gap-4 mb-3">
-                    <div className={`w-14 h-14 ${checkpoint.color} rounded-xl flex items-center justify-center flex-shrink-0`}>
-                      <Icon className="w-7 h-7 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-lg text-[#1B263A]">{checkpoint.label}</h3>
-                      {checkpoint.requiresPhoto && (
-                        <p className="text-sm text-[#D0B064] font-semibold">📷 Wajib foto</p>
+                return (
+                  <div key={checkpoint.id} className="relative flex gap-6">
+                    {/* Timeline Line & Dot */}
+                    <div className="flex flex-col items-center">
+                      {/* Dot */}
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 border-4 transition-all ${
+                        isCompleted
+                          ? `${checkpoint.color} border-white shadow-md`
+                          : 'bg-gray-100 border-gray-300'
+                      }`}>
+                        <Icon className={`w-6 h-6 ${isCompleted ? 'text-white' : 'text-gray-400'}`} />
+                      </div>
+
+                      {/* Vertical Line (except last item) */}
+                      {!isLastItem && (
+                        <div className={`w-1 flex-grow mt-2 ${
+                          isCompleted ? 'bg-gradient-to-b from-[#D0B064] to-gray-200' : 'bg-gray-200'
+                        }`}
+                          style={{ minHeight: '120px' }}
+                        />
                       )}
                     </div>
-                    {isCompleted && (
-                      <div className="bg-[#D0B064] text-white rounded-full p-1.5 flex-shrink-0">
-                        <CheckCircle className="w-5 h-5" />
+
+                    {/* Content */}
+                    <div className="pb-8 pt-1 flex-grow">
+                      <div className={`rounded-2xl border-2 p-6 transition-all ${
+                        isCompleted
+                          ? 'bg-white border-[#D0B064] shadow-sm'
+                          : 'bg-white border-gray-200'
+                      }`}>
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <h3 className="font-bold text-lg text-[#1B263A]">{checkpoint.label}</h3>
+                            <p className="text-sm text-gray-600">{checkpoint.description}</p>
+                            {checkpoint.requiresPhoto && !isCompleted && (
+                              <p className="text-xs text-[#D0B064] font-semibold mt-1">📷 Wajib foto</p>
+                            )}
+                          </div>
+                          {isCompleted && (
+                            <div className="bg-[#D0B064] text-white rounded-full p-2 flex-shrink-0">
+                              <CheckCircle className="w-5 h-5" />
+                            </div>
+                          )}
+                        </div>
+
+                        {isCompleted && data ? (
+                          <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">Waktu:</span>
+                              <span className="font-bold text-[#1B263A]">{formatDate(data.timestamp)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">Lokasi:</span>
+                              <span className="font-bold text-[#1B263A]">{data.lokasi}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">Pemindai:</span>
+                              <span className="font-bold text-[#1B263A]">{data.pemindaiOleh}</span>
+                            </div>
+                            {data.catatan && (
+                              <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                <p className="text-xs text-blue-600 font-semibold mb-1">Catatan:</p>
+                                <p className="text-sm text-blue-900">{data.catatan}</p>
+                              </div>
+                            )}
+                            {data.fotoUrl && (
+                              <button
+                                onClick={() => setPhotoModal({
+                                  isOpen: true,
+                                  photoUrl: data.fotoUrl || '',
+                                  title: checkpoint.label
+                                })}
+                                className="w-full mt-3 flex items-center justify-center gap-2 p-3 bg-[#D0B064] hover:bg-[#C9A355] text-white rounded-lg text-sm font-semibold transition-all"
+                              >
+                                <ZoomIn className="w-4 h-4" />
+                                Lihat Foto
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="mt-4 text-center text-gray-400 py-4">
+                            <p className="text-sm font-semibold">Menunggu checkpoint...</p>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
-
-                  <p className="text-sm text-gray-600 mb-3">{checkpoint.description}</p>
-
-                  {isCompleted && data ? (
-                    <div className="bg-green-50 rounded-lg p-4 space-y-2 border border-green-200">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-green-600">Waktu:</span>
-                        <span className="text-green-700 font-bold">{formatDate(data.timestamp)}</span>
-                      </div>
-                      <div className="border-t border-green-200 pt-2 flex justify-between text-xs">
-                        <span className="text-green-600">Lokasi:</span>
-                        <span className="text-green-900 font-bold">{data.lokasi}</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-green-600">Pemindai:</span>
-                        <span className="text-green-900 font-bold">{data.pemindaiOleh}</span>
-                      </div>
-                      {data.catatan && (
-                        <div className="border-t border-green-200 pt-2">
-                          <p className="text-xs text-green-600 mb-1">Catatan:</p>
-                          <p className="text-xs text-green-900">{data.catatan}</p>
-                        </div>
-                      )}
-                      {data.fotoUrl && (
-                        <div className="border-t border-green-200 pt-2">
-                          <button
-                            onClick={() => setPhotoModal({
-                              isOpen: true,
-                              photoUrl: data.fotoUrl || '',
-                              title: checkpoint.label
-                            })}
-                            className="w-full flex items-center justify-center gap-2 p-2 bg-green-100 hover:bg-green-200 rounded text-xs text-green-700 font-semibold transition-all"
-                          >
-                            <ZoomIn className="w-4 h-4" />
-                            Lihat Foto
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center text-gray-400 py-8">
-                      <p className="text-sm font-semibold">Belum ada checkpoint</p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </>
       )}
