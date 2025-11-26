@@ -29,6 +29,12 @@ interface CachedProduksiData {
 
 const memoryCache = new Map<string, CachedProduksiData>();
 
+// 🔥 Export function to clear memory cache on logout
+export const clearProduksiMemoryCache = () => {
+  memoryCache.clear()
+  console.log('[useProduksiCache] Memory cache cleared on logout')
+}
+
 async function getAuthToken() {
   if (typeof window === 'undefined') return '';
   return localStorage.getItem('authToken') || localStorage.getItem('mbg_token') || '';
@@ -111,6 +117,7 @@ function normalizeDateString(dateString: string | null | undefined): string | nu
 interface UseProduksiCacheOptions {
   pollingInterval?: number;
   menuDataProvider?: () => Promise<any>; // 🔥 OPTIMIZATION: Accept menu data from parent instead of fetching
+  dapurId?: string; // 🔥 OPTIMIZATION: Pass dapurId to separate cache per account
 }
 
 // 🔥 OPTIMIZATION: Simple request queue to limit concurrent API calls (max 3)
@@ -156,6 +163,7 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
   const fetchInProgress = useRef(false);
   const pollingInterval = useRef<NodeJS.Timeout | null>(null);
   const pollingIntervalMs = options?.pollingInterval ?? 30000;
+  const dapurId = options?.dapurId;
 
   // Get menu plannings dari context
   const { menuPlannings, isLoading: contextLoading } = useDapurContext();
@@ -279,60 +287,28 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
 
       console.log(`[useProduksiCache] ✨ Summary: Found ${todayMenusList.length} menus for today (target: ${today})`);
 
-      // 🔥 OPTIMIZATION: Fetch checkpoints via request queue (max 3 concurrent)
-      const checkpointStartTime = performance.now();
-      const batchPromises = todayMenusList.map(({ planning, menu }) =>
-        requestQueue.add(() =>
-          apiCall<any>(
-            `/api/menu-harian/${menu.id}/checkpoint?limit=10`,
-            {},
-            15000
-          )
-            .catch(() => ({ data: { data: [] } }))
-            .then((checkpointRes) => {
-              const checkpoints = extractArray(checkpointRes?.data || []);
-              const sekolahName = planning.sekolah?.nama || 'Unknown';
-              const targetTrays = menu.targetTray || 1200;
+      // Skip checkpoint fetch for faster initial load - use default status
+      const batchPromises = todayMenusList.map(({ planning, menu }) => {
+        const sekolahName = planning.sekolah?.nama || 'Unknown';
+        const targetTrays = menu.targetTray || 1200;
 
-              return {
-                id: `BATCH-${menu.id}`,
-                dailyMenu: menu,
-                menuId: menu.id,
-                sekolahId: planning.sekolahId,
-                sekolahName: sekolahName,
-                status:
-                  checkpoints.length >= 4
-                    ? 'COMPLETED'
-                    : checkpoints.length >= 2
-                      ? 'IN_PROGRESS'
-                      : 'PREPARING',
-                expectedTrays: targetTrays,
-                packedTrays:
-                  checkpoints.length >= 3
-                    ? targetTrays
-                    : checkpoints.length >= 2
-                      ? Math.round(targetTrays / 2)
-                      : 0,
-                checkpoints: checkpoints,
-                createdBy: 'System',
-                startTime: menu.jamMulaiMasak,
-                endTime: menu.jamSelesaiMasak,
-              } as ProduksiBatch;
-            })
-            .catch((err) => {
-              console.warn(`[useProduksiCache] Gagal fetch batch data untuk menu ${menu.id}:`, err);
-              return null;
-            })
-        )
-      );
+        return {
+          id: `BATCH-${menu.id}`,
+          dailyMenu: menu,
+          menuId: menu.id,
+          sekolahId: planning.sekolahId,
+          sekolahName: sekolahName,
+          status: 'PREPARING' as const,
+          expectedTrays: targetTrays,
+          packedTrays: 0,
+          checkpoints: [],
+          createdBy: 'System',
+          startTime: menu.jamMulaiMasak,
+          endTime: menu.jamSelesaiMasak,
+        } as ProduksiBatch;
+      });
 
-      const batchesData = (await Promise.allSettled(batchPromises))
-        .filter((result: any) => result.status === 'fulfilled')
-        .map((result: any) => result.value)
-        .filter((b: any) => b !== null);
-
-      const checkpointEndTime = performance.now();
-      console.log(`[useProduksiCache] Fetch checkpoints took ${(checkpointEndTime - checkpointStartTime).toFixed(2)}ms (with request queue, max 3 concurrent)`);
+      const batchesData = batchPromises.filter((b: any) => b !== null);
 
       console.log(`[useProduksiCache] Created ${batchesData.length} batches`);
       const fetchEndTime = performance.now();
@@ -346,7 +322,7 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
 
   // Load data dengan cache
   const loadData = useCallback(async (plannings: any[]) => {
-    const cacheId = 'produksi_cache';
+    const cacheId = dapurId ? `produksi_cache_${dapurId}` : 'produksi_cache';
 
     // Check memory cache first
     if (memoryCache.has(cacheId)) {
@@ -446,7 +422,8 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
   );
 
   const setupPolling = useCallback(
-    async (cacheId: string, plannings: any[]) => {
+    async (plannings: any[]) => {
+      const cacheId = dapurId ? `produksi_cache_${dapurId}` : 'produksi_cache';
       if (pollingIntervalMs <= 0) {
         console.log('[useProduksiCache] Polling disabled');
         return;
@@ -535,9 +512,8 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
         await loadData(menuPlannings);
         console.log('[useProduksiCache] ✅ Initialize complete');
 
-        const cacheId = 'produksi_cache';
         if (pollingIntervalMs > 0) {
-          setupPolling(cacheId, menuPlannings);
+          setupPolling(menuPlannings);
         }
       } catch (err) {
         console.error('[useProduksiCache] Error initializing:', err);
@@ -566,10 +542,10 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
   }, []);
 
   const refreshData = useCallback(async () => {
-    const cacheId = 'produksi_cache';
+    const cacheId = dapurId ? `produksi_cache_${dapurId}` : 'produksi_cache';
     clearCache();
     return fetchAndUpdateCache(cacheId, menuPlannings);
-  }, [clearCache, fetchAndUpdateCache, menuPlannings]);
+  }, [clearCache, fetchAndUpdateCache, menuPlannings, dapurId]);
 
   const stopPolling = useCallback(() => {
     if (pollingInterval.current) {
@@ -581,7 +557,6 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
 
   const startPolling = useCallback(
     async (intervalMs?: number) => {
-      const cacheId = 'produksi_cache';
       const interval = intervalMs ?? pollingIntervalMs;
 
       if (interval <= 0) {
@@ -589,7 +564,7 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
         return;
       }
 
-      await setupPolling(cacheId, menuPlannings);
+      await setupPolling(menuPlannings);
     },
     [pollingIntervalMs, setupPolling, menuPlannings]
   );

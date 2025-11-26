@@ -184,6 +184,12 @@ interface DapurDashboardData {
 // ✅ Global memory cache (persists during session)
 const globalMemoryCache = new Map<string, DapurDashboardData>()
 
+// 🔥 Export function to clear memory cache on logout
+export const clearDapurDashboardMemoryCache = () => {
+  globalMemoryCache.clear()
+  console.log('[useDapurDashboardCache] Memory cache cleared on logout')
+}
+
 export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData) => void, dapurId?: string) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -286,20 +292,8 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
             );
             let menus = extractArray(menuRes?.data || [])
 
-            // 🔥 OPTIMIZATION: Batch kalender akademik calls with request queue
+            // Skip kalender akademik - holidays not needed for basic calculation
             let holidays: string[] = []
-            try {
-              const calendarRes = await requestQueue.add(() =>
-                apiCall<any>(`/api/kalender-akademik?sekolahId=${planning.sekolahId}&limit=100`)
-              );
-              // API returns: { data: { kalenders: [...], pagination: {...} } }
-              const calendarList = calendarRes?.data?.kalenders || []
-              holidays = calendarList
-                .map((c: any) => c.tanggalMulai || c.tanggal || c.date)
-                .filter((d: string) => d) // Filter out empty dates
-            } catch (err) {
-              // Continue without holidays if fetch fails
-            }
             allMenus = [...allMenus, ...menus]
 
             // Parse planning dates using local time
@@ -401,6 +395,8 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
               mingguanKe: planning.mingguanKe,
               sekolahId: planning.sekolahId,
               sekolahNama: planning.sekolah?.nama || "Unknown",
+              sekolahAlamat: planning.sekolah?.alamat || "",
+              picSekolah: planning.sekolah?.picSekolah?.[0] || null,
               tanggalMulai: planning.tanggalMulai,
               tanggalSelesai: planning.tanggalSelesai,
               todayMenu: planningTodayMenu,
@@ -483,7 +479,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
 
   // ✅ Load data with cache priority - show cache immediately, fetch background
   const loadData = useCallback(async () => {
-    const cacheId = "dapur_dashboard"
+    const cacheId = dapurId ? `dapur_dashboard_${dapurId}` : "dapur_dashboard"
 
     // 1. Check memory cache first (fastest)
     if (globalMemoryCache.has(cacheId)) {
@@ -590,10 +586,10 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
 
   // ✅ Force refresh
   const refreshData = useCallback(async () => {
-    const cacheId = "dapur_dashboard"
+    const cacheId = dapurId ? `dapur_dashboard_${dapurId}` : "dapur_dashboard"
     clearCache()
     return fetchAndUpdateCache(cacheId)
-  }, [clearCache, fetchAndUpdateCache])
+  }, [clearCache, fetchAndUpdateCache, dapurId])
 
   // ✅ Background refresh dengan callback (declare before updateCache)
   const backgroundRefresh = useCallback(
@@ -639,7 +635,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
   // ✅ Update cache dengan data baru (optimistic + background refresh)
   const updateCache = useCallback(
     (newData: Partial<DapurDashboardData>, onSuccess?: (data: DapurDashboardData) => void) => {
-      const cacheId = "dapur_dashboard"
+      const cacheId = dapurId ? `dapur_dashboard_${dapurId}` : "dapur_dashboard"
 
       // Get existing cache
       let cachedData = globalMemoryCache.get(cacheId)

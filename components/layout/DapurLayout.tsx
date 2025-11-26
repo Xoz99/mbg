@@ -2,6 +2,8 @@
 import { useState, ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDapurData } from '@/lib/hooks/useDapurData';
+import { clearDapurDashboardMemoryCache } from '@/lib/hooks/useDapurDashboardCache';
+import { clearProduksiMemoryCache } from '@/lib/hooks/useProduksiCache';
 import {
   Home,
   ChefHat,
@@ -304,6 +306,10 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
     // ✅ Clear dapur data cache
     clearCache();
 
+    // 🔥 Clear memory cache from hooks (penting untuk multi-account!)
+    clearDapurDashboardMemoryCache();
+    clearProduksiMemoryCache();
+
     if (typeof window !== 'undefined') {
       localStorage.removeItem('mbg_user');
       localStorage.removeItem('mbg_token');
@@ -311,11 +317,13 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
       localStorage.removeItem('userDapurId');
 
       // 🔥 Clear ALL dashboard cache keys (untuk multi-account safety)
+      // Include both old format and new format with dapurId
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith('dapur_dashboard_cache') ||
             key.startsWith('dapur_menu_cache') ||
             key.startsWith('dapur_produksi_cache') ||
-            key.startsWith('dapur_sekolah_terdekat_cache')) {
+            key.startsWith('dapur_sekolah_terdekat_cache') ||
+            key.startsWith('produksi_cache')) {
           localStorage.removeItem(key);
         }
       });
