@@ -90,3 +90,14 @@ body {
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    #e5e7eb 0%,
+    #f3f4f6 50%,
+    #e5e7eb 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}

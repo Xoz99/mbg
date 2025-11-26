@@ -443,9 +443,11 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
       })
       const totalTargetHariIni = todayMenus.reduce((sum, m) => sum + (m.targetTray || 0), 0)
 
+      // Count unique schools (sekolah yang sama di multiple weeks hanya dihitung 1x)
+      const uniqueSekolahIds = new Set(plannings.map(p => p.sekolahId))
       const newStats = {
         targetHariIni: totalTargetHariIni || 0,
-        totalSekolah: plannings.length,
+        totalSekolah: uniqueSekolahIds.size,
       }
 
       const produksiData = Object.entries(dateMap)

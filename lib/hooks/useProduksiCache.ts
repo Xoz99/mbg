@@ -185,48 +185,11 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
 
       console.log(`[useProduksiCache] Using ${plannings.length} plannings from context`);
 
-      // 🔥 OPTIMIZATION: Try to use unified `/api/menu-harian/today` endpoint first (SINGLE API CALL!)
+      // 🔥 OPTIMIZATION: Fetch menus per planning via request queue (max 3 concurrent)
       let menuResults: any[] = [];
 
       try {
-        console.log(`[useProduksiCache] 🎯 Attempting to fetch from unified /api/menu-harian/today endpoint...`);
-        const todayMenuResponse = await apiCall<any>(
-          `/api/menu-harian/today`,
-          {},
-          15000
-        );
-
-        const todayMenusList = extractArray(todayMenuResponse?.data || []);
-
-        if (todayMenusList && todayMenusList.length > 0) {
-          console.log(`[useProduksiCache] ✅ Got ${todayMenusList.length} menus from /api/menu-harian/today endpoint!`);
-
-          // Group menus by planning for compatibility with existing code
-          const menusByPlanning = new Map<string, any[]>();
-
-          todayMenusList.forEach((menu: any) => {
-            const planningId = menu.planningId || menu.menuPlanningId;
-            if (planningId) {
-              if (!menusByPlanning.has(planningId)) {
-                menusByPlanning.set(planningId, []);
-              }
-              menusByPlanning.get(planningId)?.push(menu);
-            }
-          });
-
-          // Convert to menuResults format
-          menuResults = Array.from(menusByPlanning.entries()).map(([planningId, menus]) => ({
-            planning: plannings.find(p => p.id === planningId),
-            menus
-          })).filter(item => item.planning);
-
-          console.log(`[useProduksiCache] ✨ Grouped into ${menuResults.length} planning groups`);
-        } else {
-          console.log(`[useProduksiCache] ℹ️ /api/menu-harian/today returned empty, will try fallback`);
-          throw new Error('Empty response');
-        }
-      } catch (err) {
-        console.warn(`[useProduksiCache] ⚠️ Unified endpoint failed, falling back to per-planning fetch:`, err);
+        console.log(`[useProduksiCache] 📦 Fetching menus per planning...`);
 
         // Fallback: fetch menus per planning via request queue (max 3 concurrent)
         const menuStartTime = performance.now();
@@ -253,7 +216,10 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
           .filter((item: any) => item);
 
         const menuEndTime = performance.now();
-        console.log(`[useProduksiCache] 📦 Fallback: Fetch menus took ${(menuEndTime - menuStartTime).toFixed(2)}ms (with request queue, max 3 concurrent)`);
+        console.log(`[useProduksiCache] 📦 Fetch menus took ${(menuEndTime - menuStartTime).toFixed(2)}ms (with request queue, max 3 concurrent)`);
+      } catch (err) {
+        console.error('[useProduksiCache] Error fetching menu data:', err);
+        throw err;
       }
 
       // Filter menus - hanya ambil yang tanggalnya sama dengan TODAY

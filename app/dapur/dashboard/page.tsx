@@ -11,22 +11,49 @@ import {
   TrendingUp,
   CheckCircle2,
   ArrowUp,
+  ChevronDown,
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 const REFRESH_INTERVAL = 120000 // 🔥 OPTIMIZATION: Reduced from 5min (300s) to 2min (120s) for faster updates
 
 const SkeletonLoader = () => (
-  <div className="space-y-6 animate-pulse">
-    <div className="h-10 bg-gray-200 rounded-lg w-1/3"></div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="bg-gray-200 rounded-lg h-36"></div>
+  <div className="space-y-6">
+    {/* Header Skeleton */}
+    <div className="h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg w-1/3 animate-shimmer"></div>
+
+    {/* Daftar Sekolah Skeleton */}
+    <div className="rounded-xl border border-[#D0B064]/20 bg-white p-6 shadow-sm space-y-3">
+      <div className="h-6 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg w-1/4 animate-shimmer mb-4"></div>
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="space-y-2 p-4 border border-gray-100 rounded-lg">
+          <div className="h-5 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer w-2/3"></div>
+          <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer w-full"></div>
+          <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer w-3/4"></div>
+        </div>
       ))}
     </div>
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="bg-gray-200 rounded-lg h-80"></div>
-      <div className="bg-gray-200 rounded-lg h-80"></div>
+
+    {/* Production Chart & Target Skeleton */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+        <div className="h-6 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg w-1/3 animate-shimmer"></div>
+        <div className="space-y-2">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-16 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer"></div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm space-y-4">
+        <div className="h-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg w-1/2 animate-shimmer"></div>
+        <div className="h-20 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer"></div>
+        <div className="space-y-2">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer"></div>
+          ))}
+        </div>
+      </div>
     </div>
   </div>
 )
@@ -79,6 +106,38 @@ const DashboardDapur = () => {
   })
   const [produksiMingguan, setProduksiMingguan] = useState<any[]>([])
   const [isLoadingComplete, setIsLoadingComplete] = useState(false)
+  const [expandedSekolahId, setExpandedSekolahId] = useState<string | null>(null)
+  const [sekolahDetails, setSekolahDetails] = useState<{[key: string]: any}>({})
+  const [loadingDetail, setLoadingDetail] = useState<{[key: string]: boolean}>({})
+
+  // Fetch sekolah detail saat expand
+  const fetchSekolahDetail = useCallback(async (sekolahId: string) => {
+    if (sekolahDetails[sekolahId]) return // Jika sudah cached, skip
+
+    setLoadingDetail(prev => ({ ...prev, [sekolahId]: true }))
+    try {
+      const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken')
+      const response = await fetch(`https://demombgv1.xyz/api/sekolah/${sekolahId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const sekolahData = data.data || data
+        setSekolahDetails(prev => ({
+          ...prev,
+          [sekolahId]: sekolahData
+        }))
+      }
+    } catch (err) {
+      console.warn('[Dashboard] Gagal fetch sekolah detail:', err)
+    } finally {
+      setLoadingDetail(prev => ({ ...prev, [sekolahId]: false }))
+    }
+  }, [sekolahDetails])
 
   // ✅ Callback untuk update state ketika data di-fetch dari background
   const handleCacheUpdate = useCallback((data: any) => {
@@ -190,8 +249,8 @@ const DashboardDapur = () => {
         <>
           {!isLoadingComplete ? (
             <SkeletonLoader />
-          ) : null}
-
+          ) : (
+            <>
             {/* Daftar Sekolah Section */}
             <div className="rounded-xl border border-[#D0B064]/40 bg-gradient-to-br from-[#1B263A]/5 to-[#D0B064]/5 p-6 shadow-sm">
               <div className="flex items-center gap-2 mb-6">
@@ -203,36 +262,86 @@ const DashboardDapur = () => {
                 </h4>
               </div>
               <div className="space-y-3">
-                {Array.from(new Map(menuPlanningData.map(p => [p.sekolahId, p])).values()).map((planning) => (
-                  <div
-                    key={planning.sekolahId}
-                    className="bg-white border border-[#D0B064]/30 rounded-lg p-4 shadow-sm hover:shadow-md hover:border-[#D0B064] transition-all"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <p className="font-bold text-[#1B263A] text-base">{planning.sekolahNama}</p>
-                        <p className="text-sm text-[#1B263A]/70 mt-1">{planning.sekolahAlamat}</p>
-                        {planning.picSekolah && (
-                          <div className="mt-2 pt-2 border-t border-[#D0B064]/20">
-                            <p className="text-sm text-[#1B263A]/60">
-                              <span className="font-medium">PIC:</span> {planning.picSekolah.name || planning.picSekolah.namaLengkap || "—"}
-                            </p>
-                            {planning.picSekolah.phone && (
-                              <p className="text-sm text-[#1B263A]/60">
-                                <span className="font-medium">Telepon:</span> {planning.picSekolah.phone || planning.picSekolah.noHp || "—"}
-                              </p>
+                {Array.from(new Map(menuPlanningData.map(p => [p.sekolahId, p])).values()).map((planning) => {
+                  const isExpanded = expandedSekolahId === planning.sekolahId
+                  return (
+                    <div
+                      key={planning.sekolahId}
+                      className="bg-white border border-[#D0B064]/30 rounded-lg shadow-sm hover:shadow-md hover:border-[#D0B064] transition-all cursor-pointer"
+                      onClick={() => {
+                        if (!isExpanded) {
+                          fetchSekolahDetail(planning.sekolahId)
+                        }
+                        setExpandedSekolahId(isExpanded ? null : planning.sekolahId)
+                      }}
+                    >
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <p className="font-bold text-[#1B263A] text-base">{planning.sekolahNama}</p>
+                            {!isExpanded && (
+                              <p className="text-sm text-[#1B263A]/70 mt-1 line-clamp-1">{planning.sekolahAlamat}</p>
                             )}
-                            {planning.picSekolah.email && (
-                              <p className="text-sm text-[#1B263A]/60">
-                                <span className="font-medium">Email:</span> {planning.picSekolah.email || "—"}
-                              </p>
+                          </div>
+                          <div className="flex-shrink-0">
+                            <ChevronDown
+                              className={`w-5 h-5 text-[#D0B064] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            />
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="mt-4 pt-4 border-t border-[#D0B064]/20 space-y-3">
+                            {/* Alamat */}
+                            <div>
+                              <p className="text-xs font-bold text-[#D0B064] uppercase">Alamat</p>
+                              <p className="text-sm text-[#1B263A] mt-1">{planning.sekolahAlamat || sekolahDetails[planning.sekolahId]?.alamat || "—"}</p>
+                            </div>
+
+                            {/* PIC Info - Dari fetch detail atau planning data */}
+                            {loadingDetail[planning.sekolahId] ? (
+                              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200 animate-pulse">
+                                <p className="text-sm text-blue-600">Loading data PIC...</p>
+                              </div>
+                            ) : (
+                              (() => {
+                                // Try to get PIC from fetched detail first, then fallback to planning data
+                                const detailData = sekolahDetails[planning.sekolahId]
+                                const picList = detailData?.picSekolah || planning.picSekolah
+                                const pic = picList?.[0] || picList
+
+                                return pic ? (
+                                  <div className="bg-[#D0B064]/10 rounded-lg p-3 border border-[#D0B064]/20">
+                                    <p className="text-xs font-bold text-[#D0B064] uppercase mb-2">Person In Charge</p>
+                                    <div className="space-y-1">
+                                      <p className="text-sm text-[#1B263A]">
+                                        <span className="font-medium">Nama:</span> {pic.name || pic.namaLengkap || "—"}
+                                      </p>
+                                      {(pic.phone || pic.noHp) && (
+                                        <p className="text-sm text-[#1B263A]">
+                                          <span className="font-medium">Telepon:</span> {pic.phone || pic.noHp || "—"}
+                                        </p>
+                                      )}
+                                      {pic.email && (
+                                        <p className="text-sm text-[#1B263A]">
+                                          <span className="font-medium">Email:</span> {pic.email || "—"}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="bg-gray-100 rounded-lg p-3">
+                                    <p className="text-sm text-[#1B263A]/60">Data PIC tidak tersedia</p>
+                                  </div>
+                                )
+                              })()
                             )}
                           </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 
@@ -304,7 +413,8 @@ const DashboardDapur = () => {
                 </div>
               </div>
             </div>
-
+            </>
+          )}
         </>
       </div>
     </DapurLayout>
