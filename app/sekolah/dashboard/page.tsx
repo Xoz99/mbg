@@ -65,6 +65,45 @@ const SkeletonTableRow = () => (
   </tr>
 )
 
+// ✅ Utility function untuk parse tanggal dari berbagai format
+const parseDate = (dateInput: any): Date | null => {
+  if (!dateInput) return null
+
+  try {
+    // Jika sudah Date object
+    if (dateInput instanceof Date) {
+      return isNaN(dateInput.getTime()) ? null : dateInput
+    }
+
+    // Jika string format ISO atau timestamp
+    if (typeof dateInput === 'string') {
+      // Handle ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)
+      if (dateInput.match(/^\d{4}-\d{2}-\d{2}/)) {
+        const parsed = new Date(dateInput)
+        return isNaN(parsed.getTime()) ? null : parsed
+      }
+
+      // Handle timestamp string
+      const numDate = Number(dateInput)
+      if (!isNaN(numDate)) {
+        const parsed = new Date(numDate)
+        return isNaN(parsed.getTime()) ? null : parsed
+      }
+    }
+
+    // Jika number (timestamp)
+    if (typeof dateInput === 'number') {
+      const parsed = new Date(dateInput)
+      return isNaN(parsed.getTime()) ? null : parsed
+    }
+
+    return null
+  } catch (err) {
+    console.error('[parseDate] Error parsing date:', dateInput, err)
+    return null
+  }
+}
+
 const GiziDistributionChart = memo(({ data }: { data: any[] }) => (
   <ResponsiveContainer width="100%" height={280}>
     <PieChart>
@@ -366,20 +405,40 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
         <p className="text-sm font-bold mb-4 text-slate-700">📌 Event Mendatang</p>
         <div className="space-y-2 max-h-80 overflow-y-auto">
           {reminder?.events && reminder.events.length > 0 ? (
-            reminder.events.slice(0, 10).map((event: any, idx: number) => (
-              <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
-                <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0"></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-slate-900 truncate">{event.nama}</p>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    {new Date(event.tanggal).toLocaleDateString("id-ID", {
+            reminder.events
+              .map((event: any) => {
+                const parsedDate = parseDate(event.tanggal || event.tanggalMulai || event.date)
+                return { event, parsedDate }
+              })
+              .filter(({ parsedDate }) => {
+                // Filter hanya event yang tanggalnya >= hari ini
+                if (!parsedDate) return false
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+                parsedDate.setHours(0, 0, 0, 0)
+                return parsedDate >= today
+              })
+              .slice(0, 10)
+              .map(({ event, parsedDate }, idx: number) => {
+                const formattedDate = parsedDate
+                  ? parsedDate.toLocaleDateString("id-ID", {
                       month: "short",
                       day: "numeric"
-                    })}
-                  </p>
-                </div>
-              </div>
-            ))
+                    })
+                  : "Tanggal tidak valid"
+
+                return (
+                  <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0"></div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-900 truncate">{event.nama || event.deskripsi || "Event"}</p>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        {formattedDate}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })
           ) : (
             <p className="text-xs text-slate-500">Tidak ada event mendatang</p>
           )}
@@ -659,8 +718,8 @@ const DashboardSekolah = () => {
       fetchReminderUpdate()
     }, 500) // Small delay to ensure initial data is loaded
 
-    // ✅ Setup polling for reminder data (every 15 seconds) for faster realtime updates
-    const pollReminderData = setInterval(fetchReminderUpdate, 15 * 1000) // Poll every 15 seconds
+    // ✅ Setup polling for reminder data (reduced from 15s to 60s for better performance)
+    const pollReminderData = setInterval(fetchReminderUpdate, 60 * 1000) // Poll every 60 seconds (was 15s)
 
     return () => {
       clearInterval(pollReminderData)

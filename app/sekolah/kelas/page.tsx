@@ -3,8 +3,8 @@
 import { useState, useMemo, memo, useEffect, useRef, useCallback } from 'react';
 import SekolahLayout from '@/components/layout/SekolahLayout';
 import { useSekolahDataCache } from '@/lib/hooks/useSekolahDataCache';
-import { 
-  Users, 
+import {
+  Users,
   GraduationCap,
   TrendingUp,
   UserCheck,
@@ -18,7 +18,8 @@ import {
   AlertCircle,
   Plus,
   Trash2,
-  ClipboardCheck
+  ClipboardCheck,
+  RotateCw
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -113,9 +114,14 @@ const DataKelas = () => {
   // Absensi form state
   const [absensiForm, setAbsensiForm] = useState({
     tanggal: new Date().toISOString().split('T')[0],
-    jumlahHadir: 0,
-    keterangan: "",
+    siswaHadir: [] as string[], // Array of siswa IDs
   });
+
+  // Search state untuk modal absensi
+  const [absensiSearchTerm, setAbsensiSearchTerm] = useState("");
+
+  // Refresh hadir hari ini state
+  const [refreshingHadir, setRefreshingHadir] = useState(false);
 
   // ✅ EFFECT 1: Wait for sekolahId to be available
   useEffect(() => {
@@ -336,13 +342,8 @@ const DataKelas = () => {
       return;
     }
 
-    if (absensiForm.jumlahHadir < 0) {
-      alert("Jumlah hadir tidak boleh negatif");
-      return;
-    }
-
-    if (absensiForm.jumlahHadir > selectedKelas.totalSiswa) {
-      alert(`Jumlah hadir tidak boleh melebihi total siswa (${selectedKelas.totalSiswa})`);
+    if (absensiForm.siswaHadir.length === 0) {
+      alert("Pilih minimal 1 siswa yang hadir");
       return;
     }
 
@@ -360,8 +361,8 @@ const DataKelas = () => {
 
       const payload = {
         tanggal: absensiForm.tanggal,
-        jumlahHadir: parseInt(absensiForm.jumlahHadir.toString()),
-        keterangan: absensiForm.keterangan,
+        jumlahHadir: absensiForm.siswaHadir.length,
+        siswaHadir: absensiForm.siswaHadir,
       };
 
       console.log("[CREATE ABSENSI] Kelas ID:", kelasId);
@@ -383,6 +384,28 @@ const DataKelas = () => {
       const responseText = await response.text();
 
       if (!response.ok) {
+        // Handle specific error: Absensi already exists
+        if (response.status === 400 && responseText.includes("already exists")) {
+          const userChoice = confirm(
+            "Absensi untuk tanggal ini sudah ada.\n\n" +
+            "Pilih:\n" +
+            "✓ OK = Ubah tanggal dan coba lagi\n" +
+            "✗ Cancel = Batal"
+          );
+
+          if (userChoice) {
+            // Auto set tanggal ke hari berikutnya
+            const nextDate = new Date(absensiForm.tanggal);
+            nextDate.setDate(nextDate.getDate() + 1);
+            setAbsensiForm({
+              ...absensiForm,
+              tanggal: nextDate.toISOString().split('T')[0],
+            });
+            alert("Tanggal sudah diubah ke hari berikutnya. Coba lagi!");
+          }
+          return;
+        }
+
         throw new Error(`API Error ${response.status}: ${responseText}`);
       }
 
@@ -391,17 +414,18 @@ const DataKelas = () => {
 
       setAbsensiForm({
         tanggal: new Date().toISOString().split('T')[0],
-        jumlahHadir: 0,
-        keterangan: "",
+        siswaHadir: [],
       });
+      setAbsensiSearchTerm("");
       setShowAbsensiModal(false);
 
       // ✅ Optimistic update: Update kelas hadirHariIni count
+      const totalHadir = absensiForm.siswaHadir.length;
       const updatedKelasData = kelasData.map((k) => {
         if (k.id === kelasId) {
           return {
             ...k,
-            hadirHariIni: absensiForm.jumlahHadir,
+            hadirHariIni: totalHadir,
           }
         }
         return k
@@ -424,10 +448,102 @@ const DataKelas = () => {
 
       alert("Absensi berhasil dibuat!");
     } catch (err) {
-      alert(`Gagal membuat absensi: ${err instanceof Error ? err.message : "Unknown error"}`);
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      alert(`Gagal membuat absensi: ${errorMsg}`);
       console.error("[CREATE ABSENSI] Error:", err);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Refresh hadir hari ini untuk kelas tertentu
+  const handleRefreshHadirHariIni = async () => {
+    if (!selectedKelas) return;
+
+    try {
+      setRefreshingHadir(true);
+      const authToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
+      if (!authToken) {
+        alert("Token tidak ditemukan");
+        return;
+      }
+
+      const kelasId = selectedKelas.id || selectedKelas._id;
+      const url = `${API_BASE_URL}/api/kelas/${kelasId}/absensi`;
+
+      console.log("[REFRESH HADIR] Fetching from:", url);
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("[REFRESH HADIR] Response:", data);
+
+      // Parse hadir hari ini dari response
+      let hadirCount = 0;
+      const today = new Date().toISOString().split('T')[0];
+
+      if (Array.isArray(data.data?.data)) {
+        const todayRecords = data.data.data.filter((record: any) => {
+          const recordDate = record.tanggal?.split('T')[0];
+          return recordDate === today;
+        });
+        if (todayRecords.length > 0) {
+          hadirCount = todayRecords[0].jumlahHadir || 0;
+        }
+      } else if (Array.isArray(data.data)) {
+        const todayRecord = data.data.find((record: any) => {
+          const recordDate = record.tanggal?.split('T')[0];
+          return recordDate === today;
+        });
+        hadirCount = todayRecord?.jumlahHadir || 0;
+      } else if (typeof data.data === 'object' && data.data?.jumlahHadir !== undefined) {
+        hadirCount = data.data.jumlahHadir || 0;
+      } else if (data.jumlahHadir !== undefined) {
+        hadirCount = data.jumlahHadir || 0;
+      }
+
+      console.log("[REFRESH HADIR] Hadir hari ini:", hadirCount);
+
+      // Update selectedKelas
+      const updatedKelas = {
+        ...selectedKelas,
+        hadirHariIni: hadirCount,
+      };
+      setSelectedKelas(updatedKelas);
+
+      // Update kelasData juga
+      const updatedKelasData = kelasData.map((k) => {
+        if (k.id === kelasId) {
+          return { ...k, hadirHariIni: hadirCount };
+        }
+        return k;
+      });
+      setKelasData(updatedKelasData);
+
+      // Update unified cache
+      const sekolahId = localStorage.getItem("sekolahId");
+      if (sekolahId && authToken) {
+        updateCache(sekolahId, authToken, {
+          kelasData: updatedKelasData,
+          siswaData: siswaData,
+          absensiData: absensiData,
+        });
+      }
+    } catch (err) {
+      alert(`Gagal refresh: ${err instanceof Error ? err.message : "Unknown error"}`);
+      console.error("[REFRESH HADIR] Error:", err);
+    } finally {
+      setRefreshingHadir(false);
     }
   };
 
@@ -703,12 +819,63 @@ const DataKelas = () => {
                     </div>
 
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         const kelasId = kelas.id || kelas._id;
                         console.log("[CLICK] Kelas dipilih:", kelas.nama);
                         console.log("[CLICK] Kelas ID:", kelasId);
                         console.log("[CLICK] Full Kelas Object:", kelas);
                         setSelectedKelas(kelas);
+
+                        // Auto-fetch hadir hari ini saat detail dibuka
+                        try {
+                          const authToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
+                          if (!authToken) return;
+
+                          const url = `${API_BASE_URL}/api/kelas/${kelasId}/absensi`;
+                          const response = await fetch(url, {
+                            method: "GET",
+                            headers: {
+                              Authorization: `Bearer ${authToken}`,
+                              "Content-Type": "application/json",
+                            },
+                          });
+
+                          if (response.ok) {
+                            const data = await response.json();
+                            let hadirCount = 0;
+                            const today = new Date().toISOString().split('T')[0];
+
+                            if (Array.isArray(data.data?.data)) {
+                              const todayRecords = data.data.data.filter((record: any) => {
+                                const recordDate = record.tanggal?.split('T')[0];
+                                return recordDate === today;
+                              });
+                              if (todayRecords.length > 0) {
+                                hadirCount = todayRecords[0].jumlahHadir || 0;
+                              }
+                            } else if (Array.isArray(data.data)) {
+                              const todayRecord = data.data.find((record: any) => {
+                                const recordDate = record.tanggal?.split('T')[0];
+                                return recordDate === today;
+                              });
+                              hadirCount = todayRecord?.jumlahHadir || 0;
+                            } else if (typeof data.data === 'object' && data.data?.jumlahHadir !== undefined) {
+                              hadirCount = data.data.jumlahHadir || 0;
+                            } else if (data.jumlahHadir !== undefined) {
+                              hadirCount = data.jumlahHadir || 0;
+                            }
+
+                            // Update selectedKelas dengan hadirHariIni
+                            setSelectedKelas((prev: any) => ({
+                              ...prev,
+                              hadirHariIni: hadirCount,
+                            }));
+
+                            console.log("[CLICK AUTO-FETCH] Hadir hari ini:", hadirCount);
+                          }
+                        } catch (err) {
+                          console.error("[CLICK AUTO-FETCH] Error:", err);
+                        }
                       }}
                       className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors font-medium"
                     >
@@ -797,65 +964,193 @@ const DataKelas = () => {
       {/* Modal Create Absensi */}
       {showAbsensiModal && selectedKelas && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
-          <div className="bg-gradient-to-r from-[#1B263A] to-[#24314d] text-white px-6 py-5 flex items-center justify-between rounded-t-2xl">
-          <div>
-                <h3 className="text-xl font-bold">Buat Absensi</h3>
-                <p className="text-sm text-white/80 mt-1">Kelas {selectedKelas.nama}</p>
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#1B263A] to-[#24314d] text-white px-6 py-5 flex items-center justify-between rounded-t-2xl flex-shrink-0">
+              <div>
+                <h3 className="text-xl font-bold">Absensi Siswa</h3>
+                <p className="text-sm text-white/80 mt-1">{selectedKelas.nama}</p>
               </div>
-              <button onClick={() => setShowAbsensiModal(false)} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
+              <button onClick={() => {
+                setShowAbsensiModal(false);
+                setAbsensiSearchTerm("");
+              }} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateAbsensi} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Tanggal Absensi <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={absensiForm.tanggal}
-                  onChange={(e) => setAbsensiForm({ ...absensiForm, tanggal: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
+            <form onSubmit={handleCreateAbsensi} className="flex flex-col flex-1 overflow-hidden">
+              {/* Content Area - Scrollable */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {/* Tanggal */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Tanggal Absensi <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={absensiForm.tanggal}
+                    onChange={(e) => setAbsensiForm({ ...absensiForm, tanggal: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </div>
+
+                {/* Search Input */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Cari Siswa
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Cari nama atau NIS..."
+                      value={absensiSearchTerm}
+                      onChange={(e) => setAbsensiSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* List Siswa dengan Checkbox */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-semibold text-gray-700">
+                      Pilih Siswa Hadir <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                      {absensiForm.siswaHadir.length} dipilih
+                    </span>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+                    <div className="max-h-64 overflow-y-auto">
+                      {siswaData
+                        .filter((siswa) => {
+                          const siswaKelasId = String(siswa.kelasId?.id || siswa.kelasId || '');
+                          const selectedKelasId = String(selectedKelas.id || '');
+                          return siswaKelasId === selectedKelasId;
+                        })
+                        .filter((siswa) => {
+                          const searchLower = absensiSearchTerm.toLowerCase();
+                          return (
+                            (siswa.nama || '').toLowerCase().includes(searchLower) ||
+                            (siswa.nis || '').toLowerCase().includes(searchLower)
+                          );
+                        })
+                        .sort((a, b) => (a.nama || '').localeCompare(b.nama || ''))
+                        .map((siswa, idx) => {
+                          const siswaId = siswa.id || siswa._id;
+                          const isChecked = absensiForm.siswaHadir.includes(siswaId);
+                          return (
+                            <label
+                              key={siswaId}
+                              className={`flex items-center gap-4 px-4 py-3 cursor-pointer transition-all ${
+                                idx !== 0 ? 'border-t border-gray-100' : ''
+                              } ${isChecked ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setAbsensiForm({
+                                      ...absensiForm,
+                                      siswaHadir: [...absensiForm.siswaHadir, siswaId]
+                                    });
+                                  } else {
+                                    setAbsensiForm({
+                                      ...absensiForm,
+                                      siswaHadir: absensiForm.siswaHadir.filter(id => id !== siswaId)
+                                    });
+                                  }
+                                }}
+                                className="w-5 h-5 text-blue-600 border-gray-300 rounded cursor-pointer flex-shrink-0"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-medium ${isChecked ? 'text-blue-900' : 'text-gray-900'}`}>
+                                  {siswa.nama}
+                                </p>
+                                <p className="text-xs text-gray-500">{siswa.nis}</p>
+                              </div>
+                              {siswa.jenisKelamin && (
+                                <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${
+                                  siswa.jenisKelamin === 'LAKI_LAKI'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-pink-100 text-pink-700'
+                                }`}>
+                                  {siswa.jenisKelamin === 'LAKI_LAKI' ? 'L' : 'P'}
+                                </span>
+                              )}
+                            </label>
+                          );
+                        })}
+
+                      {siswaData.filter((siswa) => {
+                        const siswaKelasId = String(siswa.kelasId?.id || siswa.kelasId || '');
+                        const selectedKelasId = String(selectedKelas.id || '');
+                        return siswaKelasId === selectedKelasId;
+                      }).filter((siswa) => {
+                        const searchLower = absensiSearchTerm.toLowerCase();
+                        return (
+                          (siswa.nama || '').toLowerCase().includes(searchLower) ||
+                          (siswa.nis || '').toLowerCase().includes(searchLower)
+                        );
+                      }).length === 0 && (
+                        <div className="p-6 text-center">
+                          <Search className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">
+                            {absensiSearchTerm ? 'Siswa tidak ditemukan' : 'Tidak ada siswa di kelas ini'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
+                    <span>
+                      {siswaData.filter((siswa) => {
+                        const siswaKelasId = String(siswa.kelasId?.id || siswa.kelasId || '');
+                        const selectedKelasId = String(selectedKelas.id || '');
+                        return siswaKelasId === selectedKelasId;
+                      }).length} siswa total
+                    </span>
+                    <span className="font-semibold text-blue-600">
+                      {absensiForm.siswaHadir.length} hadir
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Jumlah Siswa Hadir <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  max={selectedKelas.totalSiswa}
-                  value={absensiForm.jumlahHadir}
-                  onChange={(e) => setAbsensiForm({ ...absensiForm, jumlahHadir: parseInt(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder={`Max: ${selectedKelas.totalSiswa} siswa`}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Total siswa di kelas: {selectedKelas.totalSiswa}
-                </p>
-              </div>
-
-              <div className="flex gap-3 pt-4">
+              {/* Footer with Buttons */}
+              <div className="border-t border-gray-100 px-6 py-4 bg-gray-50 flex gap-3 flex-shrink-0">
                 <button
                   type="button"
-                  onClick={() => setShowAbsensiModal(false)}
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+                  onClick={() => {
+                    setShowAbsensiModal(false);
+                    setAbsensiSearchTerm("");
+                  }}
+                  className="flex-1 px-4 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="flex-1 px-4 py-2.5 bg-[#1B263A] text-white rounded-xl hover:bg-[#24314d] transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <ClipboardCheck className="w-5 h-5" />}
-                  Buat Absensi
+                  disabled={submitting || absensiForm.siswaHadir.length === 0}
+                  className="flex-1 px-4 py-3 bg-[#1B263A] text-white rounded-xl hover:bg-[#24314d] transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <ClipboardCheck className="w-5 h-5" />
+                      Simpan Absensi ({absensiForm.siswaHadir.length})
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -880,15 +1175,25 @@ const DataKelas = () => {
                   <p className="text-2xl font-bold text-blue-900">{selectedKelas.totalSiswa || 0}</p>
                   <p className="text-xs text-blue-700">Total Siswa</p>
                 </div>
-                <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+                <div className="bg-green-50 rounded-xl p-4 border border-green-100 relative group">
                   <div className="flex items-center justify-between mb-2">
                     <UserCheck className="w-6 h-6 text-green-600" />
-                    {loading && <Loader2 className="w-4 h-4 text-green-600 animate-spin" />}
+                    {(loading || refreshingHadir) && <Loader2 className="w-4 h-4 text-green-600 animate-spin" />}
                   </div>
                   <p className="text-2xl font-bold text-green-900">
-                    {loading ? '...' : (selectedKelas.hadirHariIni || 0)}
+                    {selectedKelas.hadirHariIni !== undefined && selectedKelas.hadirHariIni !== null
+                      ? selectedKelas.hadirHariIni
+                      : (loading ? '...' : 0)}
                   </p>
                   <p className="text-xs text-green-700">Hadir Hari Ini</p>
+                  <button
+                    onClick={handleRefreshHadirHariIni}
+                    disabled={refreshingHadir}
+                    className="absolute top-2 right-2 p-1.5 rounded hover:bg-green-100 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                    title="Refresh hadir hari ini"
+                  >
+                    <RotateCw className={`w-4 h-4 text-green-600 ${refreshingHadir ? 'animate-spin' : ''}`} />
+                  </button>
                 </div>
               </div>
 

@@ -3,8 +3,8 @@ import { cacheEmitter } from "@/lib/utils/cacheEmitter"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
 const CACHE_EMIT_KEY = "sekolah_unified_cache_update"
-const CACHE_KEY = "sekolah_unified_cache"
-const CACHE_EXPIRY = 1 * 60 * 1000 // 1 minute
+const CACHE_KEY_PREFIX = "sekolah_unified_cache" // Added _PREFIX to clarify it's a base key
+const CACHE_EXPIRY = 5 * 60 * 1000 // 5 minutes (increased from 1 min for better performance + multi-account safety)
 
 // ✅ Simple hash function untuk compare data changes
 function simpleHash(str: string): string {
@@ -173,7 +173,10 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
       const siswaPerKelas: { [key: string]: { laki: number; perempuan: number; alergi: number } } = {}
 
       siswaList.forEach((siswa: any) => {
-        const kelasId = siswa.kelasId?.id || siswa.kelasId
+        // Normalize kelasId to string for consistent matching
+        const kelasId = String(siswa.kelasId?.id || siswa.kelasId || '')
+        if (!kelasId) return // Skip if no kelasId
+
         if (!siswaPerKelas[kelasId]) {
           siswaPerKelas[kelasId] = { laki: 0, perempuan: 0, alergi: 0 }
         }
@@ -192,14 +195,24 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
         }
       })
 
+      console.log("[FETCH KELAS] siswaPerKelas map:", siswaPerKelas)
+
       // Update kelas dengan siswa count
-      const finalKelasList = kelasList.map((kelas: any) => ({
-        ...kelas,
-        totalSiswa: (siswaPerKelas[kelas.id]?.laki || 0) + (siswaPerKelas[kelas.id]?.perempuan || 0) || kelas.totalSiswa || 0,
-        lakiLaki: siswaPerKelas[kelas.id]?.laki || kelas.lakiLaki || 0,
-        perempuan: siswaPerKelas[kelas.id]?.perempuan || kelas.perempuan || 0,
-        alergiCount: siswaPerKelas[kelas.id]?.alergi || kelas.alergiCount || 0,
-      }))
+      const finalKelasList = kelasList.map((kelas: any) => {
+        // Normalize kelas.id to string for consistent matching
+        const normalizedKelasId = String(kelas.id || '')
+        const siswaCount = siswaPerKelas[normalizedKelasId]
+
+        console.log(`[FETCH KELAS] Kelas ${kelas.nama} (ID: ${normalizedKelasId}) -> siswaCount:`, siswaCount)
+
+        return {
+          ...kelas,
+          totalSiswa: (siswaCount?.laki || 0) + (siswaCount?.perempuan || 0) || kelas.totalSiswa || 0,
+          lakiLaki: siswaCount?.laki || kelas.lakiLaki || 0,
+          perempuan: siswaCount?.perempuan || kelas.perempuan || 0,
+          alergiCount: siswaCount?.alergi || kelas.alergiCount || 0,
+        }
+      })
 
       console.timeEnd("fetchKelas")
       return finalKelasList
@@ -219,43 +232,60 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
           "Content-Type": "application/json",
         }
 
-        const today = new Date().toISOString().split("T")[0]
         const absensiPerKelas: { [key: string]: number } = {}
 
         const absensiPromises = kelasList.map(async (kelas: any) => {
           try {
-            const absensiUrl = `${API_BASE_URL}/api/kelas/${kelas.id}/absensi?tanggal=${today}`
+            // ✅ Use /api/kelas/:kelasId/absensi to get today's attendance summary
+            const absensiUrl = `${API_BASE_URL}/api/kelas/${kelas.id}/absensi`
+            console.log(`[FETCH ABSENSI TODAY] Fetching from: ${absensiUrl}`)
             const absensiRes = await fetch(absensiUrl, { headers })
 
             if (absensiRes.ok) {
               const absensiData = await absensiRes.json()
+              console.log(`[FETCH ABSENSI TODAY] Response for kelas ${kelas.id}:`, absensiData)
 
-              let absensiList = []
+              // Parse response berdasarkan berbagai struktur API
+              let hadirCount = 0
+
+              // Cek jika response adalah array of absensi records
               if (Array.isArray(absensiData.data?.data)) {
-                absensiList = absensiData.data.data
-              } else if (Array.isArray(absensiData.data)) {
-                absensiList = absensiData.data
-              } else if (Array.isArray(absensiData)) {
-                absensiList = absensiData
-              } else if (absensiData.data && typeof absensiData.data === "object") {
-                absensiList = [absensiData.data]
-              }
-
-              if (absensiList.length > 0) {
-                const todayAbsensi = absensiList.find((a: any) => {
-                  const absensiDate = new Date(a.tanggal).toISOString().split("T")[0]
-                  return absensiDate === today
+                // Filter untuk hari ini (tanggal sesuai hari ini)
+                const today = new Date().toISOString().split('T')[0]
+                const todayRecords = absensiData.data.data.filter((record: any) => {
+                  const recordDate = record.tanggal?.split('T')[0]
+                  return recordDate === today
                 })
 
-                if (todayAbsensi && todayAbsensi.jumlahHadir !== undefined) {
-                  absensiPerKelas[kelas.id] = todayAbsensi.jumlahHadir
+                if (todayRecords.length > 0) {
+                  // Ambil hadir dari record hari ini
+                  hadirCount = todayRecords[0].jumlahHadir || 0
                 }
+              } else if (Array.isArray(absensiData.data)) {
+                // Direct array of records
+                const today = new Date().toISOString().split('T')[0]
+                const todayRecord = absensiData.data.find((record: any) => {
+                  const recordDate = record.tanggal?.split('T')[0]
+                  return recordDate === today
+                })
+                hadirCount = todayRecord?.jumlahHadir || 0
+              } else if (typeof absensiData.data === 'object' && absensiData.data?.jumlahHadir !== undefined) {
+                // Single object response
+                hadirCount = absensiData.data.jumlahHadir || 0
+              } else if (absensiData.jumlahHadir !== undefined) {
+                // Direct field
+                hadirCount = absensiData.jumlahHadir || 0
               }
+
+              absensiPerKelas[kelas.id] = hadirCount
+              console.log(`[FETCH ABSENSI TODAY] Kelas ${kelas.id}: ${hadirCount} hadir hari ini`)
 
               return {
                 kelasId: kelas.id,
-                data: absensiList,
+                data: Array.isArray(absensiData.data) ? absensiData.data : [],
               }
+            } else {
+              console.warn(`[FETCH ABSENSI TODAY] No data for kelas ${kelas.id}, status: ${absensiRes.status}`)
             }
           } catch (err) {
             console.error(`[FETCH ABSENSI] Error for kelas ${kelas.id}:`, err)
@@ -602,8 +632,14 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
         // 3. Fetch absensi + absensi chart for dashboard
         console.log("[FETCH ALL] Step 3: Fetching absensi...")
-        const { allAbsensi } = await fetchAbsensiDataReturn(kelasList, token)
-        console.log("[FETCH ALL] ✅ Absensi fetched:", allAbsensi.length)
+        const { allAbsensi, absensiPerKelas } = await fetchAbsensiDataReturn(kelasList, token)
+        console.log("[FETCH ALL] ✅ Absensi fetched:", allAbsensi.length, "absensiPerKelas:", absensiPerKelas)
+
+        // ✅ Merge hadirHariIni into kelas data
+        const kelasDataWithAbsensi = kelasList.map((kelas: any) => ({
+          ...kelas,
+          hadirHariIni: absensiPerKelas[kelas.id] || 0
+        }))
 
         // 4. Fetch absensi per minggu untuk dashboard chart
         console.log("[FETCH ALL] Step 4: Fetching absensi chart per minggu...")
@@ -621,7 +657,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
         const data: SekolahData = {
           siswaData: siswaList,
-          kelasData: kelasList,
+          kelasData: kelasDataWithAbsensi,
           absensiData: allAbsensi,
           absensiChartData,
           pengirimanData: pengirimanResult,
@@ -652,6 +688,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
   const loadData = useCallback(
     async (schoolId: string, token: string) => {
       const cacheId = `${schoolId}_${token.substring(0, 10)}`
+      const localStorageCacheKey = `${CACHE_KEY_PREFIX}_${cacheId}` // ✅ FIX: Unique key per account
 
       // 1. Check memory cache first (fastest)
       if (globalMemoryCache.has(cacheId)) {
@@ -671,7 +708,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
       // 2. Check localStorage
       if (typeof window !== "undefined") {
-        const localCached = localStorage.getItem(CACHE_KEY)
+        const localCached = localStorage.getItem(localStorageCacheKey)
         if (localCached) {
           try {
             const parsed = JSON.parse(localCached) as SekolahCachedData
@@ -765,7 +802,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
         // Update localStorage
         if (typeof window !== "undefined") {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(cachedData))
+          localStorage.setItem(`${CACHE_KEY_PREFIX}_${cacheId}`, JSON.stringify(cachedData))
         }
 
         console.log("✅ [UNIFIED CACHE] Data updated and cached - dashboard fields included!")
@@ -795,7 +832,12 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
   const clearCache = useCallback(() => {
     globalMemoryCache.clear()
     if (typeof window !== "undefined") {
-      localStorage.removeItem(CACHE_KEY)
+      // Clear all sekolah cache keys (for multi-account safety)
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(CACHE_KEY_PREFIX)) {
+          localStorage.removeItem(key)
+        }
+      })
     }
     console.log("✅ [UNIFIED CACHE] Cleared")
   }, [])
@@ -862,7 +904,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
       // Update localStorage immediately
       if (typeof window !== "undefined") {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(updatedData))
+        localStorage.setItem(`${CACHE_KEY_PREFIX}_${cacheId}`, JSON.stringify(updatedData))
       }
 
       console.log("✅ [UNIFIED CACHE] Updated with optimistic data - AUTO SYNC to all pages!")
@@ -962,7 +1004,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
         // Update localStorage
         if (typeof window !== "undefined") {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(cachedData))
+          localStorage.setItem(`${CACHE_KEY_PREFIX}_${cacheId}`, JSON.stringify(cachedData))
         }
 
         console.log("✅ [UNIFIED] Background refresh completed successfully - all fields including attendance chart updated!")
