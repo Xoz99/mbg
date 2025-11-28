@@ -254,7 +254,7 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
       icon: ChefHat, 
       hasSubmenu: true,
       submenu: [
-        { id: 'produksi', name: 'Produksi Harian', path: '/dapur/produksi' },
+        //{ id: 'produksi', name: 'Produksi Harian', path: '/dapur/produksi' },
         { id: 'menu', name: 'Menu Planning', path: '/dapur/menu' },
         { id: 'sekolah', name: 'Sekolah Terdekat', path: '/dapur/sekolah-terdekat' },
       ]
