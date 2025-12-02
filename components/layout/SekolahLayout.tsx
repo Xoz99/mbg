@@ -17,7 +17,8 @@ import {
   MessageCircle,
   Send,
   CheckCircle,
-  ChevronDown
+  ChevronDown,
+  Package
 } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
@@ -258,6 +259,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
           submenu: [
             { id: 'presensi', name: 'Presensi Siswa', path: '/sekolah/presensi' },
             { id: 'absensi', name: 'Absensi Penerima', path: '/sekolah/absensi' },
+            { id: 'pengembalian', name: 'Pengembalian Makanan', path: '/sekolah/pengembalian' },
             { id: 'tracking', name: 'Tracking MBG', path: '/sekolah/tracking' },
           ]
         },
@@ -301,6 +303,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
         submenu: [
           { id: 'presensi', name: 'Presensi Siswa', path: '/sekolah/presensi' },
           { id: 'absensi', name: 'Absensi Penerima', path: '/sekolah/absensi' },
+          { id: 'pengembalian', name: 'Pengembalian Makanan', path: '/sekolah/pengembalian' },
           { id: 'tracking', name: 'Tracking MBG', path: '/sekolah/tracking' },
         ]
       },
