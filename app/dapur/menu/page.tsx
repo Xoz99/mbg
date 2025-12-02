@@ -60,6 +60,8 @@ interface Kelas {
 interface AlergiItem {
   nama: string
   jumlahSiswa: number
+  uniqueSiswaAlergi?: number
+  totalSiswaAlergi?: number
 }
 
 interface Holiday {
@@ -586,11 +588,16 @@ function ModalCreateMenuHarian({
 
           {alergiList.length > 0 && (
             <div className="bg-amber-50 p-4 rounded-lg text-sm border border-amber-200">
-              <p className="font-bold text-amber-900 mb-2">Alergi di Sekolah Ini:</p>
+              <p className="font-bold text-amber-900 mb-2">
+                Alergi di Sekolah Ini:
+                {alergiList[0]?.totalSiswaAlergi !== undefined && (
+                  <span className="ml-2 text-amber-700">({alergiList[0].totalSiswaAlergi} siswa alergi)</span>
+                )}
+              </p>
               <div className="flex flex-wrap gap-2">
                 {alergiList.map((a: AlergiItem, i: number) => (
                   <span key={i} className="bg-white px-2 py-1 rounded text-xs text-amber-800 border border-amber-300">
-                    {a.nama}
+                    {a.nama} • {a.jumlahSiswa} siswa
                   </span>
                 ))}
               </div>
@@ -1141,9 +1148,18 @@ export default function MenuPlanningPage() {
               }
             }
 
+            // Hitung total siswa yang alergi (unique)
+            const allAlergiSiswaSet = new Set<string>()
+            for (const data of alergiMap.values()) {
+              data.siswas.forEach(id => allAlergiSiswaSet.add(id))
+            }
+            const totalSiswaAlergi = allAlergiSiswaSet.size
+
             return Array.from(alergiMap.entries()).map(([nama, data]) => ({
               nama,
               jumlahSiswa: data.count,
+              uniqueSiswaAlergi: new Set(data.siswas).size,
+              totalSiswaAlergi,
             }))
           })(),
           (async () => {
