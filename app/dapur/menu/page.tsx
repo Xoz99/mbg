@@ -17,7 +17,7 @@ import {
   Users,
 } from "lucide-react"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://demombgv1.xyz'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
 
 interface MenuHarian {
   id: string
@@ -465,8 +465,8 @@ function ModalCreateMenuHarian({
 }: any) {
   if (!isOpen) return null
 
-  const minDate = currentPlanning?.tanggalMulai || ""
-  const maxDate = currentPlanning?.tanggalSelesai || ""
+  const minDate = normalizeDateString(currentPlanning?.tanggalMulai) || ""
+  const maxDate = normalizeDateString(currentPlanning?.tanggalSelesai) || ""
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
@@ -523,9 +523,10 @@ function ModalCreateMenuHarian({
   const goToPreviousMonth = () => {
     const prev = new Date(displayMonth)
     prev.setMonth(prev.getMonth() - 1)
-    const minDateObj = new Date(minDate)
+    const minDateObj = parseDateAsUTC(minDate)
+    if (!minDateObj) return
     const prevYearMonth = prev.getFullYear() * 12 + prev.getMonth()
-    const minYearMonth = minDateObj.getFullYear() * 12 + minDateObj.getMonth()
+    const minYearMonth = minDateObj.getUTCFullYear() * 12 + minDateObj.getUTCMonth()
     if (prevYearMonth >= minYearMonth) {
       setDisplayMonth(prev)
     }
@@ -534,9 +535,10 @@ function ModalCreateMenuHarian({
   const goToNextMonth = () => {
     const next = new Date(displayMonth)
     next.setMonth(next.getMonth() + 1)
-    const maxDateObj = new Date(maxDate)
+    const maxDateObj = parseDateAsUTC(maxDate)
+    if (!maxDateObj) return
     const nextYearMonth = next.getFullYear() * 12 + next.getMonth()
-    const maxYearMonth = maxDateObj.getFullYear() * 12 + maxDateObj.getMonth()
+    const maxYearMonth = maxDateObj.getUTCFullYear() * 12 + maxDateObj.getUTCMonth()
     if (nextYearMonth <= maxYearMonth) {
       setDisplayMonth(next)
     }
@@ -546,9 +548,10 @@ function ModalCreateMenuHarian({
     try {
       const prev = new Date(displayMonth)
       prev.setMonth(prev.getMonth() - 1)
-      const minDateObj = new Date(minDate)
+      const minDateObj = parseDateAsUTC(minDate)
+      if (!minDateObj) return false
       const prevYearMonth = prev.getFullYear() * 12 + prev.getMonth()
-      const minYearMonth = minDateObj.getFullYear() * 12 + minDateObj.getMonth()
+      const minYearMonth = minDateObj.getUTCFullYear() * 12 + minDateObj.getUTCMonth()
       return prevYearMonth >= minYearMonth
     } catch (e) {
       return false
@@ -559,9 +562,10 @@ function ModalCreateMenuHarian({
     try {
       const next = new Date(displayMonth)
       next.setMonth(next.getMonth() + 1)
-      const maxDateObj = new Date(maxDate)
+      const maxDateObj = parseDateAsUTC(maxDate)
+      if (!maxDateObj) return false
       const nextYearMonth = next.getFullYear() * 12 + next.getMonth()
-      const maxYearMonth = maxDateObj.getFullYear() * 12 + maxDateObj.getMonth()
+      const maxYearMonth = maxDateObj.getUTCFullYear() * 12 + maxDateObj.getUTCMonth()
       return nextYearMonth <= maxYearMonth
     } catch (e) {
       return false
@@ -900,6 +904,7 @@ function ModalCreateMenuHarian({
             </div>
           </div>
 
+
           <div className="flex gap-3 pt-4 border-t">
             <button
               onClick={onClose}
@@ -1163,10 +1168,13 @@ export default function MenuPlanningPage() {
             }))
           })(),
           (async () => {
+            console.log("[DEBUG HOLIDAYS] Fetching holidays for sekolahId:", selectedSekolahId)
             const holidayRes = await apiCall<any>(`/api/kalender-akademik?sekolahId=${selectedSekolahId}`)
+            console.log("[DEBUG HOLIDAYS] Raw response:", holidayRes)
             const rawHolidays = extractArray(holidayRes?.data || [])
-            
-            return rawHolidays
+            console.log("[DEBUG HOLIDAYS] Raw holidays array:", rawHolidays)
+
+            const processed = rawHolidays
               .filter((h: any) => {
                 const dateField = h.tanggal || h.tanggalMulai || h.tanggalSelesai
                 if (!dateField) return false
@@ -1178,6 +1186,8 @@ export default function MenuPlanningPage() {
                 const descriptionField = h.keterangan || h.deskripsi || "Hari Libur"
                 return { tanggal: dateField, keterangan: descriptionField }
               })
+            console.log("[DEBUG HOLIDAYS] Processed holidays:", processed)
+            return processed
           })(),
           aggregateAbsensiForSekolah(selectedSekolahId),
         ])
@@ -1188,7 +1198,11 @@ export default function MenuPlanningPage() {
         }
 
         if (holidayResult.status === 'fulfilled') {
+          console.log("[DEBUG HOLIDAYS] Holidays fetched:", holidayResult.value)
           setHolidays(holidayResult.value || [])
+        } else {
+          console.error("[DEBUG HOLIDAYS] Failed to fetch holidays:", holidayResult.reason)
+          setHolidays([])
         }
 
         if (absensiResult.status === 'fulfilled') {
@@ -1339,10 +1353,12 @@ export default function MenuPlanningPage() {
       console.log("[DEBUG] currentPlanning.tanggalMulai:", currentPlanning?.tanggalMulai)
       console.log("[DEBUG] currentPlanning.tanggalSelesai:", currentPlanning?.tanggalSelesai)
 
-      // Cek range validation di frontend - GUNAKAN UTC CONSISTENT
+      // Cek range validation di frontend - NORMALIZE semua tanggal ke format YYYY-MM-DD terlebih dahulu
       const selectedDate = parseDateAsUTC(menuFormData.tanggal)
-      const minDate = parseDateAsUTC(currentPlanning?.tanggalMulai || "")
-      const maxDate = parseDateAsUTC(currentPlanning?.tanggalSelesai || "")
+      const minDateNormalized = normalizeDateString(currentPlanning?.tanggalMulai) || ""
+      const maxDateNormalized = normalizeDateString(currentPlanning?.tanggalSelesai) || ""
+      const minDate = parseDateAsUTC(minDateNormalized)
+      const maxDate = parseDateAsUTC(maxDateNormalized)
 
       console.log("[DEBUG] selectedDate (UTC):", selectedDate)
       console.log("[DEBUG] minDate (UTC):", minDate)
