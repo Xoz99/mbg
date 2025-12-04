@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import SekolahLayout from "@/components/layout/SekolahLayout"
-import { BarChart3, Package, AlertCircle, CheckCircle2, Loader, Clock, Users, Sparkles, XCircle, Zap } from "lucide-react"
+import { AlertCircle, CheckCircle2, Loader, Sparkles, XCircle, Camera, RefreshCw } from "lucide-react"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
 
@@ -11,7 +11,7 @@ const PengembalianMakanan = () => {
   const [credentialsReady, setCredentialsReady] = useState(false)
 
   // Step management
-  const [step, setStep] = useState<"camera-face" | "processing-face" | "rfid-scan" | "camera-food" | "keterangan" | "submitting" | "result" | "statistics">("camera-face")
+  const [step, setStep] = useState<"camera-face" | "processing-face" | "rfid-scan" | "camera-food" | "keterangan" | "submitting" | "result">("camera-face")
 
   // Face detection
   const [faceDetected, setFaceDetected] = useState(false)
@@ -21,17 +21,24 @@ const PengembalianMakanan = () => {
   const [foodPhoto, setFoodPhoto] = useState<string | null>(null)
   const [selectedSiswa, setSelectedSiswa] = useState<any>(null)
 
+  // Food detection
+  const [foodConditionOk, setFoodConditionOk] = useState(false)
+  const [foodCondition, setFoodCondition] = useState<string>("")
+  const [foodCountdown, setFoodCountdown] = useState(3)
+  const [isFoodCountdownActive, setIsFoodCountdownActive] = useState(false)
+
   // RFID & Keterangan
   const [isScanning, setIsScanning] = useState(false)
   const [trayId, setTrayId] = useState("")
   const [keterangan, setKeterangan] = useState("")
+  const [statusMakanan, setStatusMakanan] = useState<"habis" | "tidak_habis">("tidak_habis")
 
   // Result
   const [validationResult, setValidationResult] = useState<any>(null)
 
-  // Statistics
-  const [stats, setStats] = useState<any>(null)
-  const [statsLoading, setStatsLoading] = useState(false)
+  // Camera Management
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([])
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("")
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -40,6 +47,8 @@ const PengembalianMakanan = () => {
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const rfidPollingRef = useRef<NodeJS.Timeout | null>(null)
+  const foodDetectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const foodCountdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Initialize credentials
@@ -88,29 +97,68 @@ const PengembalianMakanan = () => {
     }
   }, [credentialsReady])
 
+  // Enumerate cameras on mount
+  useEffect(() => {
+    enumerateCameras()
+  }, [])
+
   useEffect(() => {
     if (step === "camera-face" && !isCameraActive) {
       startCamera("user")
     } else if (step === "camera-food" && !isCameraActive) {
-      startCamera("environment")
+      // Re-enumerate cameras saat masuk camera-food
+      enumerateCameras()
+
+      // Untuk foto makanan, gunakan selectedCameraId jika ada
+      if (selectedCameraId) {
+        startCamera("environment", selectedCameraId)
+      } else {
+        startCamera("environment")
+      }
     }
 
     return () => {
       stopCamera()
       stopFaceDetection()
     }
-  }, [step])
+  }, [step, selectedCameraId])
 
-  const startCamera = async (facingMode: "user" | "environment" = "user") => {
+  const enumerateCameras = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videoDevices = devices.filter((device) => device.kind === "videoinput")
+      setAvailableCameras(videoDevices)
+      console.log("[PENGEMBALIAN] Available cameras:", videoDevices)
+
+      // Set default camera jika belum dipilih
+      if (!selectedCameraId && videoDevices.length > 0) {
+        setSelectedCameraId(videoDevices[0].deviceId)
+      }
+    } catch (err) {
+      console.error("Error enumerating cameras:", err)
+    }
+  }
+
+  const startCamera = async (facingMode: "user" | "environment" = "user", deviceId?: string) => {
     try {
       setIsCameraActive(true)
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      })
+
+      // Jika ada deviceId spesifik, gunakan itu. Kalau tidak, gunakan facingMode
+      const constraints: MediaStreamConstraints = {
+        video: deviceId
+          ? {
+              deviceId: { exact: deviceId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            }
+          : {
+              facingMode,
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
@@ -119,6 +167,8 @@ const PengembalianMakanan = () => {
         videoRef.current.onloadedmetadata = () => {
           if (step === "camera-face") {
             startFaceDetection()
+          } else if (step === "camera-food") {
+            startFoodDetection()
           }
         }
       }
@@ -131,6 +181,8 @@ const PengembalianMakanan = () => {
 
   const stopCamera = () => {
     stopFaceDetection()
+    stopFoodDetection()
+    stopFoodCountdown()
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop())
       streamRef.current = null
@@ -214,6 +266,85 @@ const PengembalianMakanan = () => {
       countdownIntervalRef.current = null
     }
     setCountdown(2)
+  }
+
+  const startFoodDetection = () => {
+    foodDetectionIntervalRef.current = setInterval(() => {
+      if (!videoRef.current || !canvasRef.current || step !== "camera-food") return
+
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      const ctx = canvas.getContext("2d")
+
+      if (!ctx) return
+
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+      const centerX = canvas.width / 2
+      const centerY = canvas.height / 2
+      const regionSize = 150
+
+      const imageData = ctx.getImageData(centerX - regionSize, centerY - regionSize, regionSize * 2, regionSize * 2)
+
+      let totalBrightness = 0
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const r = imageData.data[i]
+        const g = imageData.data[i + 1]
+        const b = imageData.data[i + 2]
+        totalBrightness += (r + g + b) / 3
+      }
+      const avgBrightness = totalBrightness / (imageData.data.length / 4)
+
+      if (avgBrightness > 80 && avgBrightness < 180) {
+        setFoodConditionOk(true)
+        setFoodCondition("ok")
+
+        if (!foodCountdownIntervalRef.current) {
+          startFoodCountdown()
+        }
+      } else {
+        setFoodConditionOk(false)
+        setFoodCondition(avgBrightness < 80 ? "too-dark" : "too-bright")
+        stopFoodCountdown()
+      }
+    }, 200)
+  }
+
+  const stopFoodDetection = () => {
+    if (foodDetectionIntervalRef.current) {
+      clearInterval(foodDetectionIntervalRef.current)
+      foodDetectionIntervalRef.current = null
+    }
+    setFoodConditionOk(false)
+    setFoodCondition("")
+  }
+
+  const startFoodCountdown = () => {
+    setIsFoodCountdownActive(true)
+    setFoodCountdown(3)
+    let count = 3
+
+    foodCountdownIntervalRef.current = setInterval(() => {
+      count -= 1
+      setFoodCountdown(count)
+
+      if (count <= 0) {
+        stopFoodCountdown()
+        capturePhoto()
+      }
+    }, 1000)
+  }
+
+  const stopFoodCountdown = () => {
+    if (foodCountdownIntervalRef.current) {
+      clearInterval(foodCountdownIntervalRef.current)
+      foodCountdownIntervalRef.current = null
+    }
+    setIsFoodCountdownActive(false)
+    setFoodCountdown(3)
   }
 
   const capturePhoto = () => {
@@ -353,6 +484,7 @@ const PengembalianMakanan = () => {
       fd.append("siswaId", selectedSiswa.id)
       fd.append("idTray", trayId)
       fd.append("fotoSisaMakanan", foodFile)
+      fd.append("status", statusMakanan)
       if (keterangan.trim()) {
         fd.append("keterangan", keterangan)
       }
@@ -462,56 +594,9 @@ const PengembalianMakanan = () => {
     setValidationResult(null)
     setKeterangan("")
     setTrayId("")
+    setStatusMakanan("tidak_habis")
     setStep("camera-face")
   }
-
-  const fetchStatistics = async () => {
-    setStatsLoading(true)
-    setError(null)
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/pengembalian-makanan/statistics/today`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      )
-
-      if (!response.ok) {
-        throw new Error("Gagal mengambil statistik")
-      }
-
-      const result = await response.json()
-      setStats(result.data || result)
-      console.log("[PENGEMBALIAN] Stats fetched:", result)
-    } catch (err) {
-      console.error("[PENGEMBALIAN] Error fetching stats:", err)
-      setError(err instanceof Error ? err.message : "Gagal mengambil data statistik")
-    } finally {
-      setStatsLoading(false)
-    }
-  }
-
-  const StatCard = ({ title, value, subtitle, icon: Icon, color }: any) => (
-    <div className="group relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-300">
-      <div className="absolute inset-0 bg-gradient-to-br from-white via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="relative">
-        <div className="flex items-start justify-between mb-3">
-          <div className={`p-3.5 rounded-xl ${color}`}>
-            <Icon className="w-5 h-5 text-white" />
-          </div>
-          <Zap className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" />
-        </div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{title}</p>
-        <p className="text-3xl font-bold text-gray-900 mb-0.5">{value}</p>
-        <p className="text-xs text-gray-500 font-medium">{subtitle}</p>
-      </div>
-    </div>
-  )
 
   return (
     <SekolahLayout currentPage="pengembalian">
@@ -522,27 +607,6 @@ const PengembalianMakanan = () => {
             <h1 className="text-4xl font-bold text-gray-900">Pengembalian Makanan</h1>
             <p className="text-gray-600 mt-1 text-sm">Deteksi wajah & pilih status makanan</p>
           </div>
-          <button
-            onClick={() => {
-              if (step !== "statistics") {
-                fetchStatistics()
-              }
-              setStep(step === "statistics" ? "camera-face" : "statistics")
-            }}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center gap-2"
-          >
-            {step === "statistics" ? (
-              <>
-                <div className="w-5 h-5">📷</div>
-                Kembali ke Scan
-              </>
-            ) : (
-              <>
-                <BarChart3 className="w-5 h-5" />
-                Lihat Statistik
-              </>
-            )}
-          </button>
         </div>
       </div>
 
@@ -716,10 +780,47 @@ const PengembalianMakanan = () => {
       {/* STEP 4: CAMERA FOOD */}
       {step === "camera-food" && selectedSiswa && (
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4">
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-white" />
               <span className="text-sm font-semibold text-white">Scan Foto Makanan Sisa</span>
+            </div>
+
+            {/* Camera Selector di Header */}
+            <div className="flex items-center gap-3">
+              {availableCameras.length > 0 && (
+                <>
+                  <select
+                    value={selectedCameraId}
+                    onChange={(e) => {
+                      setSelectedCameraId(e.target.value)
+                      stopCamera()
+                      setTimeout(() => {
+                        startCamera("environment", e.target.value)
+                      }, 100)
+                    }}
+                    className="px-3 py-1.5 border border-emerald-400 bg-emerald-600 text-white rounded-lg text-xs font-medium focus:ring-2 focus:ring-white focus:border-transparent transition-all"
+                  >
+                    {availableCameras.map((camera, index) => (
+                      <option key={camera.deviceId} value={camera.deviceId}>
+                        {camera.label || `Camera ${index + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      enumerateCameras()
+                    }}
+                    className="p-1.5 text-white hover:text-emerald-200 hover:bg-emerald-700 rounded-lg transition-colors"
+                    title="Refresh cameras"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -748,21 +849,96 @@ const PengembalianMakanan = () => {
             {/* Camera for food */}
             <div className="relative bg-black overflow-hidden aspect-video rounded-lg mb-6">
               <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-              <div className="absolute top-6 left-6 bg-black/60 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                Kamera Aktif
+              <canvas ref={canvasRef} className="hidden" />
+
+              {/* Detection Overlay Guide */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div
+                  className={`w-96 h-64 border-4 rounded-2xl transition-all duration-300 ${
+                    foodConditionOk
+                      ? "border-emerald-400 shadow-2xl shadow-emerald-400/40 scale-100"
+                      : "border-gray-500 animate-pulse scale-95"
+                  }`}
+                >
+                  {/* Countdown in center */}
+                  {isFoodCountdownActive && foodCountdown > 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-white text-9xl font-bold animate-pulse">{foodCountdown}</div>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Status Badges */}
+              <div className="absolute top-6 right-6 space-y-3">
+                {foodConditionOk && (
+                  <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Kondisi Baik
+                  </div>
+                )}
+
+                {!foodConditionOk && foodCondition && (
+                  <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg">
+                    {foodCondition === "too-dark" && "⚫ Terlalu Gelap"}
+                    {foodCondition === "too-bright" && "⚪ Terlalu Terang"}
+                  </div>
+                )}
+              </div>
+
+              {/* Instruction */}
+              <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2">
+                <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
+                  {isFoodCountdownActive
+                    ? "📸 Mengambil foto..."
+                    : foodConditionOk
+                      ? "✓ Siap mengambil foto..."
+                      : "Atur pencahayaan makanan"}
+                </div>
+              </div>
+
+              {/* Switch Camera Button - Floating */}
+              {availableCameras.length > 1 && (
+                <button
+                  onClick={() => {
+                    const currentIndex = availableCameras.findIndex((cam) => cam.deviceId === selectedCameraId)
+                    const nextIndex = (currentIndex + 1) % availableCameras.length
+                    const nextCamera = availableCameras[nextIndex]
+                    setSelectedCameraId(nextCamera.deviceId)
+                    stopCamera()
+                    setTimeout(() => {
+                      startCamera("environment", nextCamera.deviceId)
+                    }, 100)
+                  }}
+                  className="absolute bottom-6 right-6 bg-black/70 hover:bg-black/90 text-white px-5 py-3 rounded-full text-sm font-semibold flex items-center gap-2 transition-all shadow-lg"
+                >
+                  <Camera className="w-5 h-5" />
+                  Switch Camera
+                </button>
+              )}
             </div>
 
-            {/* Button */}
-            <button
-              onClick={capturePhoto}
-              disabled={!isCameraActive}
-              className="w-full px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg text-white rounded-xl transition-all font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <span className="text-xl">📷</span>
-              Ambil Foto Makanan
-            </button>
+            {/* Info */}
+            <div className="text-center mb-6">
+              <p className="text-sm text-gray-600 mb-2">
+                🍱 Tray: <span className="font-mono font-bold text-gray-900">{trayId}</span>
+              </p>
+              {isFoodCountdownActive ? (
+                <p className="text-xs text-gray-500">
+                  📸 Mengambil foto dalam <span className="font-bold text-emerald-600">{foodCountdown} detik</span>
+                </p>
+              ) : foodConditionOk ? (
+                <p className="text-xs text-emerald-600 font-semibold">
+                  ✓ Kondisi baik - Countdown akan dimulai...
+                </p>
+              ) : (
+                <p className="text-xs text-amber-600 font-semibold">
+                  {foodCondition === "too-dark" && "⚫ Cahaya terlalu gelap - Tambah pencahayaan"}
+                  {foodCondition === "too-bright" && "⚪ Cahaya terlalu terang - Kurangi pencahayaan"}
+                  {!foodCondition && "📷 Menunggu kondisi optimal..."}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -826,6 +1002,37 @@ const PengembalianMakanan = () => {
                 </div>
               )}
 
+              {/* Status Makanan Selection */}
+              <div className="mb-8">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Status Makanan</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStatusMakanan("habis")}
+                    className={`px-6 py-4 rounded-xl font-semibold transition-all border-2 ${
+                      statusMakanan === "habis"
+                        ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-500 shadow-lg"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-emerald-400"
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">✅</div>
+                    <div className="text-sm font-bold">Habis</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusMakanan("tidak_habis")}
+                    className={`px-6 py-4 rounded-xl font-semibold transition-all border-2 ${
+                      statusMakanan === "tidak_habis"
+                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 shadow-lg"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-amber-400"
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">⚠️</div>
+                    <div className="text-sm font-bold">Tidak Habis</div>
+                  </button>
+                </div>
+              </div>
+
               {/* Keterangan Input */}
               <div className="mb-8">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Keterangan (Opsional)</label>
@@ -844,6 +1051,7 @@ const PengembalianMakanan = () => {
                   onClick={() => {
                     setSelectedSiswa(null)
                     setKeterangan("")
+                    setStatusMakanan("tidak_habis")
                     setFacePhoto(null)
                     setFoodPhoto(null)
                     setTrayId("")
@@ -877,7 +1085,7 @@ const PengembalianMakanan = () => {
         </div>
       )}
 
-      {/* STEP 5: RESULT */}
+      {/* STEP 6: RESULT */}
       {step === "result" && (
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
           <div
@@ -926,8 +1134,13 @@ const PengembalianMakanan = () => {
                 </p>
                 <div className="pt-3 border-t border-emerald-300">
                   <p className="text-sm font-semibold text-emerald-700">
-                    Status: {validationResult.status === "habis" ? "✅ Habis" : "⚠️ Tidak Habis"}
+                    Status: {statusMakanan === "habis" ? "✅ Habis" : "⚠️ Tidak Habis"}
                   </p>
+                  {keterangan && (
+                    <p className="text-xs text-gray-600 mt-2">
+                      Keterangan: {keterangan}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -959,54 +1172,6 @@ const PengembalianMakanan = () => {
 
             <p className="text-center text-gray-500 text-xs">Kembali otomatis dalam 5 detik...</p>
           </div>
-        </div>
-      )}
-
-      {/* STEP 6: STATISTICS */}
-      {step === "statistics" && (
-        <div>
-          {statsLoading ? (
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-12 text-center">
-              <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-              <p className="text-gray-600">Mengambil data statistik...</p>
-            </div>
-          ) : stats ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Total Pengembalian"
-                value={stats.totalPengembalian || 0}
-                subtitle="Hari ini"
-                icon={Package}
-                color="bg-gradient-to-br from-blue-500 to-blue-600"
-              />
-              <StatCard
-                title="Total Tray"
-                value={stats.totalTray || 0}
-                subtitle="Tray"
-                icon={BarChart3}
-                color="bg-gradient-to-br from-emerald-500 to-emerald-600"
-              />
-              <StatCard
-                title="Siswa"
-                value={stats.totalSiswa || 0}
-                subtitle="Siswa"
-                icon={Users}
-                color="bg-gradient-to-br from-purple-500 to-purple-600"
-              />
-              <StatCard
-                title="Update Terakhir"
-                value={stats.lastUpdate ? new Date(stats.lastUpdate).toLocaleTimeString("id-ID") : "-"}
-                subtitle="Hari ini"
-                icon={Clock}
-                color="bg-gradient-to-br from-amber-500 to-amber-600"
-              />
-            </div>
-          ) : (
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
-              <AlertCircle className="w-8 h-8 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Tidak ada data statistik tersedia</p>
-            </div>
-          )}
         </div>
       )}
     </SekolahLayout>
