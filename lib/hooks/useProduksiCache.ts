@@ -94,11 +94,20 @@ function normalizeDateString(dateString: string | null | undefined): string | nu
 
   if (dateString.includes('T')) {
     try {
-      // Extract the DATE COMPONENT from the ISO string BEFORE conversion
-      // Backend stores user's intended date as YYYY-MM-DD, then appends T17:00:00Z
-      // So we extract the date part which represents the INTENDED date
-      const datePart = dateString.substring(0, 10); // Get YYYY-MM-DD
-      console.log(`[normalizeDateString] ISO date ${dateString} -> intended date: ${datePart}`);
+      // Convert ISO string to Indonesia timezone (UTC+7)
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+
+      // Adjust for Indonesia timezone (UTC+7)
+      const utcDate = new Date(date.getTime() + (7 * 60 * 60 * 1000));
+      const adjustedYear = utcDate.getFullYear();
+      const adjustedMonth = String(utcDate.getMonth() + 1).padStart(2, '0');
+      const adjustedDay = String(utcDate.getDate()).padStart(2, '0');
+
+      const datePart = `${adjustedYear}-${adjustedMonth}-${adjustedDay}`;
+      console.log(`[normalizeDateString] ISO date ${dateString} -> adjusted to UTC+7: ${datePart}`);
       return datePart;
     } catch (e) {
       console.warn(`[normalizeDateString] Failed to parse ISO date: ${dateString}`);

@@ -5,6 +5,7 @@ import { apiCache, generateCacheKey } from "@/lib/utils/cache"
 import DapurLayout from "@/components/layout/DapurLayout"
 import { useMenuCache, type MenuData } from "@/lib/hooks/useMenuCache"
 import { useMenuPlanningRealtime } from "@/lib/hooks/useMenuPlanningRealtime"
+import { useSekolahSiswaCache } from "@/lib/hooks/useSekolahSiswaCache"
 import {
   Calendar,
   ChefHat,
@@ -17,7 +18,7 @@ import {
   Users,
 } from "lucide-react"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://demombgv1.xyz'
 
 interface MenuHarian {
   id: string
@@ -465,6 +466,11 @@ function ModalCreateMenuHarian({
 }: any) {
   if (!isOpen) return null
 
+  // Use hook untuk cache data siswa
+  const { totalSiswa, loading: loadingTotalSiswa } = useSekolahSiswaCache(
+    currentPlanning?.sekolahId || null
+  )
+
   const minDate = normalizeDateString(currentPlanning?.tanggalMulai) || ""
   const maxDate = normalizeDateString(currentPlanning?.tanggalSelesai) || ""
 
@@ -584,10 +590,23 @@ function ModalCreateMenuHarian({
 
         <div className="p-6 space-y-4">
           <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-700 border border-blue-200">
-            <p className="font-bold text-blue-900">Untuk: {currentPlanning?.sekolah?.nama}</p>
-            <p className="text-xs mt-2 text-blue-600">
-              {currentPlanning && formatDateSafe(currentPlanning.tanggalMulai)} s/d {currentPlanning && formatDateSafe(currentPlanning.tanggalSelesai)}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <p className="font-bold text-blue-900">Untuk: {currentPlanning?.sekolah?.nama}</p>
+                <p className="text-xs mt-2 text-blue-600">
+                  {currentPlanning && formatDateSafe(currentPlanning.tanggalMulai)} s/d {currentPlanning && formatDateSafe(currentPlanning.tanggalSelesai)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-blue-200">
+                <Users className="w-4 h-4 text-blue-600" />
+                <div className="text-center">
+                  <p className="text-xs text-gray-600">Total Siswa</p>
+                  <p className="font-bold text-lg text-blue-900">
+                    {loadingTotalSiswa ? "..." : totalSiswa}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {alergiList.length > 0 && (

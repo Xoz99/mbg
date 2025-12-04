@@ -259,6 +259,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
           submenu: [
             { id: 'presensi', name: 'Presensi Siswa', path: '/sekolah/presensi' },
             { id: 'absensi', name: 'Absensi Penerima', path: '/sekolah/absensi' },
+            { id: 'validasi-tray', name: 'Validasi Tray', path: '/sekolah/validasi-tray' },
             { id: 'pengembalian', name: 'Pengembalian Makanan', path: '/sekolah/pengembalian' },
             { id: 'tracking', name: 'Tracking MBG', path: '/sekolah/tracking' },
           ]
@@ -303,6 +304,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
         submenu: [
           { id: 'presensi', name: 'Presensi Siswa', path: '/sekolah/presensi' },
           { id: 'absensi', name: 'Absensi Penerima', path: '/sekolah/absensi' },
+          { id: 'validasi-tray', name: 'Validasi Tray', path: '/sekolah/validasi-tray' },
           { id: 'pengembalian', name: 'Pengembalian Makanan', path: '/sekolah/pengembalian' },
           { id: 'tracking', name: 'Tracking MBG', path: '/sekolah/tracking' },
         ]

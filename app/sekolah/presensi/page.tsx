@@ -389,9 +389,18 @@ const Presensi = () => {
       }
 
       const url = `${API_BASE_URL}/api/kelas/${selectedKelas.id}/absensi/face-recognition`
+
+      // Get today's date in Indonesia timezone (UTC+7)
+      const now = new Date();
+      const indonesiaTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+      const year = indonesiaTime.getUTCFullYear();
+      const month = String(indonesiaTime.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(indonesiaTime.getUTCDate()).padStart(2, '0');
+      const todayString = `${year}-${month}-${day}`;
+
       const payload = {
         siswaId: String(selectedSiswa.id),
-        tanggal: new Date().toISOString().split("T")[0],
+        tanggal: todayString,
       }
 
       console.log("[PRESENSI] Submitting to endpoint:", url)
@@ -861,6 +870,22 @@ const Presensi = () => {
                     <p className="text-sm text-gray-600 mb-3">
                       {validationResult.siswa.kelas} • NIS {validationResult.siswa.nis}
                     </p>
+
+                    {/* Tanggal Presensi */}
+                    {validationResult?.data?.absensiKelas?.tanggal && (
+                      <div className="mt-4 pt-4 border-t border-emerald-300 text-center">
+                        <p className="text-xs text-gray-600 mb-1">Tanggal Presensi</p>
+                        <p className="text-lg font-bold text-emerald-700">
+                          {new Date(validationResult.data.absensiKelas.tanggal + 'T00:00:00').toLocaleDateString('id-ID', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    )}
+
                     {validationResult.siswa.alergi && validationResult.siswa.alergi.length > 0 && (
                       <div className="pt-3 border-t border-emerald-300">
                         <p className="text-xs text-gray-700">Alergi: {validationResult.siswa.alergi.join(", ")}</p>

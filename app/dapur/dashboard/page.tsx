@@ -6,17 +6,17 @@ import DapurLayout from "@/components/layout/DapurLayout"
 import { useDapurDashboardCache } from "@/lib/hooks/useDapurDashboardCache"
 import { useProduksiCache } from "@/lib/hooks/useProduksiCache"
 import { useDapurContext } from "@/lib/context/DapurContext"
+import { useTraySummaryRealtime } from "@/lib/hooks/useTraySummaryRealtime"
 import {
   CheckCircle,
   TrendingUp,
   CheckCircle2,
   ArrowUp,
   ChevronDown,
+  Wifi,
 } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
-const REFRESH_INTERVAL = 120000 // 🔥 OPTIMIZATION: Reduced from 5min (300s) to 2min (120s) for faster updates
-
+const REFRESH_INTERVAL = 120000 
 const SkeletonLoader = () => (
   <div className="space-y-6">
     {/* Header Skeleton */}
@@ -58,32 +58,6 @@ const SkeletonLoader = () => (
   </div>
 )
 
-const ProductionChart = ({ data }: { data: any[] }) => (
-  <ResponsiveContainer width="100%" height={260}>
-    <LineChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-      <defs>
-        <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
-          <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
-        </linearGradient>
-      </defs>
-      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-      <XAxis dataKey="hari" stroke="#6b7280" style={{ fontSize: "12px" }} />
-      <YAxis stroke="#6b7280" style={{ fontSize: "12px" }} />
-      <Tooltip
-        contentStyle={{ backgroundColor: "#1f2937", border: "1px solid #374151", borderRadius: "8px", color: "#fff" }}
-      />
-      <Line
-        type="monotone"
-        dataKey="actual"
-        stroke="#0ea5e9"
-        strokeWidth={2}
-        dot={{ fill: "#0ea5e9", r: 4 }}
-        activeDot={{ r: 6 }}
-      />
-    </LineChart>
-  </ResponsiveContainer>
-)
 
 
 
@@ -104,11 +78,12 @@ const DashboardDapur = () => {
     targetHariIni: 0,
     totalSekolah: 0,
   })
-  const [produksiMingguan, setProduksiMingguan] = useState<any[]>([])
   const [isLoadingComplete, setIsLoadingComplete] = useState(false)
   const [expandedSekolahId, setExpandedSekolahId] = useState<string | null>(null)
   const [sekolahDetails, setSekolahDetails] = useState<{[key: string]: any}>({})
   const [loadingDetail, setLoadingDetail] = useState<{[key: string]: boolean}>({})
+  const [selectedSekolahId, setSelectedSekolahId] = useState<string>("")
+  const { traySummary, loading: loadingTraySummary, isConnected: wsConnected } = useTraySummaryRealtime(selectedSekolahId)
 
   // Fetch sekolah detail saat expand
   const fetchSekolahDetail = useCallback(async (sekolahId: string) => {
@@ -143,7 +118,6 @@ const DashboardDapur = () => {
   const handleCacheUpdate = useCallback((data: any) => {
     setMenuPlanningData(data.menuPlanningData || [])
     setStats(data.stats || { targetHariIni: 0, totalSekolah: 0 })
-    setProduksiMingguan(data.produksiMingguan || [])
   }, [])
 
   // ✅ Use custom hook untuk fetch menu planning data dan stats
@@ -205,7 +179,6 @@ const DashboardDapur = () => {
         if (data) {
           setMenuPlanningData(data.menuPlanningData || [])
           setStats(data.stats || { targetHariIni: 0, totalSekolah: 0 })
-          setProduksiMingguan(data.produksiMingguan || [])
         }
       } catch (err) {
         console.error("Failed to load dashboard data:", err)
@@ -346,18 +319,64 @@ const DashboardDapur = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Production Chart (Left) */}
+              {/* Total Tray Siap Dikirim (Left) */}
               <div className="rounded-2xl border border-[#D0B064]/20 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h4 className="font-bold text-[#1B263A] text-lg">Produksi Mingguan</h4>
-                    <p className="text-sm text-[#1B263A]/60 mt-1">Tren produksi 6 hari terakhir</p>
+                    <h4 className="font-bold text-[#1B263A] text-lg">Total Tray Siap Dikirim</h4>
+                    <p className="text-sm text-[#1B263A]/60 mt-1">Status pengiriman tray per sekolah</p>
                   </div>
                   <div className="p-3 bg-[#D0B064]/20 rounded-lg">
                     <TrendingUp className="w-5 h-5 text-[#D0B064]" />
                   </div>
                 </div>
-                <ProductionChart data={produksiMingguan} />
+
+                {/* Dropdown Sekolah */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-[#1B263A]">Pilih Sekolah</label>
+                    {selectedSekolahId && wsConnected && (
+                      <div className="flex items-center gap-1">
+                        <Wifi className="w-4 h-4 text-green-600" />
+                        <span className="text-xs text-green-600">Realtime</span>
+                      </div>
+                    )}
+                  </div>
+                  <select
+                    value={selectedSekolahId}
+                    onChange={(e) => setSelectedSekolahId(e.target.value)}
+                    className="w-full px-4 py-2 border border-[#D0B064]/30 rounded-lg bg-white text-[#1B263A] focus:outline-none focus:border-[#D0B064] focus:ring-2 focus:ring-[#D0B064]/20"
+                  >
+                    <option value="">-- Pilih Sekolah --</option>
+                    {Array.from(new Map(menuPlanningData.map(p => [p.sekolahId, p])).values()).map((planning) => (
+                      <option key={planning.sekolahId} value={planning.sekolahId}>
+                        {planning.sekolahNama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Tray Summary Content */}
+                {loadingTraySummary && !traySummary ? (
+                  <div className="bg-blue-50 rounded-lg p-6 border border-blue-200 text-center">
+                    <p className="text-sm text-blue-600">Loading data tray...</p>
+                  </div>
+                ) : selectedSekolahId && traySummary ? (
+                  <div className="bg-gradient-to-br from-green-50 to-green-100/50 rounded-lg p-6 border border-green-200">
+                    <p className="text-sm text-green-700 font-medium">Total Tray Siap Dikirim</p>
+                    <p className="text-5xl font-black text-green-700 mt-4">
+                      {traySummary?.totalTrayUnik !== undefined && traySummary?.totalTrayUnik !== null
+                        ? traySummary.totalTrayUnik
+                        : traySummary?.total !== undefined && traySummary?.total !== null
+                        ? traySummary.total
+                        : 0}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-lg p-6 border border-gray-200 text-center">
+                    <p className="text-sm text-[#1B263A]/60">Pilih sekolah untuk melihat data tray</p>
+                  </div>
+                )}
               </div>
 
               {/* Target Hari Ini Card (Right) - MODERN VERSION */}
