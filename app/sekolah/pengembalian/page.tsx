@@ -17,6 +17,7 @@ const PengembalianMakanan = () => {
   const [faceDetected, setFaceDetected] = useState(false)
   const [countdown, setCountdown] = useState(3)
   const [isCameraActive, setIsCameraActive] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
   const [facePhoto, setFacePhoto] = useState<string | null>(null)
   const [foodPhoto, setFoodPhoto] = useState<string | null>(null)
   const [selectedSiswa, setSelectedSiswa] = useState<any>(null)
@@ -103,7 +104,7 @@ const PengembalianMakanan = () => {
   }, [])
 
   useEffect(() => {
-    if (step === "camera-face" && !isCameraActive) {
+    if (step === "camera-face" && !isCameraActive && cameraReady) {
       startCamera("user")
     } else if (step === "camera-food" && !isCameraActive) {
       // Re-enumerate cameras saat masuk camera-food
@@ -121,7 +122,7 @@ const PengembalianMakanan = () => {
       stopCamera()
       stopFaceDetection()
     }
-  }, [step, selectedCameraId])
+  }, [step, selectedCameraId, cameraReady])
 
   const enumerateCameras = async () => {
     try {
@@ -595,6 +596,7 @@ const PengembalianMakanan = () => {
     setKeterangan("")
     setTrayId("")
     setStatusMakanan("tidak_habis")
+    setCameraReady(false)
     setStep("camera-face")
   }
 
@@ -622,49 +624,73 @@ const PengembalianMakanan = () => {
       {/* STEP 1: CAMERA FACE */}
       {step === "camera-face" && (
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-sm font-semibold text-white">Kamera Aktif</span>
-            </div>
-            <span className="text-xs text-gray-400 font-mono">STEP 1</span>
-          </div>
-
-          <div className="relative bg-black overflow-hidden aspect-video">
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-            <canvas ref={canvasRef} className="hidden" />
-
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div
-                className={`w-64 h-64 border-4 rounded-full transition-all duration-300 ${
-                  faceDetected
-                    ? "border-emerald-400 shadow-2xl shadow-emerald-400/40 scale-100"
-                    : "border-gray-500 animate-pulse scale-95"
-                }`}
-              >
-                {faceDetected && countdown > 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-white text-6xl font-bold animate-pulse">{countdown}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="absolute top-6 right-6 space-y-3">
-              {faceDetected && (
-                <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Wajah Terdeteksi
+          {!cameraReady ? (
+            // Button untuk mulai
+            <div className="p-12 text-center">
+              <div className="mb-8">
+                <div className="w-32 h-32 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full mx-auto mb-6 flex items-center justify-center shadow-2xl">
+                  <Camera className="w-16 h-16 text-white" />
                 </div>
-              )}
-            </div>
-
-            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
-              <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
-                {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
+                <h2 className="text-3xl font-bold text-gray-900 mb-3">Siap untuk Mengembalikan Makanan?</h2>
+                <p className="text-gray-600 text-lg mb-2">Sistem akan mendeteksi wajah Anda secara otomatis</p>
+                <p className="text-gray-500 text-sm">Pastikan wajah Anda terlihat jelas dan pencahayaan cukup</p>
               </div>
+
+              <button
+                onClick={() => setCameraReady(true)}
+                className="px-10 py-4 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-2xl text-white rounded-2xl transition-all font-bold text-lg flex items-center justify-center gap-3 mx-auto transform hover:scale-105"
+              >
+                <Camera className="w-6 h-6" />
+                Mulai Scan Wajah
+              </button>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-semibold text-white">Kamera Aktif</span>
+                </div>
+                <span className="text-xs text-gray-400 font-mono">STEP 1</span>
+              </div>
+
+              <div className="relative bg-black overflow-hidden aspect-video">
+                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                <canvas ref={canvasRef} className="hidden" />
+
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div
+                    className={`w-64 h-64 border-4 rounded-full transition-all duration-300 ${
+                      faceDetected
+                        ? "border-[#D0B064] shadow-2xl shadow-[#D0B064]/40 scale-100"
+                        : "border-gray-500 animate-pulse scale-95"
+                    }`}
+                  >
+                    {faceDetected && countdown > 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-white text-6xl font-bold animate-pulse">{countdown}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="absolute top-6 right-6 space-y-3">
+                  {faceDetected && (
+                    <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Wajah Terdeteksi
+                    </div>
+                  )}
+                </div>
+
+                <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
+                  <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
+                    {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -682,8 +708,8 @@ const PengembalianMakanan = () => {
           </div>
           <div className="flex justify-center mb-6">
             <div className="relative">
-              <div className="absolute inset-0 bg-emerald-500 rounded-full animate-pulse opacity-20"></div>
-              <div className="relative w-16 h-16 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center">
+              <div className="absolute inset-0 bg-[#D0B064] rounded-full animate-pulse opacity-20"></div>
+              <div className="relative w-16 h-16 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full flex items-center justify-center">
                 <Sparkles className="w-8 h-8 text-white animate-pulse" />
               </div>
             </div>
@@ -691,13 +717,13 @@ const PengembalianMakanan = () => {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Mengenali Wajah...</h2>
           <p className="text-gray-600 text-sm mb-6">Menganalisis dengan AI Detection Face</p>
           <div className="flex justify-center gap-1.5">
-            <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"></div>
             <div
-              className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"
+              className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
               style={{ animationDelay: "0.1s" }}
             ></div>
             <div
-              className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"
+              className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
               style={{ animationDelay: "0.2s" }}
             ></div>
           </div>
@@ -707,7 +733,7 @@ const PengembalianMakanan = () => {
       {/* STEP 3: RFID SCAN */}
       {step === "rfid-scan" && selectedSiswa && (
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4">
+          <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-white" />
               <span className="text-sm font-semibold text-white">Wajah Berhasil Dikenali - Scan Tray RFID</span>
@@ -716,7 +742,7 @@ const PengembalianMakanan = () => {
 
           <div className="p-8">
             {/* Student Info */}
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 mb-8 border-2 border-emerald-200">
+            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 mb-8 border-2 border-[#D0B064]/30">
               <div className="mb-4">
                 <h3 className="text-xl font-bold text-gray-900">{selectedSiswa.nama}</h3>
                 <p className="text-sm text-gray-600">{selectedSiswa.kelas}</p>
@@ -734,9 +760,9 @@ const PengembalianMakanan = () => {
             {/* RFID Scan Section */}
             <div className="text-center mb-8">
               <div className="relative w-32 h-32 mx-auto mb-6">
-                <div className="absolute inset-0 border-4 border-emerald-500/30 rounded-full animate-ping"></div>
-                <div className="absolute inset-2 border-4 border-emerald-500/50 rounded-full animate-pulse"></div>
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center shadow-xl">
+                <div className="absolute inset-0 border-4 border-[#D0B064]/30 rounded-full animate-ping"></div>
+                <div className="absolute inset-2 border-4 border-[#D0B064]/50 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full flex items-center justify-center shadow-xl">
                   <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-4c-2.2 0-4 1.8-4 4h2c0-1.1.9-2 2-2s2 .9 2 2h2c0-2.2-1.8-4-4-4zm0-4c-3.3 0-6 2.7-6 6h2c0-2.2 1.8-4 4-4s4 1.8 4 4h2c0-3.3-2.7-6-6-6zm0-4C7.6 6 4 9.6 4 14h2c0-3.3 2.7-6 6-6s6 2.7 6 6h2c0-4.4-3.6-8-8-8z" />
                   </svg>
@@ -747,16 +773,16 @@ const PengembalianMakanan = () => {
 
               {isScanning && (
                 <div className="mt-6 flex justify-center items-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"></div>
                   <div
-                    className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"
+                    className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
                     style={{ animationDelay: "0.1s" }}
                   ></div>
                   <div
-                    className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"
+                    className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
                     style={{ animationDelay: "0.2s" }}
                   ></div>
-                  <span className="text-sm text-emerald-600 font-semibold ml-2">Menunggu scan...</span>
+                  <span className="text-sm text-[#C9A355] font-semibold ml-2">Menunggu scan...</span>
                 </div>
               )}
             </div>
@@ -780,7 +806,7 @@ const PengembalianMakanan = () => {
       {/* STEP 4: CAMERA FOOD */}
       {step === "camera-food" && selectedSiswa && (
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4 flex items-center justify-between gap-4">
+          <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-white" />
               <span className="text-sm font-semibold text-white">Scan Foto Makanan Sisa</span>
@@ -799,7 +825,7 @@ const PengembalianMakanan = () => {
                         startCamera("environment", e.target.value)
                       }, 100)
                     }}
-                    className="px-3 py-1.5 border border-emerald-400 bg-emerald-600 text-white rounded-lg text-xs font-medium focus:ring-2 focus:ring-white focus:border-transparent transition-all"
+                    className="px-3 py-1.5 border border-gray-600 bg-gray-800 text-white rounded-lg text-xs font-medium focus:ring-2 focus:ring-[#D0B064] focus:border-transparent transition-all"
                   >
                     {availableCameras.map((camera, index) => (
                       <option key={camera.deviceId} value={camera.deviceId}>
@@ -814,7 +840,7 @@ const PengembalianMakanan = () => {
                       e.stopPropagation()
                       enumerateCameras()
                     }}
-                    className="p-1.5 text-white hover:text-emerald-200 hover:bg-emerald-700 rounded-lg transition-colors"
+                    className="p-1.5 text-white hover:bg-gray-700 rounded-lg transition-colors"
                     title="Refresh cameras"
                   >
                     <RefreshCw className="w-4 h-4" />
@@ -826,16 +852,16 @@ const PengembalianMakanan = () => {
 
           <div className="p-8">
             {/* Student Info & Tray Info */}
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 mb-8 border-2 border-emerald-200">
+            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 mb-8 border-2 border-[#D0B064]/30">
               <div className="mb-4">
                 <h3 className="text-xl font-bold text-gray-900">{selectedSiswa.nama}</h3>
                 <p className="text-sm text-gray-600">{selectedSiswa.kelas}</p>
                 <p className="text-xs text-gray-500">NIS: {selectedSiswa.nis}</p>
               </div>
 
-              <div className="pt-3 border-t border-emerald-300 mt-3">
-                <p className="text-xs font-bold text-emerald-700 mb-1">ID TRAY</p>
-                <p className="text-lg font-bold text-emerald-900">{trayId}</p>
+              <div className="pt-3 border-t border-[#D0B064]/30 mt-3">
+                <p className="text-xs font-bold text-[#C9A355] mb-1">ID TRAY</p>
+                <p className="text-lg font-bold text-gray-900">{trayId}</p>
               </div>
 
               {selectedSiswa.alergi && selectedSiswa.alergi.length > 0 && (
@@ -856,7 +882,7 @@ const PengembalianMakanan = () => {
                 <div
                   className={`w-96 h-64 border-4 rounded-2xl transition-all duration-300 ${
                     foodConditionOk
-                      ? "border-emerald-400 shadow-2xl shadow-emerald-400/40 scale-100"
+                      ? "border-[#D0B064] shadow-2xl shadow-[#D0B064]/40 scale-100"
                       : "border-gray-500 animate-pulse scale-95"
                   }`}
                 >
@@ -872,7 +898,7 @@ const PengembalianMakanan = () => {
               {/* Status Badges */}
               <div className="absolute top-6 right-6 space-y-3">
                 {foodConditionOk && (
-                  <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
+                  <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
                     <CheckCircle2 className="w-4 h-4" />
                     Kondisi Baik
                   </div>
@@ -925,10 +951,10 @@ const PengembalianMakanan = () => {
               </p>
               {isFoodCountdownActive ? (
                 <p className="text-xs text-gray-500">
-                  📸 Mengambil foto dalam <span className="font-bold text-emerald-600">{foodCountdown} detik</span>
+                  📸 Mengambil foto dalam <span className="font-bold text-[#D0B064]">{foodCountdown} detik</span>
                 </p>
               ) : foodConditionOk ? (
-                <p className="text-xs text-emerald-600 font-semibold">
+                <p className="text-xs text-[#C9A355] font-semibold">
                   ✓ Kondisi baik - Countdown akan dimulai...
                 </p>
               ) : (
@@ -947,7 +973,7 @@ const PengembalianMakanan = () => {
       {step === "keterangan" && selectedSiswa && (
         <div className="max-w-2xl mx-auto">
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4">
+            <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-white" />
                 <span className="text-sm font-semibold text-white">Konfirmasi Data Pengembalian</span>
@@ -956,16 +982,16 @@ const PengembalianMakanan = () => {
 
             <div className="p-8">
               {/* Student Info */}
-              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 mb-8 border-2 border-emerald-200">
+              <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 mb-8 border-2 border-[#D0B064]/30">
                 <div className="mb-4">
                   <h3 className="text-xl font-bold text-gray-900">{selectedSiswa.nama}</h3>
                   <p className="text-sm text-gray-600">{selectedSiswa.kelas}</p>
                   <p className="text-xs text-gray-500">NIS: {selectedSiswa.nis}</p>
                 </div>
 
-                <div className="pt-3 border-t border-emerald-300 mt-3">
-                  <p className="text-xs font-bold text-emerald-700 mb-1">ID TRAY</p>
-                  <p className="text-lg font-bold text-emerald-900">{trayId}</p>
+                <div className="pt-3 border-t border-[#D0B064]/30 mt-3">
+                  <p className="text-xs font-bold text-[#C9A355] mb-1">ID TRAY</p>
+                  <p className="text-lg font-bold text-gray-900">{trayId}</p>
                 </div>
 
                 {selectedSiswa.alergi && selectedSiswa.alergi.length > 0 && (
@@ -1011,8 +1037,8 @@ const PengembalianMakanan = () => {
                     onClick={() => setStatusMakanan("habis")}
                     className={`px-6 py-4 rounded-xl font-semibold transition-all border-2 ${
                       statusMakanan === "habis"
-                        ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-500 shadow-lg"
-                        : "bg-white text-gray-700 border-gray-300 hover:border-emerald-400"
+                        ? "bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white border-[#D0B064] shadow-lg"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-[#D0B064]"
                     }`}
                   >
                     <div className="text-2xl mb-1">✅</div>
@@ -1041,7 +1067,7 @@ const PengembalianMakanan = () => {
                   onChange={(e) => setKeterangan(e.target.value)}
                   placeholder="Contoh: Makanan tidak habis karena siswa tidak nafsu makan..."
                   rows={3}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent transition-all"
                 />
               </div>
 
@@ -1063,7 +1089,7 @@ const PengembalianMakanan = () => {
                 </button>
                 <button
                   onClick={submitPengembalian}
-                  className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg text-white rounded-xl transition-all font-semibold"
+                  className="px-6 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-lg text-white rounded-xl transition-all font-semibold"
                 >
                   Kirim
                 </button>
@@ -1077,8 +1103,8 @@ const PengembalianMakanan = () => {
       {step === "submitting" && (
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
           <div className="relative w-16 h-16 mx-auto mb-6">
-            <div className="absolute inset-0 bg-emerald-500 rounded-full animate-ping opacity-20"></div>
-            <Loader className="w-full h-full animate-spin text-emerald-600 relative" />
+            <div className="absolute inset-0 bg-[#D0B064] rounded-full animate-ping opacity-20"></div>
+            <Loader className="w-full h-full animate-spin text-[#D0B064] relative" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Menyimpan Data...</h2>
           <p className="text-gray-600 text-sm">Sistem sedang memproses informasi</p>
@@ -1089,7 +1115,7 @@ const PengembalianMakanan = () => {
       {step === "result" && (
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
           <div
-            className={`bg-gradient-to-r ${validationResult?.success ? "from-emerald-500 to-teal-600" : "from-red-500 to-red-600"} px-6 py-4`}
+            className={`bg-gradient-to-r ${validationResult?.success ? "from-[#D0B064] to-[#C9A355]" : "from-red-500 to-red-600"} px-6 py-4`}
           >
             <div className="flex items-center gap-2">
               {validationResult?.success ? (
@@ -1110,11 +1136,11 @@ const PengembalianMakanan = () => {
             <div className="text-center mb-8">
               <div
                 className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                  validationResult?.success ? "bg-emerald-100" : "bg-red-100"
+                  validationResult?.success ? "bg-amber-100" : "bg-red-100"
                 }`}
               >
                 {validationResult?.success ? (
-                  <CheckCircle2 className="w-12 h-12 text-emerald-600" />
+                  <CheckCircle2 className="w-12 h-12 text-[#D0B064]" />
                 ) : (
                   <XCircle className="w-12 h-12 text-red-600" />
                 )}
@@ -1126,14 +1152,14 @@ const PengembalianMakanan = () => {
             </div>
 
             {validationResult?.success && validationResult?.siswa && (
-              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 mb-6 border-2 border-emerald-200">
-                <p className="text-xs font-bold text-emerald-700 mb-3">✓ DATA TERSIMPAN</p>
+              <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 mb-6 border-2 border-[#D0B064]/30">
+                <p className="text-xs font-bold text-[#C9A355] mb-3">✓ DATA TERSIMPAN</p>
                 <p className="text-xl font-bold text-gray-900 mb-1">{validationResult.siswa.nama}</p>
                 <p className="text-sm text-gray-600 mb-3">
                   {validationResult.siswa.kelas} • NIS {validationResult.siswa.nis}
                 </p>
-                <div className="pt-3 border-t border-emerald-300">
-                  <p className="text-sm font-semibold text-emerald-700">
+                <div className="pt-3 border-t border-[#D0B064]/30">
+                  <p className="text-sm font-semibold text-[#C9A355]">
                     Status: {statusMakanan === "habis" ? "✅ Habis" : "⚠️ Tidak Habis"}
                   </p>
                   {keterangan && (

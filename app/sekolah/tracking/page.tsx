@@ -666,8 +666,8 @@ const TrackingPage = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       {(vehicle.status === 'dalam_perjalanan' || vehicle.status === 'active') && (
-                        <div className="flex items-center gap-2 bg-blue-500/20 px-3 py-1.5 rounded-lg border border-blue-400/30">
-                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                        <div className="flex items-center gap-2 bg-red-500/20 px-3 py-1.5 rounded-lg border border-red-400/30">
+                          <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
                           <span className="text-xs md:text-sm font-semibold">Live</span>
                         </div>
                       )}
@@ -863,14 +863,14 @@ const TrackingPage = () => {
             <div className="flex items-center gap-3 min-w-0">
               <MapPin className="w-6 h-6 flex-shrink-0" />
               <div className="min-w-0">
-                <h3 className="text-lg md:text-xl font-semibold truncate">Peta Live Tracking - Full Screen</h3>
+                <h3 className="text-lg md:text-xl font-semibold truncate">Peta Live Tracking</h3>
                 <p className="text-xs text-white/70">OpenStreetMap - Real-time Location</p>
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {(vehicle.status === 'dalam_perjalanan' || vehicle.status === 'active') && (
-                <div className="flex items-center gap-2 bg-blue-500/20 px-3 py-1.5 rounded-lg border border-blue-400/30 whitespace-nowrap">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                <div className="flex items-center gap-2 bg-blue-500/20 px-3 py-1.5 rounded-lg border border-red-400/30 whitespace-nowrap">
+                  <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
                   <span className="text-xs md:text-sm font-semibold">Live</span>
                 </div>
               )}

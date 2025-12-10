@@ -9,11 +9,12 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.
 const AbsensiPenerima = () => {
   const [step, setStep] = useState<
     "camera-face" | "processing-face" | "rfid-scan" | "input-tray" | "confirm" | "camera-menu" | "submitting" | "result" | "duplicate-warning"
-  >("camera-face") 
+  >("camera-face")
   const [faceDetected, setFaceDetected] = useState(false)
   const [facePosition, setFacePosition] = useState<string>("") // 'too-dark', 'too-bright'
   const [countdown, setCountdown] = useState(3)
   const [isCameraActive, setIsCameraActive] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
   const [facePhoto, setFacePhoto] = useState<string | null>(null)
   const [selectedSiswa, setSelectedSiswa] = useState<any>(null) // { nama, kelas, nis, alergi }
   const [isScanning, setIsScanning] = useState(false)
@@ -157,7 +158,7 @@ const AbsensiPenerima = () => {
   }, [])
 
   useEffect(() => {
-    if (step === "camera-face" && !isCameraActive) {
+    if (step === "camera-face" && !isCameraActive && cameraReady) {
       startCamera("user")
     } else if (step === "camera-menu" && !isCameraActive) {
       // Re-enumerate cameras saat masuk step camera-menu untuk ensure terdeteksi
@@ -175,7 +176,7 @@ const AbsensiPenerima = () => {
       stopCamera()
       stopFaceDetection()
     }
-  }, [step, selectedCameraId])
+  }, [step, selectedCameraId, cameraReady])
 
   const stats = useMemo(() => {
     const total = siswaData.length
@@ -794,6 +795,7 @@ const AbsensiPenerima = () => {
     setValidationResult(null)
     setIsDuplicate(false)
     setDuplicateSiswaInfo(null)
+    setCameraReady(false)
     setStep("camera-face")
   }
 
@@ -868,61 +870,85 @@ const AbsensiPenerima = () => {
       {/* STEP 1: CAMERA FACE */}
 {step === "camera-face" && (
   <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-    {/* Status Bar */}
-    <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-        <span className="text-sm font-semibold text-white">Kamera Aktif</span>
-      </div>
-      <span className="text-xs text-gray-400 font-mono">STEP 1</span>
-    </div>
+    {!cameraReady ? (
+      // Button untuk mulai absen
+      <div className="p-12 text-center">
+        <div className="mb-8">
+          <div className="w-32 h-32 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full mx-auto mb-6 flex items-center justify-center shadow-2xl">
+            <Camera className="w-16 h-16 text-white" />
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-3">Siap untuk Ambil Makanan?</h2>
+          <p className="text-gray-600 text-lg mb-2">Sistem akan mendeteksi wajah Anda secara otomatis</p>
+          <p className="text-gray-500 text-sm">Pastikan wajah Anda terlihat jelas dan pencahayaan cukup</p>
+        </div>
 
-    {/* Camera Container */}
-    <div className="relative bg-black overflow-hidden aspect-video">
-      <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-      <canvas ref={canvasRef} className="hidden" />
-
-      {/* Overlay Guide */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div
-          className={`w-64 h-64 border-4 rounded-full transition-all duration-300 ${
-            faceDetected
-              ? "border-emerald-400 shadow-2xl shadow-emerald-400/40 scale-100"
-              : "border-gray-500 animate-pulse scale-95"
-          }`}
+        <button
+          onClick={() => setCameraReady(true)}
+          className="px-10 py-4 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-2xl text-white rounded-2xl transition-all font-bold text-lg flex items-center justify-center gap-3 mx-auto transform hover:scale-105"
         >
-          {faceDetected && countdown > 0 && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-white text-6xl font-bold animate-pulse">{countdown}</div>
+          <Camera className="w-6 h-6" />
+          Mulai Absen
+        </button>
+      </div>
+    ) : (
+      <>
+        {/* Status Bar */}
+        <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-semibold text-white">Kamera Aktif</span>
+          </div>
+          <span className="text-xs text-gray-400 font-mono">STEP 1</span>
+        </div>
+
+        {/* Camera Container */}
+        <div className="relative bg-black overflow-hidden aspect-video">
+          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+          <canvas ref={canvasRef} className="hidden" />
+
+          {/* Overlay Guide */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div
+              className={`w-64 h-64 border-4 rounded-full transition-all duration-300 ${
+                faceDetected
+                  ? "border-[#D0B064] shadow-2xl shadow-[#D0B064]/40 scale-100"
+                  : "border-gray-500 animate-pulse scale-95"
+              }`}
+            >
+              {faceDetected && countdown > 0 && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-white text-6xl font-bold animate-pulse">{countdown}</div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Info Badges */}
-      <div className="absolute top-6 right-6 space-y-3">
-        {faceDetected && (
-          <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
-            <CheckCircle className="w-4 h-4" />
-            Wajah Terdeteksi
           </div>
-        )}
 
-        {!faceDetected && facePosition && (
-          <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg">
-            {facePosition === "too-dark" && "Terlalu gelap"}
-            {facePosition === "too-bright" && "Terlalu terang"}
+          {/* Info Badges */}
+          <div className="absolute top-6 right-6 space-y-3">
+            {faceDetected && (
+              <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
+                <CheckCircle className="w-4 h-4" />
+                Wajah Terdeteksi
+              </div>
+            )}
+
+            {!faceDetected && facePosition && (
+              <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg">
+                {facePosition === "too-dark" && "Terlalu gelap"}
+                {facePosition === "too-bright" && "Terlalu terang"}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Instruction */}
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
-        <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
-          {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
+          {/* Instruction */}
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
+            <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
+              {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </>
+    )}
   </div>
 )}
 
@@ -940,8 +966,8 @@ const AbsensiPenerima = () => {
     </div>
     <div className="flex justify-center mb-6">
       <div className="relative">
-        <div className="absolute inset-0 bg-emerald-500 rounded-full animate-pulse opacity-20"></div>
-        <div className="relative w-16 h-16 bg-gradient-to-br  from-blue-80 to-emerald-600 rounded-full flex items-center justify-center">
+        <div className="absolute inset-0 bg-[#D0B064] rounded-full animate-pulse opacity-20"></div>
+        <div className="relative w-16 h-16 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full flex items-center justify-center">
           <Sparkles className="w-8 h-8 text-white animate-pulse" />
         </div>
       </div>
@@ -949,13 +975,13 @@ const AbsensiPenerima = () => {
     <h2 className="text-2xl font-bold text-gray-900 mb-2">Mengenali Wajah...</h2>
     <p className="text-gray-600 text-sm mb-6">Menganalisis dengan AI Detection Face</p>
     <div className="flex justify-center gap-1.5">
-      <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"></div>
+      <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"></div>
       <div
-        className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"
+        className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
         style={{ animationDelay: "0.1s" }}
       ></div>
       <div
-        className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"
+        className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
         style={{ animationDelay: "0.2s" }}
       ></div>
     </div>
@@ -1077,7 +1103,7 @@ const AbsensiPenerima = () => {
 {step === "rfid-scan" && selectedSiswa && (
   <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
     {/* Success Header */}
-    <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4">
+    <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4">
       <div className="flex items-center gap-2">
         <CheckCircle className="w-5 h-5 text-white" />
         <span className="text-sm font-semibold text-white">Wajah Berhasil Dikenali</span>
@@ -1087,7 +1113,7 @@ const AbsensiPenerima = () => {
     {/* Content */}
     <div className="p-8">
       {/* Student Info & Photo Comparison */}
-      <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 mb-8 border-2 border-emerald-200">
+      <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 mb-8 border-2 border-[#D0B064]/30">
         {/* Header dengan Info */}
         <div className="mb-4">
           <h3 className="text-xl font-bold text-gray-900">{selectedSiswa.nama}</h3>
@@ -1104,10 +1130,10 @@ const AbsensiPenerima = () => {
               <img
                 src={selectedSiswa.fotoUrl || "/placeholder.svg"}
                 alt="Foto Siswa"
-                className="w-32 h-32 rounded-full object-cover border-4 border-emerald-400 shadow-lg"
+                className="w-32 h-32 rounded-full object-cover border-4 border-[#D0B064] shadow-lg"
               />
             ) : (
-              <div className="w-32 h-32 rounded-full bg-gray-200 border-4 border-emerald-400 flex items-center justify-center">
+              <div className="w-32 h-32 rounded-full bg-gray-200 border-4 border-[#D0B064] flex items-center justify-center">
                 {selectedSiswa.jenisKelamin === "LAKI_LAKI" ? (
                   <Users2 className="w-16 h-16 text-gray-500" />
                 ) : (
@@ -1119,8 +1145,8 @@ const AbsensiPenerima = () => {
 
           {/* Divider with Valid Icon */}
           <div className="flex flex-col items-center gap-2">
-            <CheckCircle className="w-12 h-12 text-emerald-500 animate-pulse" />
-            <p className="text-xs text-emerald-600 font-semibold">Valid</p>
+            <CheckCircle className="w-12 h-12 text-[#D0B064] animate-pulse" />
+            <p className="text-xs text-[#C9A355] font-semibold">Valid</p>
           </div>
 
           {/* Foto dari Kamera - RIGHT */}
@@ -1130,17 +1156,17 @@ const AbsensiPenerima = () => {
               <img
                 src={facePhoto || "/placeholder.svg"}
                 alt="Foto Validasi"
-                className="w-32 h-32 rounded-full object-cover border-4 border-emerald-400 shadow-lg"
+                className="w-32 h-32 rounded-full object-cover border-4 border-[#D0B064] shadow-lg"
               />
             )}
           </div>
         </div>
 
         {/* Verification Status */}
-        <div className="bg-white rounded-lg p-3 mb-4 border-2 border-emerald-300">
+        <div className="bg-white rounded-lg p-3 mb-4 border-2 border-[#D0B064]/30">
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-            <p className="text-sm font-semibold text-emerald-700">✓ Wajah cocok dengan data siswa di database</p>
+            <CheckCircle className="w-5 h-5 text-[#D0B064] flex-shrink-0" />
+            <p className="text-sm font-semibold text-[#C9A355]">✓ Wajah cocok dengan data siswa di database</p>
           </div>
         </div>
 
@@ -1155,9 +1181,9 @@ const AbsensiPenerima = () => {
       {/* RFID Scan Section */}
       <div className="text-center mb-8">
         <div className="relative w-32 h-32 mx-auto mb-6">
-          <div className="absolute inset-0 border-4 border-emerald-500/30 rounded-full animate-ping"></div>
-          <div className="absolute inset-2 border-4 border-emerald-500/50 rounded-full animate-pulse"></div>
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center shadow-xl">
+          <div className="absolute inset-0 border-4 border-[#D0B064]/30 rounded-full animate-ping"></div>
+          <div className="absolute inset-2 border-4 border-[#D0B064]/50 rounded-full animate-pulse"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full flex items-center justify-center shadow-xl">
             <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-4c-2.2 0-4 1.8-4 4h2c0-1.1.9-2 2-2s2 .9 2 2h2c0-2.2-1.8-4-4-4zm0-4c-3.3 0-6 2.7-6 6h2c0-2.2 1.8-4 4-4s4 1.8 4 4h2c0-3.3-2.7-6-6-6zm0-4C7.6 6 4 9.6 4 14h2c0-3.3 2.7-6 6-6s6 2.7 6 6h2c0-4.4-3.6-8-8-8z" />
             </svg>
@@ -1168,16 +1194,16 @@ const AbsensiPenerima = () => {
 
         {isScanning && (
           <div className="mt-6 flex justify-center items-center gap-2">
-            <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"></div>
             <div
-              className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"
+              className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
               style={{ animationDelay: "0.1s" }}
             ></div>
             <div
-              className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"
+              className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
               style={{ animationDelay: "0.2s" }}
             ></div>
-            <span className="text-sm text-emerald-600 font-semibold ml-2">Menunggu scan...</span>
+            <span className="text-sm text-[#C9A355] font-semibold ml-2">Menunggu scan...</span>
           </div>
         )}
       </div>
@@ -1198,7 +1224,7 @@ const AbsensiPenerima = () => {
         <div className="max-w-2xl mx-auto">
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4">
+            <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4">
               <div className="flex items-center gap-2">
                 <Hash className="w-5 h-5 text-white" />
                 <span className="text-sm font-semibold text-white">MASUKKAN ID TRAY</span>
@@ -1221,10 +1247,10 @@ const AbsensiPenerima = () => {
                       <img
                         src={selectedSiswa.fotoUrl || "/placeholder.svg"}
                         alt="Foto Siswa"
-                        className="w-24 h-24 rounded-full object-cover border-3 border-emerald-400 shadow-md"
+                        className="w-24 h-24 rounded-full object-cover border-3 border-[#D0B064] shadow-md"
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded-full bg-gray-200 border-3 border-emerald-400 flex items-center justify-center">
+                      <div className="w-24 h-24 rounded-full bg-gray-200 border-3 border-[#D0B064] flex items-center justify-center">
                         {selectedSiswa.jenisKelamin === "LAKI_LAKI" ? (
                           <Users2 className="w-12 h-12 text-gray-500" />
                         ) : (
@@ -1236,8 +1262,8 @@ const AbsensiPenerima = () => {
 
                   {/* Divider with Valid Icon */}
                   <div className="flex flex-col items-center gap-1">
-                    <CheckCircle className="w-8 h-8 text-emerald-500" />
-                    <p className="text-xs text-emerald-600 font-semibold">✓</p>
+                    <CheckCircle className="w-8 h-8 text-[#D0B064]" />
+                    <p className="text-xs text-[#C9A355] font-semibold">✓</p>
                   </div>
 
                   {/* Foto dari Kamera - RIGHT */}
@@ -1247,7 +1273,7 @@ const AbsensiPenerima = () => {
                       <img
                         src={facePhoto || "/placeholder.svg"}
                         alt="Foto Deteksi"
-                        className="w-24 h-24 rounded-full object-cover border-3 border-emerald-400 shadow-md"
+                        className="w-24 h-24 rounded-full object-cover border-3 border-[#D0B064] shadow-md"
                       />
                     )}
                   </div>
@@ -1269,7 +1295,7 @@ const AbsensiPenerima = () => {
                   value={trayId}
                   onChange={(e) => setTrayId(e.target.value.toUpperCase())}
                   placeholder="Contoh: TRAY001"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-lg font-mono text-center transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-lg font-mono text-center transition-all"
                   autoFocus
                 />
               </div>
@@ -1290,7 +1316,7 @@ const AbsensiPenerima = () => {
                 <button
                   onClick={handleTraySubmit}
                   disabled={!trayId.trim()}
-                  className="px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg text-white rounded-xl transition-all font-semibold disabled:opacity-50"
+                  className="px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-lg text-white rounded-xl transition-all font-semibold disabled:opacity-50"
                 >
                   Lanjut
                 </button>
@@ -1342,7 +1368,7 @@ const AbsensiPenerima = () => {
         </button>
         <button
           onClick={handleConfirmYes}
-          className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2"
+          className="px-6 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-lg text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2"
         >
           <CheckCircle className="w-5 h-5" />
           Lanjut
@@ -1410,7 +1436,7 @@ const AbsensiPenerima = () => {
         <div
           className={`w-96 h-64 border-4 rounded-2xl transition-all duration-300 ${
             foodConditionOk
-              ? "border-emerald-400 shadow-2xl shadow-emerald-400/40 scale-100"
+              ? "border-[#D0B064] shadow-2xl shadow-[#D0B064]/40 scale-100"
               : "border-gray-500 animate-pulse scale-95"
           }`}
         >
@@ -1426,7 +1452,7 @@ const AbsensiPenerima = () => {
       {/* Status Badges */}
       <div className="absolute top-6 right-6 space-y-3">
         {foodConditionOk && (
-          <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
+          <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
             <CheckCircle className="w-4 h-4" />
             Kondisi Baik
           </div>
@@ -1480,10 +1506,10 @@ const AbsensiPenerima = () => {
         </p>
         {isMenuCountdownActive ? (
           <p className="text-xs text-gray-500">
-            📸 Mengambil foto dalam <span className="font-bold text-emerald-600">{menuCountdown} detik</span>
+            📸 Mengambil foto dalam <span className="font-bold text-[#D0B064]">{menuCountdown} detik</span>
           </p>
         ) : foodConditionOk ? (
-          <p className="text-xs text-emerald-600 font-semibold">
+          <p className="text-xs text-[#C9A355] font-semibold">
             ✓ Kondisi baik - Countdown akan dimulai...
           </p>
         ) : (
@@ -1502,8 +1528,8 @@ const AbsensiPenerima = () => {
 {step === "submitting" && (
   <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
     <div className="relative w-16 h-16 mx-auto mb-6">
-      <div className="absolute inset-0 bg-emerald-500 rounded-full animate-ping opacity-20"></div>
-      <Loader className="w-full h-full animate-spin text-emerald-600 relative" />
+      <div className="absolute inset-0 bg-[#D0B064] rounded-full animate-ping opacity-20"></div>
+      <Loader className="w-full h-full animate-spin text-[#D0B064] relative" />
     </div>
     <h2 className="text-xl font-bold text-gray-900 mb-2">Menyimpan Data...</h2>
     <p className="text-gray-600 text-sm">Sistem sedang memproses informasi</p>
@@ -1515,7 +1541,7 @@ const AbsensiPenerima = () => {
   <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
     {/* Header */}
     <div
-      className={`bg-gradient-to-r ${validationResult?.success ? "from-emerald-500 to-teal-600" : "from-red-500 to-red-600"} px-6 py-4`}
+      className={`bg-gradient-to-r ${validationResult?.success ? "from-[#D0B064] to-[#C9A355]" : "from-red-500 to-red-600"} px-6 py-4`}
     >
       <div className="flex items-center gap-2">
         {validationResult?.success ? (
@@ -1537,11 +1563,11 @@ const AbsensiPenerima = () => {
       <div className="text-center mb-8">
         <div
           className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
-            validationResult?.success ? "bg-emerald-100" : "bg-red-100"
+            validationResult?.success ? "bg-amber-100" : "bg-red-100"
           }`}
         >
           {validationResult?.success ? (
-            <CheckCircle2 className="w-12 h-12 text-emerald-600" />
+            <CheckCircle2 className="w-12 h-12 text-[#D0B064]" />
           ) : (
             <XCircle className="w-12 h-12 text-red-600" />
           )}
@@ -1554,15 +1580,15 @@ const AbsensiPenerima = () => {
 
       {/* Success Info */}
       {validationResult?.success && validationResult?.siswa && (
-        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 mb-6 border-2 border-emerald-200">
-          <p className="text-xs font-bold text-emerald-700 mb-3">✓ DATA TERSIMPAN</p>
+        <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 mb-6 border-2 border-[#D0B064]/30">
+          <p className="text-xs font-bold text-[#C9A355] mb-3">✓ DATA TERSIMPAN</p>
           <p className="text-xl font-bold text-gray-900 mb-1">{validationResult.siswa.nama}</p>
           <p className="text-sm text-gray-600 mb-3">
             {validationResult.siswa.kelas} • NIS {validationResult.siswa.nis}
           </p>
-          <p className="text-lg font-mono font-bold text-emerald-700 mb-3">🍱 {trayId}</p>
+          <p className="text-lg font-mono font-bold text-[#C9A355] mb-3">🍱 {trayId}</p>
           {validationResult.siswa.alergi && validationResult.siswa.alergi.length > 0 && (
-            <div className="pt-3 border-t border-emerald-300">
+            <div className="pt-3 border-t border-[#D0B064]/30">
               <p className="text-xs text-gray-700">⚠️ Alergi: {validationResult.siswa.alergi.join(", ")}</p>
             </div>
           )}

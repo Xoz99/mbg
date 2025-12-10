@@ -15,6 +15,7 @@ import {
   User,
   Users2,
   AlertTriangle,
+  Camera,
 } from "lucide-react"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
@@ -55,6 +56,7 @@ const Presensi = () => {
   const [facePosition, setFacePosition] = useState<string>("")
   const [countdown, setCountdown] = useState(3)
   const [isCameraActive, setIsCameraActive] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
 
   const [authToken, setAuthToken] = useState("")
   const [sekolahId, setSekolahId] = useState("")
@@ -117,7 +119,7 @@ const Presensi = () => {
 
   // Camera setup based on step
   useEffect(() => {
-    if (step === "camera-face" && !isCameraActive) {
+    if (step === "camera-face" && !isCameraActive && cameraReady) {
       startCamera("user")
     }
 
@@ -127,7 +129,7 @@ const Presensi = () => {
         stopFaceDetection()
       }
     }
-  }, [step])
+  }, [step, cameraReady])
 
   const stats = useMemo(() => {
     if (!selectedKelas || !cachedData) return { total: 0, lakiLaki: 0, perempuan: 0 }
@@ -461,6 +463,7 @@ const Presensi = () => {
     setFacePhoto(null)
     setSelectedSiswa(null)
     setValidationResult(null)
+    setCameraReady(false)
     setStep("camera-face")
   }
 
@@ -641,61 +644,85 @@ const Presensi = () => {
           {/* STEP: CAMERA FACE */}
           {step === "camera-face" && (
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-              {/* Status Bar */}
-              <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-semibold text-white">Kamera Aktif</span>
-                </div>
-                <span className="text-xs text-gray-400 font-mono">DETEKSI WAJAH</span>
-              </div>
+              {!cameraReady ? (
+                // Button untuk mulai presensi
+                <div className="p-12 text-center">
+                  <div className="mb-8">
+                    <div className="w-32 h-32 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full mx-auto mb-6 flex items-center justify-center shadow-2xl">
+                      <Camera className="w-16 h-16 text-white" />
+                    </div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-3">Siap untuk Presensi?</h2>
+                    <p className="text-gray-600 text-lg mb-2">Sistem akan mendeteksi wajah siswa secara otomatis</p>
+                    <p className="text-gray-500 text-sm">Pastikan wajah terlihat jelas dan pencahayaan cukup</p>
+                  </div>
 
-              {/* Camera Container */}
-              <div className="relative bg-black overflow-hidden aspect-video">
-                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                <canvas ref={canvasRef} className="hidden" />
-
-                {/* Overlay Guide */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div
-                    className={`w-64 h-64 border-4 rounded-full transition-all duration-300 ${
-                      faceDetected
-                        ? "border-emerald-400 shadow-2xl shadow-emerald-400/40 scale-100"
-                        : "border-gray-500 animate-pulse scale-95"
-                    }`}
+                  <button
+                    onClick={() => setCameraReady(true)}
+                    className="px-10 py-4 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-2xl text-white rounded-2xl transition-all font-bold text-lg flex items-center justify-center gap-3 mx-auto transform hover:scale-105"
                   >
-                    {faceDetected && countdown > 0 && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-white text-6xl font-bold animate-pulse">{countdown}</div>
+                    <Camera className="w-6 h-6" />
+                    Mulai Presensi
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Status Bar */}
+                  <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm font-semibold text-white">Kamera Aktif</span>
+                    </div>
+                    <span className="text-xs text-gray-400 font-mono">DETEKSI WAJAH</span>
+                  </div>
+
+                  {/* Camera Container */}
+                  <div className="relative bg-black overflow-hidden aspect-video">
+                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                    <canvas ref={canvasRef} className="hidden" />
+
+                    {/* Overlay Guide */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div
+                        className={`w-64 h-64 border-4 rounded-full transition-all duration-300 ${
+                          faceDetected
+                            ? "border-[#D0B064] shadow-2xl shadow-[#D0B064]/40 scale-100"
+                            : "border-gray-500 animate-pulse scale-95"
+                        }`}
+                      >
+                        {faceDetected && countdown > 0 && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-white text-6xl font-bold animate-pulse">{countdown}</div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Info Badges */}
-                <div className="absolute top-6 right-6 space-y-3">
-                  {faceDetected && (
-                    <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
-                      <CheckCircle className="w-4 h-4" />
-                      Wajah Terdeteksi
                     </div>
-                  )}
 
-                  {!faceDetected && facePosition && (
-                    <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg">
-                      {facePosition === "too-dark" && "Terlalu gelap"}
-                      {facePosition === "too-bright" && "Terlalu terang"}
+                    {/* Info Badges */}
+                    <div className="absolute top-6 right-6 space-y-3">
+                      {faceDetected && (
+                        <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
+                          <CheckCircle className="w-4 h-4" />
+                          Wajah Terdeteksi
+                        </div>
+                      )}
+
+                      {!faceDetected && facePosition && (
+                        <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg">
+                          {facePosition === "too-dark" && "Terlalu gelap"}
+                          {facePosition === "too-bright" && "Terlalu terang"}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {/* Instruction */}
-                <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
-                    {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
+                    {/* Instruction */}
+                    <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
+                      <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
+                        {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           )}
 
@@ -713,8 +740,8 @@ const Presensi = () => {
               </div>
               <div className="flex justify-center mb-6">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-emerald-500 rounded-full animate-pulse opacity-20"></div>
-                  <div className="relative w-16 h-16 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center">
+                  <div className="absolute inset-0 bg-[#D0B064] rounded-full animate-pulse opacity-20"></div>
+                  <div className="relative w-16 h-16 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full flex items-center justify-center">
                     <Sparkles className="w-8 h-8 text-white animate-pulse" />
                   </div>
                 </div>
@@ -722,9 +749,9 @@ const Presensi = () => {
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Mengenali Wajah...</h2>
               <p className="text-gray-600 text-sm mb-6">Menganalisis dengan AI Detection Face</p>
               <div className="flex justify-center gap-1.5">
-                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
-                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+                <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
               </div>
             </div>
           )}
@@ -732,7 +759,7 @@ const Presensi = () => {
           {/* STEP: CONFIRM */}
           {step === "confirm" && selectedSiswa && (
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-              <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4">
+              <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-white" />
                   <span className="text-sm font-semibold text-white">Wajah Berhasil Dikenali</span>
@@ -740,7 +767,7 @@ const Presensi = () => {
               </div>
 
               <div className="p-8">
-                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 mb-8 border-2 border-emerald-200">
+                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 mb-8 border-2 border-[#D0B064]/30">
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedSiswa.nama}</h3>
                   <p className="text-sm text-gray-600 mb-1">{selectedSiswa.kelas}</p>
                   <p className="text-xs text-gray-500 mb-4">NIS: {selectedSiswa.nis}</p>
@@ -752,10 +779,10 @@ const Presensi = () => {
                         <img
                           src={selectedSiswa.fotoUrl || "/placeholder.svg"}
                           alt="Foto"
-                          className="w-24 h-24 rounded-full object-cover border-4 border-emerald-400 shadow-lg"
+                          className="w-24 h-24 rounded-full object-cover border-4 border-[#D0B064] shadow-lg"
                         />
                       ) : (
-                        <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-emerald-400 flex items-center justify-center">
+                        <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-[#D0B064] flex items-center justify-center">
                           {selectedSiswa.jenisKelamin === "LAKI_LAKI" ? (
                             <Users2 className="w-12 h-12 text-gray-500" />
                           ) : (
@@ -766,7 +793,7 @@ const Presensi = () => {
                     </div>
 
                     <div>
-                      <CheckCircle className="w-8 h-8 text-emerald-500" />
+                      <CheckCircle className="w-8 h-8 text-[#D0B064]" />
                     </div>
 
                     <div className="text-center">
@@ -775,7 +802,7 @@ const Presensi = () => {
                         <img
                           src={facePhoto || "/placeholder.svg"}
                           alt="Foto Deteksi"
-                          className="w-24 h-24 rounded-full object-cover border-4 border-emerald-400 shadow-lg"
+                          className="w-24 h-24 rounded-full object-cover border-4 border-[#D0B064] shadow-lg"
                         />
                       )}
                     </div>
@@ -801,7 +828,7 @@ const Presensi = () => {
                   </button>
                   <button
                     onClick={() => submitPresensi()}
-                    className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2"
+                    className="px-6 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-lg text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2"
                   >
                     <CheckCircle className="w-5 h-5" />
                     Konfirmasi
@@ -815,8 +842,8 @@ const Presensi = () => {
           {step === "submitting" && (
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
               <div className="relative w-16 h-16 mx-auto mb-6">
-                <div className="absolute inset-0 bg-emerald-500 rounded-full animate-ping opacity-20"></div>
-                <Loader className="w-full h-full animate-spin text-emerald-600 relative" />
+                <div className="absolute inset-0 bg-[#D0B064] rounded-full animate-ping opacity-20"></div>
+                <Loader className="w-full h-full animate-spin text-[#D0B064] relative" />
               </div>
               <h2 className="text-xl font-bold text-gray-900 mb-2">Menyimpan Presensi...</h2>
               <p className="text-gray-600 text-sm">Sistem sedang memproses informasi</p>
@@ -828,7 +855,7 @@ const Presensi = () => {
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
               <div
                 className={`bg-gradient-to-r ${
-                  validationResult?.success ? "from-emerald-500 to-teal-600" : "from-red-500 to-red-600"
+                  validationResult?.success ? "from-[#D0B064] to-[#C9A355]" : "from-red-500 to-red-600"
                 } px-6 py-4`}
               >
                 <div className="flex items-center gap-2">
@@ -849,11 +876,11 @@ const Presensi = () => {
               <div className="p-8 text-center">
                 <div
                   className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                    validationResult?.success ? "bg-emerald-100" : "bg-red-100"
+                    validationResult?.success ? "bg-amber-100" : "bg-red-100"
                   }`}
                 >
                   {validationResult?.success ? (
-                    <CheckCircle2 className="w-12 h-12 text-emerald-600" />
+                    <CheckCircle2 className="w-12 h-12 text-[#D0B064]" />
                   ) : (
                     <XCircle className="w-12 h-12 text-red-600" />
                   )}
@@ -864,8 +891,8 @@ const Presensi = () => {
                 <p className="text-gray-600">{validationResult?.message}</p>
 
                 {validationResult?.success && validationResult?.siswa && (
-                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 my-6 border-2 border-emerald-200">
-                    <p className="text-xs font-bold text-emerald-700 mb-3">✓ PRESENSI TERSIMPAN</p>
+                  <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 my-6 border-2 border-[#D0B064]/30">
+                    <p className="text-xs font-bold text-[#C9A355] mb-3">✓ PRESENSI TERSIMPAN</p>
                     <p className="text-xl font-bold text-gray-900 mb-1">{validationResult.siswa.nama}</p>
                     <p className="text-sm text-gray-600 mb-3">
                       {validationResult.siswa.kelas} • NIS {validationResult.siswa.nis}

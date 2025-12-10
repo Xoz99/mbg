@@ -103,7 +103,7 @@ const SkeletonFormCard = () => (
   </div>
 );
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://demombgv1.xyz';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 const ValidasiTrayPage = () => {
   const router = useRouter();
@@ -270,28 +270,6 @@ const ValidasiTrayPage = () => {
           </div>
         </div>
 
-        {/* Tray Summary Card - Realtime */}
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 p-6 shadow-sm">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <p className="text-sm font-semibold text-blue-900 uppercase tracking-wide">Total Tray Dikirim</p>
-              <p className="text-4xl font-black text-blue-700 mt-2">
-                {traySummary?.totalTrayUnik || traySummary?.total || 0}
-              </p>
-            </div>
-            {wsConnected && (
-              <div className="flex items-center gap-2">
-                <Wifi className="w-5 h-5 text-green-600" />
-                <span className="text-sm font-semibold text-green-600">Realtime</span>
-              </div>
-            )}
-          </div>
-          {loadingTraySummary && (
-            <p className="text-xs text-blue-700">Memuat data...</p>
-          )}
-        </div>
-
-        {/* Menu Selection */}
         {menus.length === 0 ? (
           <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-8 text-center">
             <AlertCircle className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
@@ -300,354 +278,375 @@ const ValidasiTrayPage = () => {
           </div>
         ) : (
           <>
-            {/* Menu Carousel */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-[#1B263A]">Menu Hari Ini</h2>
-                {menus.length > 1 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">
-                      {currentMenuIndex + 1} / {menus.length}
-                    </span>
+            {/* Row 1: Tray Summary & Menu Side by Side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Total Tray Dikirim */}
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 p-6 shadow-sm">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-blue-900 uppercase tracking-wide">Total Tray Dikirim</p>
+                    <p className="text-5xl font-black text-blue-700 mt-2">
+                      {traySummary?.totalTrayUnik || traySummary?.total || 0}
+                    </p>
                   </div>
-                )}
-              </div>
-
-              {currentMenu && (
-                <div className="space-y-4 mb-6">
-                  {/* Menu Info */}
-                  <div className="bg-gradient-to-br from-[#1B263A]/5 to-[#D0B064]/5 rounded-xl p-4 border border-[#D0B064]/20">
-                    <h3 className="text-lg font-bold text-[#1B263A] mb-3">{currentMenu.namaMenu}</h3>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div>
-                        <p className="text-xs font-semibold text-[#D0B064] uppercase mb-1">Tanggal</p>
-                        <p className="text-sm font-bold text-[#1B263A]">{currentMenu.tanggal}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-[#D0B064] uppercase mb-1">Jam Masak</p>
-                        <p className="text-sm font-bold text-[#1B263A]">
-                          {currentMenu.jamMulaiMasak} - {currentMenu.jamSelesaiMasak}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-[#D0B064] uppercase mb-1">Target Tray</p>
-                        <p className="text-sm font-bold text-[#1B263A]">{currentMenu.targetTray} biji</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-[#D0B064] uppercase mb-1">Biaya/Tray</p>
-                        <p className="text-sm font-bold text-[#1B263A]">Rp {currentMenu.biayaPerTray?.toLocaleString()}</p>
-                      </div>
-                    </div>
-
-                    {/* Nutrition Info */}
-                    <div className="mt-4 pt-4 border-t border-[#D0B064]/20">
-                      <p className="text-xs font-semibold text-[#D0B064] uppercase mb-2">Informasi Gizi</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="text-sm">
-                          <span className="text-gray-600">Kalori: </span>
-                          <span className="font-bold text-[#1B263A]">{currentMenu.kalori} kcal</span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-gray-600">Protein: </span>
-                          <span className="font-bold text-[#1B263A]">{currentMenu.protein}g</span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-gray-600">Karbo: </span>
-                          <span className="font-bold text-[#1B263A]">{currentMenu.karbohidrat}g</span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-gray-600">Lemak: </span>
-                          <span className="font-bold text-[#1B263A]">{currentMenu.lemak}g</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Navigation */}
-                  {menus.length > 1 && (
-                    <div className="flex items-center justify-between gap-3">
-                      <button
-                        onClick={handlePrevMenu}
-                        className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                      >
-                        <ChevronLeft className="w-5 h-5 text-gray-600" />
-                      </button>
-                      <div className="flex items-center gap-2 flex-1">
-                        {menus.map((_, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              setCurrentMenuIndex(idx);
-                              resetForm();
-                            }}
-                            className={`h-2 rounded-full transition-all ${
-                              idx === currentMenuIndex ? 'w-8 bg-[#D0B064]' : 'w-2 bg-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <button
-                        onClick={handleNextMenu}
-                        className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                      >
-                        <ChevronRight className="w-5 h-5 text-gray-600" />
-                      </button>
+                  {wsConnected && (
+                    <div className="flex items-center gap-2">
+                      <Wifi className="w-5 h-5 text-green-600" />
+                      <span className="text-xs font-semibold text-green-600">Live</span>
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-
-            {/* Validation Form */}
-            {!showResult ? (
-              <form onSubmit={handleSubmitValidasi} className="space-y-6">
-                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                  <h3 className="text-lg font-bold text-[#1B263A] mb-6">Form Validasi Tray</h3>
-
-                  <div className="space-y-4">
-                    {/* Total Tray Diterima */}
-                    <div>
-                      <label className="block text-sm font-semibold text-[#1B263A] mb-2">
-                        Total Tray Diterima <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min="0"
-                          value={totalTrayDiterima}
-                          onChange={(e) => setTotalTrayDiterima(e.target.value ? Number(e.target.value) : '')}
-                          placeholder={`Masukkan jumlah tray (target: ${currentMenu?.targetTray})`}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D0B064] focus:ring-2 focus:ring-[#D0B064]/20"
-                        />
-                        <Package className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      </div>
-                      {currentMenu && totalTrayDiterima !== '' && (
-                        <p className="text-xs text-gray-600 mt-2">
-                          Target: {currentMenu.targetTray} biji | Diterima: {totalTrayDiterima} biji
-                          {Number(totalTrayDiterima) !== currentMenu.targetTray && (
-                            <span className="text-orange-600 font-semibold ml-2">
-                              ({Number(totalTrayDiterima) > currentMenu.targetTray ? '+' : '-'}
-                              {Math.abs(Number(totalTrayDiterima) - currentMenu.targetTray)})
-                            </span>
-                          )}
-                        </p>
-                      )}
+                <div className="pt-6 mt-2 border-t border-blue-200">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <Clock className="w-6 h-6 text-blue-700" />
+                      <p className="text-sm font-semibold uppercase text-blue-700 tracking-wide">Update Terakhir</p>
                     </div>
+                    <p className="text-5xl font-black text-blue-900">
+                      {new Date().toLocaleTimeString('id-ID', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-                    {/* Keterangan */}
-                    <div>
-                      <label className="block text-sm font-semibold text-[#1B263A] mb-2">
-                        Keterangan Kondisi Tray
-                      </label>
-                      <textarea
-                        value={keterangan}
-                        onChange={(e) => setKeterangan(e.target.value)}
-                        placeholder="Contoh: Tray diterima dalam kondisi baik, ada beberapa tray yang kotor..."
-                        rows={4}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D0B064] focus:ring-2 focus:ring-[#D0B064]/20 resize-none"
-                      />
-                    </div>
-
-                    {/* Error Message */}
-                    {submitError && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-red-700">{submitError}</p>
+              {/* Menu Carousel */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold text-[#1B263A]">Menu Hari Ini</h2>
+                    {menus.length > 1 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">
+                          {currentMenuIndex + 1} / {menus.length}
+                        </span>
                       </div>
                     )}
                   </div>
 
-                  {/* Submit Button */}
-                  <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
-                    <button
-                      type="button"
-                      onClick={resetForm}
-                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      Reset
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={submitting || totalTrayDiterima === ''}
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {submitting ? (
-                        <>
-                          <Loader className="w-4 h-4 animate-spin" />
-                          Memproses...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4" />
-                          Validasi Tray
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </form>
-            ) : (
-              /* Validation Result */
-              validationResult && (
-                <div className="space-y-6">
-                  {/* Status Alert */}
-                  <div
-                    className={`rounded-2xl p-6 border ${
-                      validationResult.statusValidasi === 'SESUAI'
-                        ? 'bg-green-50 border-green-200'
-                        : 'bg-red-50 border-red-200'
-                    }`}
-                  >
-                    <div className="flex items-start gap-4">
-                      {validationResult.statusValidasi === 'SESUAI' ? (
-                        <CheckCircle className="w-8 h-8 text-green-600 flex-shrink-0 mt-1" />
-                      ) : (
-                        <AlertTriangle className="w-8 h-8 text-red-600 flex-shrink-0 mt-1" />
-                      )}
-                      <div className="flex-1">
-                        <h3
-                          className={`text-lg font-bold mb-2 ${
-                            validationResult.statusValidasi === 'SESUAI'
-                              ? 'text-green-900'
-                              : 'text-red-900'
-                          }`}
-                        >
-                          {validationResult.statusValidasi === 'SESUAI'
-                            ? 'Validasi Sesuai'
-                            : 'Validasi Tidak Sesuai'}
-                        </h3>
-                        <p
-                          className={`text-sm ${
-                            validationResult.statusValidasi === 'SESUAI'
-                              ? 'text-green-700'
-                              : 'text-red-700'
-                          }`}
-                        >
-                          {validationResult.catatan}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  {currentMenu && (
+                    <div className="space-y-4 mb-6">
+                      {/* Menu Info */}
+                      <div className="bg-gradient-to-br from-[#1B263A]/5 to-[#D0B064]/5 rounded-xl p-4 border border-[#D0B064]/20">
+                        <h3 className="text-lg font-bold text-[#1B263A] mb-3">{currentMenu.namaMenu}</h3>
 
-                  {/* Detail Result */}
-                  <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
-                    {/* Perhitungan Tray */}
-                    <div>
-                      <h4 className="text-lg font-bold text-[#1B263A] mb-4">Perhitungan Tray</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                          <p className="text-xs text-blue-700 font-semibold uppercase mb-1">Seharusnya</p>
-                          <p className="text-3xl font-bold text-blue-900">
-                            {validationResult.perhitunganTray.trayYangSeharusnya}
-                          </p>
-                        </div>
-                        <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                          <p className="text-xs text-purple-700 font-semibold uppercase mb-1">Diterima</p>
-                          <p className="text-3xl font-bold text-purple-900">
-                            {validationResult.perhitunganTray.trayDiterima}
-                          </p>
-                        </div>
-                        <div
-                          className={`rounded-lg p-4 border ${
-                            validationResult.perhitunganTray.selisih === 0
-                              ? 'bg-green-50 border-green-200'
-                              : 'bg-orange-50 border-orange-200'
-                          }`}
-                        >
-                          <p
-                            className={`text-xs font-semibold uppercase mb-1 ${
-                              validationResult.perhitunganTray.selisih === 0
-                                ? 'text-green-700'
-                                : 'text-orange-700'
-                            }`}
-                          >
-                            Selisih
-                          </p>
-                          <p
-                            className={`text-3xl font-bold ${
-                              validationResult.perhitunganTray.selisih === 0
-                                ? 'text-green-900'
-                                : 'text-orange-900'
-                            }`}
-                          >
-                            {validationResult.perhitunganTray.selisih > 0
-                              ? '+'
-                              : ''}
-                            {validationResult.perhitunganTray.selisih}
-                          </p>
-                        </div>
-                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Clock className="w-4 h-4 text-gray-600" />
-                            <p className="text-xs text-gray-700 font-semibold uppercase">Waktu Validasi</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          <div>
+                            <p className="text-xs font-semibold text-[#D0B064] uppercase mb-1">Tanggal</p>
+                            <p className="text-sm font-bold text-[#1B263A]">{currentMenu.tanggal}</p>
                           </div>
-                          <p className="text-2xl font-bold text-gray-900 font-mono">
-                            {new Date(validationResult.validasiTime).toLocaleTimeString('id-ID', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit',
-                              hour12: false
-                            })}
-                          </p>
-                          <p className="text-xs text-gray-600 mt-1">
-                            {new Date(validationResult.validasiTime).toLocaleDateString('id-ID', {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
-                          </p>
+                          <div>
+                            <p className="text-xs font-semibold text-[#D0B064] uppercase mb-1">Jam Masak</p>
+                            <p className="text-sm font-bold text-[#1B263A]">
+                              {currentMenu.jamMulaiMasak} - {currentMenu.jamSelesaiMasak}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-[#D0B064] uppercase mb-1">Biaya/Tray</p>
+                            <p className="text-sm font-bold text-[#1B263A]">Rp {currentMenu.biayaPerTray?.toLocaleString()}</p>
+                          </div>
+                        </div>
+
+                        {/* Nutrition Info */}
+                        <div className="mt-4 pt-4 border-t border-[#D0B064]/20">
+                          <p className="text-xs font-semibold text-[#D0B064] uppercase mb-2">Informasi Gizi</p>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="text-sm">
+                              <span className="text-gray-600">Kalori: </span>
+                              <span className="font-bold text-[#1B263A]">{currentMenu.kalori} kcal</span>
+                            </div>
+                            <div className="text-sm">
+                              <span className="text-gray-600">Protein: </span>
+                              <span className="font-bold text-[#1B263A]">{currentMenu.protein}g</span>
+                            </div>
+                            <div className="text-sm">
+                              <span className="text-gray-600">Karbo: </span>
+                              <span className="font-bold text-[#1B263A]">{currentMenu.karbohidrat}g</span>
+                            </div>
+                            <div className="text-sm">
+                              <span className="text-gray-600">Lemak: </span>
+                              <span className="font-bold text-[#1B263A]">{currentMenu.lemak}g</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      {validationResult.perhitunganTray.peringatan && (
-                        <div className="mt-4 bg-orange-100 border border-orange-300 rounded-lg p-3">
-                          <p className="text-sm font-semibold text-orange-900">
-                            ⚠️ {validationResult.perhitunganTray.peringatan}
-                          </p>
+
+                      {/* Navigation */}
+                      {menus.length > 1 && (
+                        <div className="flex items-center justify-between gap-3">
+                          <button
+                            onClick={handlePrevMenu}
+                            className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                          >
+                            <ChevronLeft className="w-5 h-5 text-gray-600" />
+                          </button>
+                          <div className="flex items-center gap-2 flex-1">
+                            {menus.map((_, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setCurrentMenuIndex(idx);
+                                  resetForm();
+                                }}
+                                className={`h-2 rounded-full transition-all ${
+                                  idx === currentMenuIndex ? 'w-8 bg-[#D0B064]' : 'w-2 bg-gray-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <button
+                            onClick={handleNextMenu}
+                            className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                          >
+                            <ChevronRight className="w-5 h-5 text-gray-600" />
+                          </button>
                         </div>
                       )}
                     </div>
+                  )}
+                </div>
+            </div>
 
-                    {/* Alergi Information */}
-                    {validationResult.analisisAlergi.totalAlergi > 0 && (
-                      <div className="pt-4 border-t border-gray-200">
-                        <h4 className="text-lg font-bold text-[#1B263A] mb-4">Informasi Alergi</h4>
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                          <p className="text-sm font-semibold text-yellow-900 mb-3">
-                            Total Siswa Alergi: {validationResult.analisisAlergi.totalAlergi}
-                          </p>
-                          {validationResult.analisisAlergi.siswaAlergiDetails.length > 0 && (
-                            <div className="space-y-2">
-                              {validationResult.analisisAlergi.siswaAlergiDetails.map((siswa, idx) => (
-                                <div key={idx} className="text-sm text-yellow-800">
-                                  • {siswa.nama}: {siswa.alergi}
-                                </div>
-                              ))}
+            {/* Row 2: Validation Form - Full Width */}
+            {!showResult ? (
+              <form onSubmit={handleSubmitValidasi} className="space-y-6">
+                    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                      <h3 className="text-lg font-bold text-[#1B263A] mb-6">Form Validasi Tray</h3>
+
+                      <div className="space-y-4">
+                        {/* Total Tray Diterima */}
+                        <div>
+                          <label className="block text-sm font-semibold text-[#1B263A] mb-2">
+                            Total Tray Diterima <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="0"
+                              value={totalTrayDiterima}
+                              onChange={(e) => setTotalTrayDiterima(e.target.value ? Number(e.target.value) : '')}
+                              placeholder="Masukkan jumlah tray yang diterima"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D0B064] focus:ring-2 focus:ring-[#D0B064]/20"
+                            />
+                            <Package className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                          </div>
+                        </div>
+
+                        {/* Keterangan */}
+                        <div>
+                          <label className="block text-sm font-semibold text-[#1B263A] mb-2">
+                            Keterangan Kondisi Tray
+                          </label>
+                          <textarea
+                            value={keterangan}
+                            onChange={(e) => setKeterangan(e.target.value)}
+                            placeholder="Contoh: Tray diterima dalam kondisi baik, ada beberapa tray yang kotor..."
+                            rows={4}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D0B064] focus:ring-2 focus:ring-[#D0B064]/20 resize-none"
+                          />
+                        </div>
+
+                        {/* Error Message */}
+                        {submitError && (
+                          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                            <p className="text-sm text-red-700">{submitError}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Submit Button */}
+                      <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
+                        <button
+                          type="button"
+                          onClick={resetForm}
+                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          Reset
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={submitting || totalTrayDiterima === ''}
+                          className="flex-1 px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {submitting ? (
+                            <>
+                              <Loader className="w-4 h-4 animate-spin" />
+                              Memproses...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4" />
+                              Validasi Tray
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                ) : (
+                  /* Validation Result */
+                  validationResult && (
+                    <div className="space-y-6">
+                      {/* Status Alert */}
+                      <div
+                        className={`rounded-2xl p-6 border ${
+                          validationResult.statusValidasi === 'SESUAI'
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-red-50 border-red-200'
+                        }`}
+                      >
+                        <div className="flex items-start gap-4">
+                          {validationResult.statusValidasi === 'SESUAI' ? (
+                            <CheckCircle className="w-8 h-8 text-green-600 flex-shrink-0 mt-1" />
+                          ) : (
+                            <AlertTriangle className="w-8 h-8 text-red-600 flex-shrink-0 mt-1" />
+                          )}
+                          <div className="flex-1">
+                            <h3
+                              className={`text-lg font-bold mb-2 ${
+                                validationResult.statusValidasi === 'SESUAI'
+                                  ? 'text-green-900'
+                                  : 'text-red-900'
+                              }`}
+                            >
+                              {validationResult.statusValidasi === 'SESUAI'
+                                ? 'Validasi Sesuai'
+                                : 'Validasi Tidak Sesuai'}
+                            </h3>
+                            <p
+                              className={`text-sm ${
+                                validationResult.statusValidasi === 'SESUAI'
+                                  ? 'text-green-700'
+                                  : 'text-red-700'
+                              }`}
+                            >
+                              {validationResult.catatan}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Detail Result */}
+                      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
+                        {/* Perhitungan Tray */}
+                        <div>
+                          <h4 className="text-lg font-bold text-[#1B263A] mb-4">Perhitungan Tray</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                              <p className="text-xs text-blue-700 font-semibold uppercase mb-1">Seharusnya</p>
+                              <p className="text-3xl font-bold text-blue-900">
+                                {validationResult.perhitunganTray.trayYangSeharusnya}
+                              </p>
+                            </div>
+                            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                              <p className="text-xs text-purple-700 font-semibold uppercase mb-1">Diterima</p>
+                              <p className="text-3xl font-bold text-purple-900">
+                                {validationResult.perhitunganTray.trayDiterima}
+                              </p>
+                            </div>
+                            <div
+                              className={`rounded-lg p-4 border ${
+                                validationResult.perhitunganTray.selisih === 0
+                                  ? 'bg-green-50 border-green-200'
+                                  : 'bg-orange-50 border-orange-200'
+                              }`}
+                            >
+                              <p
+                                className={`text-xs font-semibold uppercase mb-1 ${
+                                  validationResult.perhitunganTray.selisih === 0
+                                    ? 'text-green-700'
+                                    : 'text-orange-700'
+                                }`}
+                              >
+                                Selisih
+                              </p>
+                              <p
+                                className={`text-3xl font-bold ${
+                                  validationResult.perhitunganTray.selisih === 0
+                                    ? 'text-green-900'
+                                    : 'text-orange-900'
+                                }`}
+                              >
+                                {validationResult.perhitunganTray.selisih > 0
+                                  ? '+'
+                                  : ''}
+                                {validationResult.perhitunganTray.selisih}
+                              </p>
+                            </div>
+                            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Clock className="w-4 h-4 text-gray-600" />
+                                <p className="text-xs text-gray-700 font-semibold uppercase">Waktu Validasi</p>
+                              </div>
+                              <p className="text-2xl font-bold text-gray-900 font-mono">
+                                {new Date(validationResult.validasiTime).toLocaleTimeString('id-ID', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                  hour12: false
+                                })}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                {new Date(validationResult.validasiTime).toLocaleDateString('id-ID', {
+                                  weekday: 'long',
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                          {validationResult.perhitunganTray.peringatan && (
+                            <div className="mt-4 bg-orange-100 border border-orange-300 rounded-lg p-3">
+                              <p className="text-sm font-semibold text-orange-900">
+                                ⚠️ {validationResult.perhitunganTray.peringatan}
+                              </p>
                             </div>
                           )}
                         </div>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => {
-                        resetForm();
-                        if (currentMenuIndex < menus.length - 1) {
-                          handleNextMenu();
-                        }
-                      }}
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white font-semibold rounded-lg hover:shadow-lg transition-all"
-                    >
-                      {currentMenuIndex < menus.length - 1 ? 'Validasi Menu Berikutnya' : 'Validasi Selesai'}
-                    </button>
-                  </div>
-                </div>
-              )
-            )}
+                        {/* Alergi Information */}
+                        {validationResult.analisisAlergi.totalAlergi > 0 && (
+                          <div className="pt-4 border-t border-gray-200">
+                            <h4 className="text-lg font-bold text-[#1B263A] mb-4">Informasi Alergi</h4>
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                              <p className="text-sm font-semibold text-yellow-900 mb-3">
+                                Total Siswa Alergi: {validationResult.analisisAlergi.totalAlergi}
+                              </p>
+                              {validationResult.analisisAlergi.siswaAlergiDetails.length > 0 && (
+                                <div className="space-y-2">
+                                  {validationResult.analisisAlergi.siswaAlergiDetails.map((siswa, idx) => (
+                                    <div key={idx} className="text-sm text-yellow-800">
+                                      • {siswa.nama}: {siswa.alergi}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            resetForm();
+                            if (currentMenuIndex < menus.length - 1) {
+                              handleNextMenu();
+                            }
+                          }}
+                          className="flex-1 px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white font-semibold rounded-lg hover:shadow-lg transition-all"
+                        >
+                          {currentMenuIndex < menus.length - 1 ? 'Validasi Menu Berikutnya' : 'Validasi Selesai'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                )}
           </>
         )}
       </div>
