@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 const CACHE_KEY = "sekolah_siswa_cache"
 const CACHE_EXPIRY = 1 * 60 * 1000 // 1 minute (more aggressive refresh)
 const INVALIDATION_EVENT = "sekolah_data_invalidated" // Broadcast event untuk cache invalidation

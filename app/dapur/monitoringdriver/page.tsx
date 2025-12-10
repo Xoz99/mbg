@@ -17,7 +17,7 @@ const TileLayer = dynamic(() => import('react-leaflet').then((mod) => mod.TileLa
 const Marker = dynamic(() => import('react-leaflet').then((mod) => mod.Marker), { ssr: false });
 const Popup = dynamic(() => import('react-leaflet').then((mod) => mod.Popup), { ssr: false });
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://demombgv1.xyz';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 // Skeleton Components
 const SkeletonStatCard = () => (

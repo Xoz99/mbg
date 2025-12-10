@@ -5,7 +5,7 @@ import DapurLayout from '@/components/layout/DapurLayout'
 import { Download, Calendar, Loader2, AlertCircle, ChefHat, Truck, CheckCircle, AlertTriangle } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 const LaporanProduksi = () => {
   const [period, setPeriod] = useState('minggu-ini')

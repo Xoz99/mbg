@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useDapurContext } from '@/lib/context/DapurContext'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://demombgv1.xyz'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 // 🔥 REALTIME CACHE - NO STALE DATA!
 // Hanya cache dari context, tidak dari localStorage

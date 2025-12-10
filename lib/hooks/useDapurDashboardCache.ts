@@ -2,7 +2,7 @@ import { useCallback, useRef, useState, useEffect } from "react"
 import { cacheEmitter } from "@/lib/utils/cacheEmitter"
 import { useDapurContext } from "@/lib/context/DapurContext"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 const CACHE_EXPIRY = 10 * 60 * 1000 // 10 minutes - Longer cache to avoid unnecessary refetch when navigating back
 
 // 🔥 Helper to generate cache key dengan dapur ID (jadi berbeda akun nggak share cache)

@@ -7,6 +7,8 @@ import {
   Loader2, Search, Trash2, Plus, X, MapPin, Building2, ChevronLeft, ChevronRight, AlertCircle
 } from 'lucide-react';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
+
 const SkeletonDapurCard = () => (
   <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 animate-pulse">
     <div className="flex items-start justify-between mb-3">
@@ -203,7 +205,7 @@ const LinkDapurSekolahPage = () => {
   const fetchDapurList = async (token: string) => {
     try { 
       setLoading(true);
-      const response = await fetch('https://demombgv1.xyz/api/dapur?page=1&limit=100', {
+      const response = await fetch(`${API_BASE_URL}/api/dapur?page=1&limit=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -238,7 +240,7 @@ const LinkDapurSekolahPage = () => {
 
   const fetchSekolahList = async (token: string) => {
     try {
-      const response = await fetch('https://demombgv1.xyz/api/sekolah?page=1&limit=100', {
+      const response = await fetch(`${API_BASE_URL}/api/sekolah?page=1&limit=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -274,7 +276,7 @@ const LinkDapurSekolahPage = () => {
 
   const fetchLinkedSekolah = async (dapurId: string): Promise<Sekolah[]> => {
     try {
-      const linkUrl = `https://demombgv1.xyz/api/dapur/${dapurId}/link-sekolah`;
+      const linkUrl = `${API_BASE_URL}/api/dapur/${dapurId}/link-sekolah`;
 
       const linkResponse = await fetch(linkUrl, {
         headers: {
@@ -351,7 +353,7 @@ const LinkDapurSekolahPage = () => {
       }
 
       const response = await fetch(
-        `https://demombgv1.xyz/api/dapur/${selectedDapur.id}/link-sekolah`,
+        `${API_BASE_URL}/api/dapur/${selectedDapur.id}/link-sekolah`,
         {
           method: 'POST',
           headers: {
@@ -398,7 +400,7 @@ const LinkDapurSekolahPage = () => {
       }
 
       const dapurId = selectedDapurForAutoLink.id;
-      const endpoint = `https://demombgv1.xyz/api/dapur/${dapurId}/link-sekolah`;
+      const endpoint = `${API_BASE_URL}/api/dapur/${dapurId}/link-sekolah`;
       const results: any = { strategies: [] };
 
       console.log('🚀 LINKING SEKOLAH - CORRECT FORMAT');
@@ -502,7 +504,7 @@ const LinkDapurSekolahPage = () => {
     if (!confirm('Yakin ingin menghapus?')) return;
 
     try {
-      const response = await fetch(`https://demombgv1.xyz/api/dapur/${dapurId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/dapur/${dapurId}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${authToken}`,

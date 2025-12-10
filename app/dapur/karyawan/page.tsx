@@ -26,7 +26,7 @@ import {
   Loader2,
 } from "lucide-react"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 const SkeletonCard = () => (
   <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 animate-pulse">

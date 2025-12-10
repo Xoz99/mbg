@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend, PieChart, Pie } from 'recharts';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 // Skeleton Components
 const SkeletonStatCard = () => (

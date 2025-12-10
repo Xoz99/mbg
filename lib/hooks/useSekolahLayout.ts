@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 const CACHE_KEY = "sekolah_layout_cache"
 const CACHE_EXPIRY = 10 * 60 * 1000 // 10 minutes
 

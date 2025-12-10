@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import SekolahLayout from "@/components/layout/SekolahLayout"
 import { useSekolahDataCache } from "@/lib/hooks/useSekolahDataCache"
 import { Users, Loader, Camera, CheckCircle, School, X, CheckCircle2, Hash, XCircle, Sparkles, Zap, AlertTriangle, User, Users2, RefreshCw } from "lucide-react"
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 const AbsensiPenerima = () => {
   const [step, setStep] = useState<

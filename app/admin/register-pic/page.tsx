@@ -8,6 +8,8 @@ import {
   Users, Mail, Phone, Lock, Trash2, Edit, Search
 } from 'lucide-react';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
+
 interface PICUser {
   id: string;
   name: string;
@@ -135,7 +137,7 @@ const RegisterPICPage = () => {
 
   const fetchDapur = async (token: string) => {
     try {
-      const response = await fetch('https://demombgv1.xyz/api/dapur?page=1&limit=100', {
+      const response = await fetch(`${API_BASE_URL}/api/dapur?page=1&limit=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -168,7 +170,7 @@ const RegisterPICPage = () => {
   const fetchPICList = async (token: string) => {
     try {
       setLoadingPic(true);
-      const response = await fetch('https://demombgv1.xyz/api/dapur?page=1&limit=100', {
+      const response = await fetch(`${API_BASE_URL}/api/dapur?page=1&limit=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -278,7 +280,7 @@ const RegisterPICPage = () => {
         provinceId: provinceIdMap[formData.province] || ''
       };
 
-      const response = await fetch('https://demombgv1.xyz/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -317,7 +319,7 @@ const RegisterPICPage = () => {
       if (selectedDapurId && formData.province) {
         const provinceId = provinceIdMap[formData.province];
         try {
-          await fetch(`https://demombgv1.xyz/api/dapur/${selectedDapurId}`, {
+          await fetch(`${API_BASE_URL}/api/dapur/${selectedDapurId}`, {
             method: 'PUT',
             headers: {
               Authorization: `Bearer ${authToken}`,

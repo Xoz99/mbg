@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 
-const API_BASE_URL = 'https://demombgv1.xyz'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 export const useTraySummaryRealtime = (sekolahId: string) => {
   const [traySummary, setTraySummary] = useState<any>(null)
@@ -71,7 +71,8 @@ export const useTraySummaryRealtime = (sekolahId: string) => {
       }
 
       // Pass token as query param since WebSocket doesn't support custom headers
-      const wsUrl = `wss://demombgv1.xyz/api/rfid/tray-summary-ws?sekolahId=${sekolahId}&token=${encodeURIComponent(token)}`
+      const wsBaseUrl = API_BASE_URL.replace('https://', 'wss://').replace('http://', 'ws://')
+      const wsUrl = `${wsBaseUrl}/api/rfid/tray-summary-ws?sekolahId=${sekolahId}&token=${encodeURIComponent(token)}`
       const ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {

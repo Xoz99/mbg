@@ -8,6 +8,8 @@ import {
   Users, Mail, Phone, Search, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
+
 interface SekolahItem {
   id: string;
   nama: string;
@@ -116,7 +118,7 @@ const RegisterPICSekolahPage = () => {
 
   const fetchSekolah = async (token: string) => {
     try {
-      const response = await fetch('https://demombgv1.xyz/api/sekolah?page=1&limit=100', {
+      const response = await fetch(`${API_BASE_URL}/api/sekolah?page=1&limit=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -149,7 +151,7 @@ const RegisterPICSekolahPage = () => {
   const fetchSekolahList = async (token: string) => {
     try {
       setLoadingSekolah(true);
-      const response = await fetch('https://demombgv1.xyz/api/sekolah?page=1&limit=100', {
+      const response = await fetch(`${API_BASE_URL}/api/sekolah?page=1&limit=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -252,7 +254,7 @@ const RegisterPICSekolahPage = () => {
         provinceId: formData.province ? provinceIdMap[formData.province] : ''
       };
 
-      const response = await fetch('https://demombgv1.xyz/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -269,7 +271,7 @@ const RegisterPICSekolahPage = () => {
       // Update sekolah with provinceId
       if (selectedSekolahId && formData.province) {
         const provinceId = provinceIdMap[formData.province];
-        await fetch(`https://demombgv1.xyz/api/sekolah/${selectedSekolahId}`, {
+        await fetch(`${API_BASE_URL}/api/sekolah/${selectedSekolahId}`, {
           method: 'PUT',
           headers: {
             Authorization: `Bearer ${authToken}`,

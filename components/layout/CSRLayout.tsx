@@ -20,7 +20,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 interface CSRLayoutProps {
   children: ReactNode;
@@ -35,8 +35,8 @@ interface BubbleReportProps {
   authToken?: string;
 }
 
-const BubbleReport = ({ 
-  apiBaseUrl = "http://72.60.79.126:3000",
+const BubbleReport = ({
+  apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL!,
   authToken = ""
 }: BubbleReportProps) => {
   const [isOpen, setIsOpen] = useState(false);

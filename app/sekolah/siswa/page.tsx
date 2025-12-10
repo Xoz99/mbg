@@ -27,7 +27,7 @@ import {
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 const SkeletonCard = () => (
   <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100 animate-pulse">

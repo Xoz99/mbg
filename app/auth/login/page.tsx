@@ -13,7 +13,7 @@ const LoginPage = () => {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL!
 
   const handleLogin = async (e: React.MouseEvent) => {
     e.preventDefault()

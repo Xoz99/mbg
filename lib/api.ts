@@ -1,9 +1,7 @@
 // lib/api.ts
 export const API_CONFIG = {
-  BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://202.155.95.183:3000",
-  API_URL: process.env.NEXT_PUBLIC_API_BASE_URL 
-    ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api`
-    : "http://202.155.95.183:3000/api",
+  BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL!,
+  API_URL: `${process.env.NEXT_PUBLIC_API_BASE_URL!}/api`,
   TIMEOUT: 30000,
 }
 

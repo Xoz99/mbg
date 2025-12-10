@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, useEffect } from "react"
 import { cacheEmitter } from "@/lib/utils/cacheEmitter"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 const CACHE_KEY = "dapur_scan_cache"
 const CACHE_EXPIRY = 30 * 1000 // 30 seconds
 const CACHE_EMIT_KEY = "dapur_scan_cache_update"

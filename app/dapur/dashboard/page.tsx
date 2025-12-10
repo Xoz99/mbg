@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import DapurLayout from "@/components/layout/DapurLayout"
 import { useDapurDashboardCache } from "@/lib/hooks/useDapurDashboardCache"
 import { useProduksiCache } from "@/lib/hooks/useProduksiCache"
-import { useDapurContext } from "@/lib/context/DapurContext"
 import { useTraySummaryRealtime } from "@/lib/hooks/useTraySummaryRealtime"
 import {
   CheckCircle,
@@ -16,6 +15,7 @@ import {
   Wifi,
 } from 'lucide-react'
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 const REFRESH_INTERVAL = 120000 
 const SkeletonLoader = () => (
   <div className="space-y-6">
@@ -92,7 +92,7 @@ const DashboardDapur = () => {
     setLoadingDetail(prev => ({ ...prev, [sekolahId]: true }))
     try {
       const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken')
-      const response = await fetch(`https://demombgv1.xyz/api/sekolah/${sekolahId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/sekolah/${sekolahId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -126,9 +126,6 @@ const DashboardDapur = () => {
 
   // ✅ Use produksi cache for menu hari ini times (correct time display)
   const { batches } = useProduksiCache({ dapurId })
-
-  // ✅ Get context loading state
-  const { isLoading: contextLoading } = useDapurContext()
 
   // ✅ Update stats to match actual production batches
   useEffect(() => {

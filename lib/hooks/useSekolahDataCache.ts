@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, useEffect } from "react"
 import { cacheEmitter } from "@/lib/utils/cacheEmitter"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 const CACHE_EMIT_KEY = "sekolah_unified_cache_update"
 const CACHE_KEY_PREFIX = "sekolah_unified_cache" // Added _PREFIX to clarify it's a base key
 const CACHE_EXPIRY = 5 * 60 * 1000 // 5 minutes (increased from 1 min for better performance + multi-account safety)

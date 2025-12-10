@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState, useEffect } from 'react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://demombgv1.xyz';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 const CACHE_EXPIRY = 10 * 60 * 1000; // 10 minutes
 const CACHE_KEY = 'dapur_dashboard_cache';
 

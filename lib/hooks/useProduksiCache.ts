@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { useDapurContext } from '@/lib/context/DapurContext';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://demombgv1.xyz';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 const CACHE_KEY = 'produksi_cache';
 const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
 

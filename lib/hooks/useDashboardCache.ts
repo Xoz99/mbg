@@ -2,7 +2,7 @@ import { useCallback, useRef, useState, useEffect } from "react"
 import { cacheEmitter } from "@/lib/utils/cacheEmitter"
 import { getTodayDateString, extractDateString, parseDateAsUTC, getMondayOfCurrentWeek, addDaysToDateString } from "@/lib/utils/dateUtils"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://demombgv1.xyz"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 const CACHE_KEY = "sekolah_dashboard_cache"
 const CACHE_EXPIRY = 30 * 60 * 1000 // 30 minutes - hold cache longer, refresh in background
 const STALE_CACHE_THRESHOLD = 5 * 60 * 1000 // 5 minutes - after this, refetch in background

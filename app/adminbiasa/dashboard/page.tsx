@@ -7,7 +7,7 @@ import {
   Building2, Users, Truck, Loader2, AlertCircle, MessageSquare
 } from 'lucide-react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 interface DashboardStats {
   totalDapur: number;

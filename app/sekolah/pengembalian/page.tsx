@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import SekolahLayout from "@/components/layout/SekolahLayout"
 import { AlertCircle, CheckCircle2, Loader, Sparkles, XCircle, Camera, RefreshCw } from "lucide-react"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://demombgv1.xyz"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 const PengembalianMakanan = () => {
   const [authToken, setAuthToken] = useState("")

@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState, useEffect } from 'react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://demombgv1.xyz';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 const CACHE_KEY_PREFIX = 'sekolah_siswa_cache_';
 const CACHE_EXPIRY = 10 * 60 * 1000; // 10 minutes
 

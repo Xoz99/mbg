@@ -20,7 +20,7 @@ import {
 
 import 'dayjs/locale/id';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL||'https://demombgv1.xyz';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 dayjs.locale('id');
 const localizer = dayjsLocalizer(dayjs);
 
