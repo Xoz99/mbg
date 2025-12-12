@@ -38,6 +38,8 @@ const AbsensiPenerima = () => {
   const [isMenuCountdownActive, setIsMenuCountdownActive] = useState(false) // Flag untuk countdown aktif
   const [foodConditionOk, setFoodConditionOk] = useState(false) // Flag kondisi foto makanan OK
   const [foodCondition, setFoodCondition] = useState<string>("") // Status kondisi: 'too-dark', 'too-bright', 'ok'
+  const [preparationCountdown, setPreparationCountdown] = useState(10) // Countdown persiapan 10 detik
+  const [isPreparationActive, setIsPreparationActive] = useState(false) // Flag preparation aktif
 
   // ✅ Callback ketika unified cache ter-update dari page lain (instant sync!)
   const handleCacheUpdate = useCallback((cachedData: any) => {
@@ -57,6 +59,7 @@ const AbsensiPenerima = () => {
   const rfidPollingRef = useRef<NodeJS.Timeout | null>(null)
   const menuCountdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const foodDetectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const preparationIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // ============================================
   // INITIALIZATION HOOKS
@@ -177,6 +180,17 @@ const AbsensiPenerima = () => {
       stopFaceDetection()
     }
   }, [step, selectedCameraId, cameraReady])
+
+  // Separate effect untuk start preparation countdown hanya sekali saat masuk camera-menu
+  useEffect(() => {
+    if (step === "camera-menu") {
+      startPreparationCountdown()
+    }
+
+    return () => {
+      stopPreparationCountdown()
+    }
+  }, [step])
 
   const stats = useMemo(() => {
     const total = siswaData.length
@@ -304,10 +318,8 @@ const AbsensiPenerima = () => {
         videoRef.current.onloadedmetadata = () => {
           if (step === "camera-face") {
             startFaceDetection()
-          } else if (step === "camera-menu") {
-            // Start food condition detection
-            startFoodDetection()
           }
+          // For camera-menu, food detection will start after preparation countdown
         }
       }
     } catch (err) {
@@ -317,10 +329,13 @@ const AbsensiPenerima = () => {
     }
   }
 
-  const stopCamera = () => {
+  const stopCamera = (keepPreparation = false) => {
     stopFaceDetection()
     stopMenuCountdown()
     stopFoodDetection()
+    if (!keepPreparation) {
+      stopPreparationCountdown()
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop())
       streamRef.current = null
@@ -486,6 +501,32 @@ const AbsensiPenerima = () => {
     }
     setFoodConditionOk(false)
     setFoodCondition("")
+  }
+
+  const startPreparationCountdown = () => {
+    setIsPreparationActive(true)
+    setPreparationCountdown(10)
+    let count = 10
+
+    preparationIntervalRef.current = setInterval(() => {
+      count -= 1
+      setPreparationCountdown(count)
+
+      if (count <= 0) {
+        stopPreparationCountdown()
+        // Preparation selesai, mulai food detection
+        startFoodDetection()
+      }
+    }, 1000)
+  }
+
+  const stopPreparationCountdown = () => {
+    if (preparationIntervalRef.current) {
+      clearInterval(preparationIntervalRef.current)
+      preparationIntervalRef.current = null
+    }
+    setIsPreparationActive(false)
+    setPreparationCountdown(10)
   }
 
   const capturePhoto = () => {
@@ -783,6 +824,8 @@ const AbsensiPenerima = () => {
     setSelectedSiswa(null)
     setTrayId("")
     setFacePhoto(null)
+    setPreparationCountdown(10)
+    setIsPreparationActive(false)
     setStep("camera-face")
   }
 
@@ -796,6 +839,8 @@ const AbsensiPenerima = () => {
     setIsDuplicate(false)
     setDuplicateSiswaInfo(null)
     setCameraReady(false)
+    setPreparationCountdown(10)
+    setIsPreparationActive(false)
     setStep("camera-face")
   }
 
@@ -1307,6 +1352,8 @@ const AbsensiPenerima = () => {
                     setSelectedSiswa(null)
                     setTrayId("")
                     setFacePhoto(null)
+                    setPreparationCountdown(10)
+                    setIsPreparationActive(false)
                     setStep("camera-face")
                   }}
                   className="px-4 py-3 bg-gray-200 text-gray-900 rounded-xl hover:bg-gray-300 transition-colors font-semibold"
@@ -1395,7 +1442,7 @@ const AbsensiPenerima = () => {
               value={selectedCameraId}
               onChange={(e) => {
                 setSelectedCameraId(e.target.value)
-                stopCamera()
+                stopCamera(true) // Keep preparation countdown running
                 setTimeout(() => {
                   startCamera("environment", e.target.value)
                 }, 100)
@@ -1435,13 +1482,24 @@ const AbsensiPenerima = () => {
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div
           className={`w-96 h-64 border-4 rounded-2xl transition-all duration-300 ${
-            foodConditionOk
-              ? "border-[#D0B064] shadow-2xl shadow-[#D0B064]/40 scale-100"
-              : "border-gray-500 animate-pulse scale-95"
+            isPreparationActive
+              ? "border-blue-500 shadow-2xl shadow-blue-500/40 scale-100"
+              : foodConditionOk
+                ? "border-[#D0B064] shadow-2xl shadow-[#D0B064]/40 scale-100"
+                : "border-gray-500 animate-pulse scale-95"
           }`}
         >
-          {/* Countdown in center */}
-          {isMenuCountdownActive && menuCountdown > 0 && (
+          {/* Preparation Countdown */}
+          {isPreparationActive && preparationCountdown > 0 && (
+            <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
+              <div className="text-white text-9xl font-bold animate-pulse">{preparationCountdown}</div>
+              <div className="text-white text-xl font-semibold bg-black/50 px-4 py-2 rounded-lg">
+                Persiapan Camera
+              </div>
+            </div>
+          )}
+          {/* Capture Countdown */}
+          {!isPreparationActive && isMenuCountdownActive && menuCountdown > 0 && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-white text-9xl font-bold animate-pulse">{menuCountdown}</div>
             </div>
@@ -1451,30 +1509,26 @@ const AbsensiPenerima = () => {
 
       {/* Status Badges */}
       <div className="absolute top-6 right-6 space-y-3">
-        {foodConditionOk && (
+        {isPreparationActive && (
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
+            <Camera className="w-4 h-4" />
+            Persiapan {preparationCountdown}s
+          </div>
+        )}
+
+        {!isPreparationActive && foodConditionOk && (
           <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
             <CheckCircle className="w-4 h-4" />
             Kondisi Baik
           </div>
         )}
 
-        {!foodConditionOk && foodCondition && (
+        {!isPreparationActive && !foodConditionOk && foodCondition && (
           <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg">
             {foodCondition === "too-dark" && "⚫ Terlalu Gelap"}
             {foodCondition === "too-bright" && "⚪ Terlalu Terang"}
           </div>
         )}
-      </div>
-
-      {/* Instruction */}
-      <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2">
-        <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
-          {isMenuCountdownActive
-            ? "📸 Mengambil foto..."
-            : foodConditionOk
-              ? "✓ Siap mengambil foto..."
-              : "Atur pencahayaan makanan"}
-        </div>
       </div>
 
       {/* Switch Camera Button - Floating */}
@@ -1485,7 +1539,7 @@ const AbsensiPenerima = () => {
             const nextIndex = (currentIndex + 1) % availableCameras.length
             const nextCamera = availableCameras[nextIndex]
             setSelectedCameraId(nextCamera.deviceId)
-            stopCamera()
+            stopCamera(true) // Keep preparation countdown running
             setTimeout(() => {
               startCamera("environment", nextCamera.deviceId)
             }, 100)
@@ -1496,30 +1550,6 @@ const AbsensiPenerima = () => {
           Switch Camera
         </button>
       )}
-    </div>
-
-    {/* Info */}
-    <div className="px-6 py-6 border-t border-gray-100">
-      <div className="text-center">
-        <p className="text-sm text-gray-600 mb-2">
-          🍱 Tray: <span className="font-mono font-bold text-gray-900">{trayId}</span>
-        </p>
-        {isMenuCountdownActive ? (
-          <p className="text-xs text-gray-500">
-            📸 Mengambil foto dalam <span className="font-bold text-[#D0B064]">{menuCountdown} detik</span>
-          </p>
-        ) : foodConditionOk ? (
-          <p className="text-xs text-[#C9A355] font-semibold">
-            ✓ Kondisi baik - Countdown akan dimulai...
-          </p>
-        ) : (
-          <p className="text-xs text-amber-600 font-semibold">
-            {foodCondition === "too-dark" && "⚫ Cahaya terlalu gelap - Tambah pencahayaan"}
-            {foodCondition === "too-bright" && "⚪ Cahaya terlalu terang - Kurangi pencahayaan"}
-            {!foodCondition && "📷 Menunggu kondisi optimal..."}
-          </p>
-        )}
-      </div>
     </div>
   </div>
 )}
