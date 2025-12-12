@@ -31,6 +31,7 @@ interface MenuHarian {
   protein: number
   lemak: number
   targetTray: number
+  jamSajikan: string
   karbohidrat: number
   isBooked?: boolean
 }
@@ -158,6 +159,28 @@ function isWeekCompleted(tanggalSelesai: string): boolean {
     return endDate < today
   } catch (e) {
     return false
+  }
+}
+
+// Helper function untuk menentukan waktu makan berdasarkan jam
+function getWaktuMakan(jamSajikan: string | null | undefined): string {
+  if (!jamSajikan) return "Tidak ada jadwal"
+
+  try {
+    // Parse jam dari format HH:MM
+    const [hours] = jamSajikan.split(':').map(Number)
+
+    if (hours >= 5 && hours < 11) {
+      return "Pagi"
+    } else if (hours >= 11 && hours < 15) {
+      return "Siang"
+    } else if (hours >= 15 && hours < 19) {
+      return "Sore"
+    } else {
+      return "Malam"
+    }
+  } catch (e) {
+    return "Tidak valid"
   }
 }
 
@@ -909,6 +932,15 @@ function ModalCreateMenuHarian({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
                 />
               </div>
+               <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700">Baik di sajikan Jam *</label>
+              <input
+                type="time"
+                value={formData.jamSajikan}
+                onChange={(e) => setFormData({ ...formData, jamSajikan: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+              />
+            </div>
               <div>
                 <label className="block text-xs font-semibold mb-2 text-gray-600">Karbohidrat (g) *</label>
                 <input
@@ -1000,6 +1032,7 @@ export default function MenuPlanningPage() {
     protein: "",
     karbohidrat: "",
     targetTray: "",
+    jamSajikan: "",
     lemak: "",
   })
 
@@ -1257,7 +1290,7 @@ export default function MenuPlanningPage() {
         const menus = extractArray(res?.data || [])
         console.log("[DEBUG] Menu Harian dari API:", menus)
         menus.forEach((menu: any) => {
-          console.log(`[DEBUG] Menu: ${menu.namaMenu}, Tanggal Raw: ${menu.tanggal}, Normalized: ${normalizeDateString(menu.tanggal)}`)
+          console.log(`[DEBUG] Menu: ${menu.namaMenu}, Tanggal Raw: ${menu.tanggal}, Normalized: ${normalizeDateString(menu.tanggal)}, jamSajikan: ${menu.jamSajikan}`)
         })
         setMenuHarianList(menus)  // ✅ No delay!
       } catch (err) {
@@ -1358,7 +1391,7 @@ export default function MenuPlanningPage() {
   }
 
   const handleCreateMenuHarian = async () => {
-    if (!menuFormData.tanggal || !menuFormData.namaMenu || !menuFormData.jamMulaiMasak || !menuFormData.jamSelesaiMasak) {
+    if (!menuFormData.tanggal || !menuFormData.namaMenu || !menuFormData.jamMulaiMasak || !menuFormData.jamSelesaiMasak || !menuFormData.jamSajikan) {
       alert("Isi semua field yang wajib")
       return
     }
@@ -1414,6 +1447,7 @@ export default function MenuPlanningPage() {
         protein: parseFloat(menuFormData.protein) || 0,
         lemak: parseFloat(menuFormData.lemak) || 0,
         targetTray: parseFloat(menuFormData.targetTray) || 0,
+        jamSajikan: menuFormData.jamSajikan,
         karbohidrat: parseFloat(menuFormData.karbohidrat) || 0,
       }
       console.log("[DEBUG] REQUEST BODY:", JSON.stringify(requestBody, null, 2))
@@ -1459,6 +1493,7 @@ export default function MenuPlanningPage() {
         protein: "",
         karbohidrat: "",
         targetTray: "",
+        jamSajikan:"",
         lemak: "",
       })
     } catch (err) {
@@ -1879,6 +1914,7 @@ export default function MenuPlanningPage() {
                     protein: "",
                     karbohidrat: "",
                     targetTray: "",
+                    jamSajikan:"",
                     lemak: "",
                   })
                   setShowCreateMenuModal(true)
@@ -1916,6 +1952,7 @@ export default function MenuPlanningPage() {
                     protein: "",
                     karbohidrat: "",
                     targetTray: "",
+                    jamSajikan:"",
                     lemak: "",
                   })
                   setShowCreateMenuModal(true)
@@ -2012,6 +2049,21 @@ export default function MenuPlanningPage() {
                       <div className="flex justify-between">
                         <span className="text-gray-600">Target Tray:</span>
                         <span className="font-semibold">{menu.targetTray}biji</span>
+                      </div>
+                      <div className="bg-blue-50 p-2 rounded">
+                        <p className="text-gray-600 text-xs">Baik di sajikan Jam:</p>
+                        <p className="font-semibold text-blue-900">
+                          {menu.jamSajikan ? (
+                            <>
+                              {menu.jamSajikan}
+                              <span className="ml-2 text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded">
+                                {getWaktuMakan(menu.jamSajikan)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-gray-400">Belum ditentukan</span>
+                          )}
+                        </p>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Karbohidrat:</span>

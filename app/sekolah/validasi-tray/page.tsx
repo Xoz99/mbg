@@ -45,6 +45,7 @@ interface MenuData {
   targetTray: number;
   jamMulaiMasak: string;
   jamSelesaiMasak: string;
+  jamSajikan: string;
   biayaPerTray: number;
   kalori: number;
   protein: number;
@@ -105,6 +106,85 @@ const SkeletonFormCard = () => (
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
+// Helper function untuk menentukan waktu makan berdasarkan jam
+function getWaktuMakan(jamSajikan: string | null | undefined): string {
+  if (!jamSajikan) return "Tidak ada jadwal";
+
+  try {
+    const [hours] = jamSajikan.split(':').map(Number);
+
+    if (hours >= 5 && hours < 11) {
+      return "Pagi";
+    } else if (hours >= 11 && hours < 15) {
+      return "Siang";
+    } else if (hours >= 15 && hours < 19) {
+      return "Sore";
+    } else {
+      return "Malam";
+    }
+  } catch (e) {
+    return "Tidak valid";
+  }
+}
+
+function getStatusWaktuSajikan(jamSajikan: string | null | undefined): {
+  status: 'belum' | 'sebentar-lagi' | 'sudah' | 'terlambat';
+  message: string;
+  color: string;
+} {
+  if (!jamSajikan) {
+    return {
+      status: 'belum',
+      message: 'Belum ada jadwal',
+      color: 'gray'
+    };
+  }
+
+  try {
+    const now = new Date();
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTotalMinutes = currentHours * 60 + currentMinutes;
+
+    const [targetHours, targetMinutes] = jamSajikan.split(':').map(Number);
+    const targetTotalMinutes = targetHours * 60 + targetMinutes;
+
+    const diffMinutes = targetTotalMinutes - currentTotalMinutes;
+
+    if (diffMinutes > 30) {
+      return {
+        status: 'belum',
+        message: 'Belum waktunya',
+        color: 'blue'
+      };
+    } else if (diffMinutes > 0 && diffMinutes <= 30) {
+      return {
+        status: 'sebentar-lagi',
+        message: 'Sebentar lagi',
+        color: 'yellow'
+      };
+    } else if (diffMinutes >= -15 && diffMinutes <= 0) {
+      return {
+        status: 'sudah',
+        message: 'Sudah waktunya!',
+        color: 'green'
+      };
+    } else {
+      return {
+        status: 'terlambat',
+        message: 'Terlambat perlu cek dengan alat',
+        color: 'red'
+      };
+    }
+  } catch (e) {
+    return {
+      status: 'belum',
+      message: 'Tidak valid',
+      color: 'gray'
+    };
+  }
+}
+
 const ValidasiTrayPage = () => {
   const router = useRouter();
   const { sekolahInfo, sekolahId } = useSekolahData();
@@ -123,6 +203,18 @@ const ValidasiTrayPage = () => {
   // Validation result state
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showResult, setShowResult] = useState(false);
+
+  // Current time state for real-time updates
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Update current time every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch menu harian untuk hari ini
   useEffect(() => {
@@ -180,6 +272,15 @@ const ValidasiTrayPage = () => {
   const currentMenu = useMemo(() => {
     return menus[currentMenuIndex] || null;
   }, [menus, currentMenuIndex]);
+
+  // Calculate status in real-time based on currentTime
+  const menuSajikanStatus = useMemo(() => {
+    if (!currentMenu?.jamSajikan) return null;
+    return {
+      status: getStatusWaktuSajikan(currentMenu.jamSajikan),
+      waktuMakan: getWaktuMakan(currentMenu.jamSajikan)
+    };
+  }, [currentMenu, currentTime]);
 
   const handlePrevMenu = () => {
     setCurrentMenuIndex((prev) => (prev > 0 ? prev - 1 : menus.length - 1));
@@ -278,52 +379,39 @@ const ValidasiTrayPage = () => {
           </div>
         ) : (
           <>
-            {/* Row 1: Tray Summary & Menu Side by Side */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Total Tray Dikirim */}
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 p-6 shadow-sm">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <p className="text-sm font-semibold text-blue-900 uppercase tracking-wide">Total Tray Dikirim</p>
-                    <p className="text-5xl font-black text-blue-700 mt-2">
-                      {traySummary?.totalTrayUnik || traySummary?.total || 0}
-                    </p>
-                  </div>
-                  {wsConnected && (
-                    <div className="flex items-center gap-2">
-                      <Wifi className="w-5 h-5 text-green-600" />
-                      <span className="text-xs font-semibold text-green-600">Live</span>
-                    </div>
-                  )}
-                </div>
-                <div className="pt-6 mt-2 border-t border-blue-200">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                      <Clock className="w-6 h-6 text-blue-700" />
-                      <p className="text-sm font-semibold uppercase text-blue-700 tracking-wide">Update Terakhir</p>
-                    </div>
-                    <p className="text-5xl font-black text-blue-900">
-                      {new Date().toLocaleTimeString('id-ID', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                      })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Menu Carousel */}
-              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-[#1B263A]">Menu Hari Ini</h2>
-                    {menus.length > 1 && (
-                      <div className="flex items-center gap-2">
+            {/* Combined Card - Menu & Tray Info */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                  {/* Header Section */}
+                  <div className="flex items-start justify-between mb-6 pb-6 border-b border-gray-200">
+                    {/* Menu Title */}
+                    <div>
+                      <h2 className="text-2xl font-bold text-[#1B263A] mb-1">Menu Hari Ini</h2>
+                      {menus.length > 1 && (
                         <span className="text-sm text-gray-600">
                           {currentMenuIndex + 1} / {menus.length}
                         </span>
+                      )}
+                    </div>
+
+                    {/* Total Tray Info - Compact */}
+                    <div className="bg-gradient-to-br from-[#1B263A] to-[#2d3e5f] rounded-xl border-2 border-[#1B263A] px-6 py-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Package className="w-5 h-5 text-[#D0B064]" />
+                        <p className="text-xs font-bold text-white uppercase tracking-wide">Total Tray Dikirim</p>
+                        {wsConnected && (
+                          <div className="flex items-center gap-1 bg-green-500 px-2 py-0.5 rounded-full ml-2">
+                            <Wifi className="w-3 h-3 text-white" />
+                            <span className="text-xs font-bold text-white">Live</span>
+                          </div>
+                        )}
                       </div>
-                    )}
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-5xl font-black text-white">
+                          {traySummary?.totalTrayUnik || traySummary?.total || 0}
+                        </p>
+                        <span className="text-xl font-bold text-[#D0B064]">tray</span>
+                      </div>
+                    </div>
                   </div>
 
                   {currentMenu && (
@@ -348,6 +436,59 @@ const ValidasiTrayPage = () => {
                             <p className="text-sm font-bold text-[#1B263A]">Rp {currentMenu.biayaPerTray?.toLocaleString()}</p>
                           </div>
                         </div>
+
+                        {/* Waktu Sajikan */}
+                        {currentMenu.jamSajikan && menuSajikanStatus && (() => {
+                          const statusInfo = menuSajikanStatus.status;
+                          const waktuMakan = menuSajikanStatus.waktuMakan;
+
+                          const colorClasses = {
+                            blue: 'bg-blue-100 border-blue-300 text-blue-900',
+                            yellow: 'bg-yellow-100 border-yellow-300 text-yellow-900',
+                            green: 'bg-green-100 border-green-300 text-green-900',
+                            red: 'bg-red-100 border-red-300 text-red-900',
+                            gray: 'bg-gray-100 border-gray-300 text-gray-900'
+                          };
+
+                          return (
+                            <div className={`mt-4 p-4 rounded-lg border-2 ${colorClasses[statusInfo.color as keyof typeof colorClasses]}`}>
+                              {/* Jam Real-time */}
+                              <div className="mb-3 pb-3 border-b border-current border-opacity-20">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Clock className="w-4 h-4 opacity-75" />
+                                  <p className="text-xs font-semibold uppercase opacity-75">Waktu Sekarang</p>
+                                </div>
+                                <p className="text-3xl font-black font-mono">
+                                  {currentTime.toLocaleTimeString('id-ID', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                  })}
+                                </p>
+                              </div>
+
+                              {/* Jam Sajikan & Status */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <p className="text-xs font-semibold uppercase mb-1 opacity-75">Baik di Sajikan</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-2xl font-black">{currentMenu.jamSajikan}</p>
+                                    <span className="px-2 py-0.5 bg-white/50 rounded text-xs font-bold">
+                                      {waktuMakan}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <AlertCircle className="w-4 h-4" />
+                                    <p className="text-xs font-semibold uppercase opacity-75">Status</p>
+                                  </div>
+                                  <p className="text-lg font-black">{statusInfo.message}</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Nutrition Info */}
                         <div className="mt-4 pt-4 border-t border-[#D0B064]/20">
@@ -406,10 +547,9 @@ const ValidasiTrayPage = () => {
                       )}
                     </div>
                   )}
-                </div>
             </div>
 
-            {/* Row 2: Validation Form - Full Width */}
+            {/* Validation Form - Full Width */}
             {!showResult ? (
               <form onSubmit={handleSubmitValidasi} className="space-y-6">
                     <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
