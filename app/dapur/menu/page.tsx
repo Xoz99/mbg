@@ -163,12 +163,18 @@ function isWeekCompleted(tanggalSelesai: string): boolean {
 }
 
 // Helper function untuk menentukan waktu makan berdasarkan jam
-function getWaktuMakan(jamSajikan: string | null | undefined): string {
-  if (!jamSajikan) return "Tidak ada jadwal"
+// Helper function untuk menentukan waktu makan berdasarkan jam
+function getWaktuMakan(jamSajikanInput: any): string {
+  const jamSajikan = typeof jamSajikanInput === 'string' ? jamSajikanInput : "";
+  if (!jamSajikan || jamSajikan.trim() === "") return "Tidak ada jadwal"
 
   try {
     // Parse jam dari format HH:MM
-    const [hours] = jamSajikan.split(':').map(Number)
+    const timeParts = jamSajikan.split(':');
+    if (timeParts.length < 1) return "Format tidak valid";
+
+    const hours = parseInt(timeParts[0], 10);
+    if (isNaN(hours)) return "Tidak valid"
 
     if (hours >= 5 && hours < 11) {
       return "Pagi"
@@ -180,6 +186,7 @@ function getWaktuMakan(jamSajikan: string | null | undefined): string {
       return "Malam"
     }
   } catch (e) {
+    console.error(`[DEBUG] Error parsing jamSajikan: ${jamSajikan}`, e);
     return "Tidak valid"
   }
 }
@@ -652,33 +659,31 @@ function ModalCreateMenuHarian({
 
           <div>
             <label className="block text-sm font-semibold mb-3 text-gray-700">Pilih Tanggal *</label>
-            
+
             <div className="bg-white border border-gray-300 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between mb-4">
                 <button
                   onClick={goToPreviousMonth}
                   disabled={!canGoPrevious()}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition ${
-                    canGoPrevious()
-                      ? 'bg-gray-100 hover:bg-gray-200 cursor-pointer'
-                      : 'bg-gray-50 text-gray-400 cursor-not-allowed opacity-50'
-                  }`}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition ${canGoPrevious()
+                    ? 'bg-gray-100 hover:bg-gray-200 cursor-pointer'
+                    : 'bg-gray-50 text-gray-400 cursor-not-allowed opacity-50'
+                    }`}
                 >
                   ← Prev
                 </button>
-                
+
                 <p className="text-center font-bold text-gray-700 text-sm flex-1 px-4">
                   {monthYear}
                 </p>
-                
+
                 <button
                   onClick={goToNextMonth}
                   disabled={!canGoNext()}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition ${
-                    canGoNext()
-                      ? 'bg-gray-100 hover:bg-gray-200 cursor-pointer'
-                      : 'bg-gray-50 text-gray-400 cursor-not-allowed opacity-50'
-                  }`}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition ${canGoNext()
+                    ? 'bg-gray-100 hover:bg-gray-200 cursor-pointer'
+                    : 'bg-gray-50 text-gray-400 cursor-not-allowed opacity-50'
+                    }`}
                 >
                   Next →
                 </button>
@@ -693,7 +698,7 @@ function ModalCreateMenuHarian({
               </div>
 
               <div className="grid grid-cols-7 gap-1">
-{days.map((day, idx) => {
+                {days.map((day, idx) => {
                   if (day === null) {
                     return <div key={`empty-${idx}`} className="aspect-square"></div>
                   }
@@ -736,19 +741,18 @@ function ModalCreateMenuHarian({
                       }}
                       disabled={!inRange || holiday}
                       title={holiday ? `Libur: ${holidayInfo?.keterangan}` : isBooked ? "Menu sudah di-booking" : absensiForDate ? `Hadir: ${absensiForDate.jumlahHadirTotal}/${absensiForDate.jumlahSiswaTotal}` : ""}
-                      className={`aspect-square rounded-lg text-xs font-medium transition flex items-center justify-center relative ${
-                        !inRange
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : holiday
+                      className={`aspect-square rounded-lg text-xs font-medium transition flex items-center justify-center relative ${!inRange
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : holiday
                           ? "bg-red-100 text-red-700 cursor-not-allowed border border-red-300"
                           : isSelected
-                          ? "bg-[#D0B064] text-white border-2 border-[#D0B064]"
-                          : isBooked
-                          ? "bg-green-100 text-green-700 border-2 border-green-400 cursor-pointer hover:bg-green-200"
-                          : absensiForDate
-                          ? "bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 cursor-pointer"
-                          : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 cursor-pointer"
-                      }`}
+                            ? "bg-[#D0B064] text-white border-2 border-[#D0B064]"
+                            : isBooked
+                              ? "bg-green-100 text-green-700 border-2 border-green-400 cursor-pointer hover:bg-green-200"
+                              : absensiForDate
+                                ? "bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 cursor-pointer"
+                                : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 cursor-pointer"
+                        }`}
                     >
                       {day}
                       {absensiForDate && !isSelected && (
@@ -932,15 +936,15 @@ function ModalCreateMenuHarian({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-sm"
                 />
               </div>
-               <div>
-              <label className="block text-sm font-semibold mb-2 text-gray-700">Baik di sajikan Jam *</label>
-              <input
-                type="time"
-                value={formData.jamSajikan}
-                onChange={(e) => setFormData({ ...formData, jamSajikan: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-gray-700">Baik di sajikan Jam *</label>
+                <input
+                  type="time"
+                  value={formData.jamSajikan}
+                  onChange={(e) => setFormData({ ...formData, jamSajikan: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                />
+              </div>
               <div>
                 <label className="block text-xs font-semibold mb-2 text-gray-600">Karbohidrat (g) *</label>
                 <input
@@ -1095,8 +1099,8 @@ export default function MenuPlanningPage() {
 
   const filteredMenuPlannings = selectedSekolahId
     ? menuPlannings
-        .filter((p) => p.sekolahId === selectedSekolahId)
-        .sort((a, b) => a.mingguanKe - b.mingguanKe)
+      .filter((p) => p.sekolahId === selectedSekolahId)
+      .sort((a, b) => a.mingguanKe - b.mingguanKe)
     : menuPlannings.sort((a, b) => a.mingguanKe - b.mingguanKe)
 
   // ✅ Auto-select first planning when sekolah changes and planning not selected
@@ -1290,7 +1294,10 @@ export default function MenuPlanningPage() {
         const menus = extractArray(res?.data || [])
         console.log("[DEBUG] Menu Harian dari API:", menus)
         menus.forEach((menu: any) => {
-          console.log(`[DEBUG] Menu: ${menu.namaMenu}, Tanggal Raw: ${menu.tanggal}, Normalized: ${normalizeDateString(menu.tanggal)}, jamSajikan: ${menu.jamSajikan}`)
+          // 🔥 DEBUG: Log full menu object to inspect property names
+          console.log(`[DEBUG] FULL MENU OBJECT for ${menu.namaMenu}:`, JSON.stringify(menu, null, 2))
+          const m = menu as any;
+          console.log(`[DEBUG] Menu: ${m.namaMenu}, jamSajikan: ${m.jamSajikan}, jam_sajikan: ${m.jam_sajikan}, jamSajian: ${m.jamSajian}`)
         })
         setMenuHarianList(menus)  // ✅ No delay!
       } catch (err) {
@@ -1493,7 +1500,7 @@ export default function MenuPlanningPage() {
         protein: "",
         karbohidrat: "",
         targetTray: "",
-        jamSajikan:"",
+        jamSajikan: "",
         lemak: "",
       })
     } catch (err) {
@@ -1817,11 +1824,10 @@ export default function MenuPlanningPage() {
                               setSelectedPlanningId(planning.id)
                               setDisplayMonth(new Date(planning.tanggalMulai))
                             }}
-                            className={`px-4 py-2 rounded-lg font-medium transition flex flex-col items-start gap-1 ${
-                              planning.id === selectedPlanningId
-                                ? "bg-[#D0B064] text-white shadow-lg"
-                                : "bg-white/20 text-white hover:bg-white/30"
-                            }`}
+                            className={`px-4 py-2 rounded-lg font-medium transition flex flex-col items-start gap-1 ${planning.id === selectedPlanningId
+                              ? "bg-[#D0B064] text-white shadow-lg"
+                              : "bg-white/20 text-white hover:bg-white/30"
+                              }`}
                           >
                             <span className="text-sm font-semibold">Minggu {planning.mingguanKe}</span>
                             <span className="text-xs opacity-90">{formatPeriode(planning.tanggalMulai, planning.tanggalSelesai)}</span>
@@ -1830,11 +1836,10 @@ export default function MenuPlanningPage() {
                           <button
                             onClick={() => handleDeleteMenuPlanning(planning.id)}
                             disabled={isDeleting === planning.id}
-                            className={`absolute -top-2 -right-2 transition rounded-full p-1 shadow-lg flex items-center justify-center ${
-                              isDeleting === planning.id
-                                ? "opacity-100 bg-orange-500 cursor-wait"
-                                : "opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600"
-                            }`}
+                            className={`absolute -top-2 -right-2 transition rounded-full p-1 shadow-lg flex items-center justify-center ${isDeleting === planning.id
+                              ? "opacity-100 bg-orange-500 cursor-wait"
+                              : "opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600"
+                              }`}
                             title={isDeleting === planning.id ? "Menghapus..." : "Hapus menu planning"}
                           >
                             {isDeleting === planning.id ? (
@@ -1871,11 +1876,10 @@ export default function MenuPlanningPage() {
                                 setSelectedPlanningId(planning.id)
                                 setDisplayMonth(new Date(planning.tanggalMulai))
                               }}
-                              className={`px-4 py-2 rounded-lg font-medium transition flex flex-col items-start gap-1 opacity-60 ${
-                                planning.id === selectedPlanningId
-                                  ? "bg-[#D0B064] text-white shadow-lg"
-                                  : "bg-white/10 text-white hover:bg-white/20"
-                              }`}
+                              className={`px-4 py-2 rounded-lg font-medium transition flex flex-col items-start gap-1 opacity-60 ${planning.id === selectedPlanningId
+                                ? "bg-[#D0B064] text-white shadow-lg"
+                                : "bg-white/10 text-white hover:bg-white/20"
+                                }`}
                               title="Week selesai (untuk referensi/bukti)"
                             >
                               <span className="text-sm font-semibold">Minggu {planning.mingguanKe}</span>
@@ -1914,7 +1918,7 @@ export default function MenuPlanningPage() {
                     protein: "",
                     karbohidrat: "",
                     targetTray: "",
-                    jamSajikan:"",
+                    jamSajikan: "",
                     lemak: "",
                   })
                   setShowCreateMenuModal(true)
@@ -1952,7 +1956,7 @@ export default function MenuPlanningPage() {
                     protein: "",
                     karbohidrat: "",
                     targetTray: "",
-                    jamSajikan:"",
+                    jamSajikan: "",
                     lemak: "",
                   })
                   setShowCreateMenuModal(true)
@@ -1985,11 +1989,10 @@ export default function MenuPlanningPage() {
                       <button
                         onClick={() => handleDeleteMenuHarian(menu.id)}
                         disabled={isDeletingMenu === menu.id}
-                        className={`p-2 rounded-lg transition flex items-center justify-center ${
-                          isDeletingMenu === menu.id
-                            ? "bg-orange-100 text-orange-600 cursor-wait"
-                            : "text-red-600 hover:bg-red-50"
-                        }`}
+                        className={`p-2 rounded-lg transition flex items-center justify-center ${isDeletingMenu === menu.id
+                          ? "bg-orange-100 text-orange-600 cursor-wait"
+                          : "text-red-600 hover:bg-red-50"
+                          }`}
                         title={isDeletingMenu === menu.id ? "Menghapus..." : "Hapus menu"}
                       >
                         {isDeletingMenu === menu.id ? (
@@ -2053,16 +2056,23 @@ export default function MenuPlanningPage() {
                       <div className="bg-blue-50 p-2 rounded">
                         <p className="text-gray-600 text-xs">Baik di sajikan Jam:</p>
                         <p className="font-semibold text-blue-900">
-                          {menu.jamSajikan ? (
-                            <>
-                              {menu.jamSajikan}
-                              <span className="ml-2 text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded">
-                                {getWaktuMakan(menu.jamSajikan)}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-gray-400">Belum ditentukan</span>
-                          )}
+                          {(() => {
+                            // 🔥 DEFENSIVE: check multiple potential property names from API
+                            const m = menu as any;
+                            const displayTime = m.jamSajikan || m.jam_sajikan || m.jamSajian;
+
+                            if (displayTime) {
+                              return (
+                                <>
+                                  {displayTime}
+                                  <span className="ml-2 text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded">
+                                    {getWaktuMakan(displayTime)}
+                                  </span>
+                                </>
+                              );
+                            }
+                            return <span className="text-gray-400">Belum ditentukan</span>;
+                          })()}
                         </p>
                       </div>
                       <div className="flex justify-between">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, memo, useRef } from "react"
+import { useState, useEffect, memo, useRef, useCallback } from "react"
 import SekolahLayout from "@/components/layout/SekolahLayout"
 import { useSekolahDataCache } from "@/lib/hooks/useSekolahDataCache"
 import {
@@ -15,6 +15,7 @@ import {
   Truck,
   Heart,
   AlertTriangle,
+  MapPin,
 } from "lucide-react"
 import {
   BarChart,
@@ -33,11 +34,11 @@ import {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 const SkeletonStatCard = () => (
-  <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 shadow-sm border border-slate-200 animate-pulse">
-    <div className="h-10 w-10 bg-slate-300 rounded-xl mb-3"></div>
-    <div className="h-3 w-24 bg-slate-300 rounded mb-2"></div>
-    <div className="h-8 w-16 bg-slate-400 rounded mb-2"></div>
-    <div className="h-3 w-20 bg-slate-300 rounded"></div>
+  <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 animate-pulse">
+    <div className="h-10 w-10 bg-slate-200 rounded-xl mb-4"></div>
+    <div className="h-4 w-24 bg-slate-200 rounded mb-3"></div>
+    <div className="h-10 w-20 bg-slate-300 rounded mb-2"></div>
+    <div className="h-3 w-32 bg-slate-100 rounded"></div>
   </div>
 )
 
@@ -177,9 +178,9 @@ const AttendanceChart = memo(({ data }: { data: any[] }) => {
 AttendanceChart.displayName = "AttendanceChart"
 
 const StatCard = memo(({ title, value, subtitle, icon: Icon, color, trend }: any) => (
-  <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-5 shadow-sm border border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all duration-300 group">
-    <div className="flex items-start justify-between mb-3">
-      <div className={`p-3 rounded-xl ${color} group-hover:scale-110 transition-transform duration-300`}>
+  <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 hover:shadow-lg transition-all duration-300 group">
+    <div className="flex items-start justify-between mb-4">
+      <div className={`p-4 rounded-2xl ${color} shadow-lg shadow-blue-900/10 group-hover:scale-110 transition-transform duration-300`}>
         <Icon className="w-6 h-6 text-white" />
       </div>
       {trend && (
@@ -191,21 +192,22 @@ const StatCard = memo(({ title, value, subtitle, icon: Icon, color, trend }: any
         </div>
       )}
     </div>
-    <p className="text-sm font-medium text-slate-600 mb-1">{title}</p>
-    <p className="text-3xl font-bold text-slate-900 mb-2">{value}</p>
-    <p className="text-xs text-slate-500">{subtitle}</p>
+    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">{title}</p>
+    <p className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">{value}</p>
+    <p className="text-sm text-slate-400 font-medium">{subtitle}</p>
   </div>
 ))
 
 const KalenderReminder = ({ reminder }: { reminder: any }) => {
   const [mounted, setMounted] = useState(false)
   const [formattedDate, setFormattedDate] = useState("")
-  const [daysStatus, setDaysStatus] = useState({
+  const [daysStatus, setDaysStatus] = useState<any>({
     daysUntil: 0,
-    bgColor: "from-green-50 to-green-100",
-    borderColor: "border-green-200",
-    iconBg: "bg-green-500",
-    textColor: "text-green-900",
+    bgColor: "bg-white",
+    borderColor: "border-slate-200",
+    iconBg: "bg-emerald-500",
+    statusBg: "bg-emerald-100 text-emerald-700",
+    textColor: "text-slate-900",
     statusText: "Sedang Berlangsung",
   })
 
@@ -221,23 +223,20 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
     const eventDate = new Date(dateToUse)
     const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
-    let bgColor = "from-green-50 to-green-100"
-    let borderColor = "border-green-200"
-    let iconBg = "bg-green-500"
-    let textColor = "text-green-900"
+    let bgColor = "bg-white"
+    let borderColor = "border-slate-200"
+    let iconBg = "bg-emerald-500"
+    let statusBg = "bg-emerald-100 text-emerald-700"
+    let textColor = "text-slate-900"
     let statusText = "Sedang Berlangsung"
 
     if (daysUntil > 0 && daysUntil <= 7) {
-      bgColor = "from-yellow-50 to-yellow-100"
-      borderColor = "border-yellow-200"
-      iconBg = "bg-yellow-500"
-      textColor = "text-yellow-900"
+      iconBg = "bg-amber-500"
+      statusBg = "bg-amber-100 text-amber-700"
       statusText = `${daysUntil} hari lagi`
     } else if (daysUntil > 7) {
-      bgColor = "from-blue-50 to-blue-100"
-      borderColor = "border-blue-200"
       iconBg = "bg-blue-500"
-      textColor = "text-blue-900"
+      statusBg = "bg-blue-100 text-blue-700"
       statusText = `${Math.ceil(daysUntil / 7)} minggu lagi`
     } else if (daysUntil < 0) {
       bgColor = "from-slate-50 to-slate-100"
@@ -263,7 +262,8 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
       iconBg,
       textColor,
       statusText,
-    })
+      statusBg,
+    } as any)
   }, [reminder, mounted])
 
   const MiniCalendar = () => {
@@ -316,12 +316,11 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
                     className={`
                       text-center text-xs p-2 rounded-lg font-semibold transition-all
                       ${day ? "cursor-pointer hover:bg-[#D0B064] hover:bg-opacity-30" : ""}
-                      ${
-                        day === today.getDate() && currentMonth === today.getMonth()
-                          ? "bg-[#D0B064] text-[#1B263A] font-bold shadow-md"
-                          : day
-                            ? "bg-[#D0B064] bg-opacity-30 text-white"
-                            : "transparent"
+                      ${day === today.getDate() && currentMonth === today.getMonth()
+                        ? "bg-[#D0B064] text-[#1B263A] font-bold shadow-md"
+                        : day
+                          ? "bg-[#D0B064] bg-opacity-30 text-white"
+                          : "transparent"
                       }
                     `}
                   >
@@ -359,10 +358,10 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
 
   return (
     <div
-      className={`bg-gradient-to-r ${daysStatus.bgColor} border ${daysStatus.borderColor} rounded-2xl p-6 shadow-lg`}
+      className={`${daysStatus.bgColor} border ${daysStatus.borderColor} rounded-2xl p-6 md:p-8 shadow-md hover:shadow-lg transition-all duration-300 h-full flex flex-col`}
     >
       <div className="flex items-start gap-4 mb-4">
-        <div className={`p-3 ${daysStatus.iconBg} rounded-xl flex-shrink-0`}>
+        <div className={`p-4 ${daysStatus.iconBg} rounded-2xl flex-shrink-0 shadow-lg shadow-slate-200`}>
           {daysStatus.daysUntil <= 7 && daysStatus.daysUntil > 0 ? (
             <Bell className="w-6 h-6 text-white" />
           ) : (
@@ -370,7 +369,10 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
           )}
         </div>
         <div className="flex-1">
-          <h3 className={`font-bold text-2xl ${daysStatus.textColor} mb-4`}>
+          <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${daysStatus.statusBg} mb-3`}>
+            {daysStatus.statusText}
+          </div>
+          <h3 className={`font-bold text-xl md:text-2xl ${daysStatus.textColor} mb-2 line-clamp-2`}>
             {reminder.deskripsi || reminder.namaSekolah || "Jadwal Pengiriman"}
           </h3>
 
@@ -390,15 +392,17 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
             )}
 
             {reminder.alamat && (
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span className={daysStatus.textColor}>{reminder.alamat}</span>
+              <div className="flex items-start gap-2 pt-2">
+                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-400" />
+                <span className="text-slate-600 line-clamp-2">{reminder.alamat}</span>
               </div>
             )}
           </div>
         </div>
       </div>
-      <MiniCalendar />
+      <div className="flex-1">
+        <MiniCalendar />
+      </div>
 
       {/* Upcoming Events Section */}
       <div className="mt-8 pt-6 border-t border-slate-200">
@@ -410,21 +414,25 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
                 const parsedDate = parseDate(event.tanggal || event.tanggalMulai || event.date)
                 return { event, parsedDate }
               })
-              .filter(({ parsedDate }) => {
+              .filter((item: { event: any; parsedDate: Date | null }) => {
                 // Filter hanya event yang tanggalnya >= hari ini
-                if (!parsedDate) return false
+                if (!item.parsedDate) return false
                 const today = new Date()
                 today.setHours(0, 0, 0, 0)
-                parsedDate.setHours(0, 0, 0, 0)
-                return parsedDate >= today
+
+                // Buat copy date agar tidak mutasi aslinya saat pengecekan
+                const checkDate = new Date(item.parsedDate)
+                checkDate.setHours(0, 0, 0, 0)
+                return checkDate >= today
               })
               .slice(0, 10)
-              .map(({ event, parsedDate }, idx: number) => {
-                const formattedDate = parsedDate
+              .map((item: { event: any; parsedDate: Date | null }, idx: number) => {
+                const { event, parsedDate } = item
+                const eventDisplayDate = parsedDate
                   ? parsedDate.toLocaleDateString("id-ID", {
-                      month: "short",
-                      day: "numeric"
-                    })
+                    month: "short",
+                    day: "numeric"
+                  })
                   : "Tanggal tidak valid"
 
                 return (
@@ -433,7 +441,7 @@ const KalenderReminder = ({ reminder }: { reminder: any }) => {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-slate-900 truncate">{event.nama || event.deskripsi || "Event"}</p>
                       <p className="text-xs text-slate-600 mt-0.5">
-                        {formattedDate}
+                        {eventDisplayDate}
                       </p>
                     </div>
                   </div>
@@ -497,7 +505,7 @@ const DashboardSekolah = () => {
   const [menuHariIni, setMenuHariIni] = useState<any>(null)
 
   // ✅ Callback ketika unified cache ter-update dari page lain (instant sync!)
-  const handleCacheUpdate = (cachedData: any) => {
+  const handleCacheUpdate = useCallback((cachedData: any) => {
     console.log("🔄 [DASHBOARD] Received cache update from unified cache - updating state instantly!")
     console.log("[DASHBOARD] Full cachedData:", cachedData)
     console.log("[DASHBOARD] absensiChartData:", cachedData?.absensiChartData)
@@ -561,7 +569,7 @@ const DashboardSekolah = () => {
     }
 
     setMenuHariIni(cachedData.menuHariIni || null)
-  }
+  }, [])
 
   const { loading, error, loadData } = useSekolahDataCache(handleCacheUpdate)
 
@@ -729,14 +737,14 @@ const DashboardSekolah = () => {
   if (loading) {
     return (
       <SekolahLayout currentPage="dashboard">
-        <div className="space-y-6 p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+        <div className="space-y-6">
           <div>
             <div className="h-8 w-64 bg-slate-300 rounded-lg animate-pulse mb-2"></div>
             <div className="h-4 w-96 bg-slate-300 rounded-lg animate-pulse"></div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(3)].map((_, i) => (
               <SkeletonStatCard key={i} />
             ))}
           </div>
@@ -781,7 +789,7 @@ const DashboardSekolah = () => {
 
   return (
     <SekolahLayout currentPage="dashboard">
-      <div className="space-y-8 p-6 md:p-8 bg-gradient-to-br from-slate-50 to-white min-h-screen">
+      <div className="space-y-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2 tracking-tight">Dashboard PIC Sekolah</h1>
@@ -831,35 +839,35 @@ const DashboardSekolah = () => {
             value={stats.totalSiswa}
             subtitle="Semua siswa aktif"
             icon={Users}
-            color="bg-blue-500"
+            color="bg-[#1B263A]"
           />
           <StatCard
             title="Gizi Normal"
             value={stats.normalGizi}
             subtitle="Status optimal"
             icon={Heart}
-            color="bg-green-500"
+            color="bg-[#D0B064]"
           />
           <StatCard
             title="Hadir Hari Ini"
             value={stats.hadirHariIni}
             subtitle="Siswa hadir"
             icon={CheckCircle}
-            color="bg-emerald-500"
+            color="bg-[#1B263A]"
           />
           <StatCard
             title="Pengiriman Selesai"
             value={stats.pengirimanSelesai}
             subtitle="Porsi dikirim"
             icon={Truck}
-            color="bg-orange-500"
+            color="bg-[#1B263A]"
           />
           <StatCard
             title="Gizi Kurang"
             value={stats.giziKurang}
             subtitle="Perlu intervensi"
             icon={AlertCircle}
-            color="bg-yellow-500"
+            color="bg-[#D0B064]"
           />
           <StatCard
             title="Risiko Stunting"
@@ -871,24 +879,34 @@ const DashboardSekolah = () => {
         </div>
 
         {/* Kalender + Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left: Kalender Reminder - Full Height */}
-          <div className="flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          {/* Left: Kalender Reminder - Fixed width on large screens */}
+          <div className="lg:col-span-5 flex flex-col h-full">
             <KalenderReminder reminder={kalenderReminder} />
           </div>
 
-          {/* Right: Charts */}
-          <div className="space-y-8">
+          {/* Right: Charts - Spans more area */}
+          <div className="lg:col-span-7 flex flex-col gap-8 h-full">
             {/* Absensi Chart */}
-            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
-              <h3 className="text-base md:text-lg font-bold text-slate-900 mb-6">📊 Absensi Minggu Ini</h3>
-              <AttendanceChart data={absensiChart} />
+            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 flex flex-col h-1/2 min-h-[400px]">
+              <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <span className="p-2 bg-blue-50 rounded-lg text-blue-600">📊</span>
+                Absensi Minggu Ini
+              </h3>
+              <div className="flex-1">
+                <AttendanceChart data={absensiChart} />
+              </div>
             </div>
 
             {/* Distribusi Gizi Chart */}
-            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
-              <h3 className="text-base md:text-lg font-bold text-slate-900 mb-6">🍎 Distribusi Status Gizi</h3>
-              <GiziDistributionChart data={siswaDiagram} />
+            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 flex flex-col h-1/2 min-h-[400px]">
+              <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <span className="p-2 bg-emerald-50 rounded-lg text-emerald-600">🍎</span>
+                Distribusi Status Gizi
+              </h3>
+              <div className="flex-1">
+                <GiziDistributionChart data={siswaDiagram} />
+              </div>
             </div>
           </div>
         </div>
@@ -935,7 +953,7 @@ const DashboardSekolah = () => {
                         )}
                       </td>
                     </tr>
-                    
+
                   ))}
                 </tbody>
               </table>

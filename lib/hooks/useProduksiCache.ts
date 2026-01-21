@@ -255,6 +255,8 @@ export const useProduksiCache = (options?: UseProduksiCacheOptions) => {
             console.log(`[useProduksiCache] ❌ Menu "${menu.namaMenu || menu.id}": tanggal=${menu.tanggal}, normalized=${menuDate}, expected=${today}`);
           } else {
             console.log(`[useProduksiCache] ✅ MATCH! Menu "${menu.namaMenu}": ${menuDate}`);
+            // 🔥 DEBUG: Log full menu object to see if jamSajikan is returned from API
+            console.log(`[useProduksiCache] FULL MENU:`, JSON.stringify(menu, null, 2));
             todayMenusList.push({ planning, menu });
           }
         });

@@ -115,18 +115,17 @@ const BubbleReport = ({
       </button>
 
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-50 transition-opacity"
           onClick={handleClose}
         />
       )}
 
       <div
-        className={`fixed bottom-24 right-8 w-96 bg-white rounded-2xl shadow-2xl z-50 transition-all transform ${
-          isOpen 
-            ? 'opacity-100 scale-100' 
-            : 'opacity-0 scale-75 pointer-events-none'
-        }`}
+        className={`fixed bottom-24 right-8 w-96 bg-white rounded-2xl shadow-2xl z-50 transition-all transform ${isOpen
+          ? 'opacity-100 scale-100'
+          : 'opacity-0 scale-75 pointer-events-none'
+          }`}
       >
         <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4 rounded-t-2xl flex items-center justify-between">
           <h3 className="text-white font-bold text-lg">Laporkan Masalah</h3>
@@ -246,12 +245,12 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
   // ===== NAVIGATION STRUCTURE YANG DIKELOMPOKKAN =====
   const navigation = [
     { id: 'dashboard', name: 'Dashboard', icon: Home, path: '/dapur/dashboard' },
-    
+
     // KATEGORI: OPERASIONAL
-    { 
-      id: 'operasional', 
-      name: 'Operasional', 
-      icon: ChefHat, 
+    {
+      id: 'operasional',
+      name: 'Operasional',
+      icon: ChefHat,
       hasSubmenu: true,
       submenu: [
         //{ id: 'produksi', name: 'Produksi Harian', path: '/dapur/produksi' },
@@ -260,22 +259,11 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
       ]
     },
 
-    // KATEGORI: INVENTORY
-    { 
-      id: 'inventory', 
-      name: 'Inventory', 
-      icon: Package, 
-      hasSubmenu: true,
-      submenu: [
-        { id: 'bahan', name: 'Stok Bahan Baku', path: '/dapur/bahan' },
-      ]
-    },
-
     // KATEGORI: DISTRIBUSI & DRIVER
-    { 
-      id: 'distribusi', 
-      name: 'Distribusi', 
-      icon: CarIcon, 
+    {
+      id: 'distribusi',
+      name: 'Distribusi',
+      icon: CarIcon,
       hasSubmenu: true,
       submenu: [
         { id: 'daftardriver', name: 'Daftar Driver', path: '/dapur/assign-driver' },
@@ -286,14 +274,13 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
     },
 
     // KATEGORI: MANAJEMEN
-    { 
-      id: 'manajemen', 
-      name: 'Manajemen', 
-      icon: BarChart3, 
+    {
+      id: 'manajemen',
+      name: 'Manajemen',
+      icon: BarChart3,
       hasSubmenu: true,
       submenu: [
         { id: 'karyawan', name: 'Data Karyawan', path: '/dapur/karyawan' },
-        { id: 'laporan', name: 'Laporan Produksi', path: '/dapur/laporan' },
       ]
     },
   ];
@@ -320,10 +307,10 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
       // Include both old format and new format with dapurId
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith('dapur_dashboard_cache') ||
-            key.startsWith('dapur_menu_cache') ||
-            key.startsWith('dapur_produksi_cache') ||
-            key.startsWith('dapur_sekolah_terdekat_cache') ||
-            key.startsWith('produksi_cache')) {
+          key.startsWith('dapur_menu_cache') ||
+          key.startsWith('dapur_produksi_cache') ||
+          key.startsWith('dapur_sekolah_terdekat_cache') ||
+          key.startsWith('produksi_cache')) {
           localStorage.removeItem(key);
         }
       });
@@ -352,13 +339,6 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
         ]
       },
       {
-        id: 'inventory',
-        name: 'Inventory',
-        submenu: [
-          { id: 'bahan', path: '/dapur/bahan' },
-        ]
-      },
-      {
         id: 'distribusi',
         name: 'Distribusi',
         submenu: [
@@ -372,7 +352,6 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
         name: 'Manajemen',
         submenu: [
           { id: 'karyawan', path: '/dapur/karyawan' },
-          { id: 'laporan', path: '/dapur/laporan' },
         ]
       },
     ];
@@ -485,21 +464,19 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
                       handleNavigation(item.path);
                     }
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                    isActive
-                      ? 'bg-[#D0B064] text-white shadow-lg'
-                      : 'text-gray-300 hover:bg-white/5 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive
+                    ? 'bg-[#D0B064] text-white shadow-lg'
+                    : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                    }`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   {sidebarOpen && (
                     <>
                       <span className="font-medium text-sm flex-1 text-left">{item.name}</span>
                       {item.hasSubmenu && (
-                        <ChevronDown 
-                          className={`w-4 h-4 transition-transform ${
-                            isSubmenuOpen ? 'rotate-180' : ''
-                          }`}
+                        <ChevronDown
+                          className={`w-4 h-4 transition-transform ${isSubmenuOpen ? 'rotate-180' : ''
+                            }`}
                         />
                       )}
                     </>
@@ -509,24 +486,21 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
                 {/* Submenu dengan Animasi */}
                 {item.hasSubmenu && sidebarOpen && (
                   <div
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      isSubmenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                    }`}
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${isSubmenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                      }`}
                   >
                     <div className="ml-4 mt-1 space-y-1 border-l border-white/10 pl-0">
                       {item.submenu.map((subitem: any, index: number) => (
                         <button
                           key={subitem.id}
                           onClick={() => handleNavigation(subitem.path)}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm transform ${
-                            isSubmenuOpen
-                              ? 'translate-x-0 opacity-100'
-                              : '-translate-x-2 opacity-0'
-                          } ${
-                            currentPage === subitem.id
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm transform ${isSubmenuOpen
+                            ? 'translate-x-0 opacity-100'
+                            : '-translate-x-2 opacity-0'
+                            } ${currentPage === subitem.id
                               ? 'bg-[#D0B064]/30 text-[#D0B064] font-medium'
                               : 'text-gray-400 hover:text-white hover:bg-white/5'
-                          }`}
+                            }`}
                           style={{
                             transitionDelay: isSubmenuOpen ? `${index * 50}ms` : '0ms',
                           }}
@@ -596,7 +570,7 @@ const DapurLayout = ({ children, currentPage = 'dashboard' }: DapurLayoutProps) 
       </main>
 
       {/* BubbleReport Component */}
-      <BubbleReport 
+      <BubbleReport
         apiBaseUrl={API_BASE_URL}
         authToken={authToken}
       />

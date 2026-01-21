@@ -11,11 +11,16 @@ import {
   AlertTriangle,
   Loader,
   Send,
-  ChevronLeft,
-  ChevronRight,
+  Package,
+  Calendar,
+  HelpCircle,
   Wifi,
   Clock,
-  Package,
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  Phone,
+  MessageCircle,
 } from 'lucide-react';
 
 interface ValidationResult {
@@ -185,6 +190,52 @@ function getStatusWaktuSajikan(jamSajikan: string | null | undefined): {
   }
 }
 
+interface DapurInfoParsed {
+  nama: string;
+  alamat: string;
+  phone: string;
+}
+
+// Helper function untuk parse dapur data
+function parseDapurInfo(dapurData: any): DapurInfoParsed | null {
+  if (!dapurData) return null;
+
+  return {
+    nama: dapurData.nama || 'Dapur MBG',
+    alamat: String(dapurData.alamat || ''),
+    phone: dapurData.phone || '',
+  };
+}
+
+const HubungiDapurCard = ({ dapurInfo, loading }: { dapurInfo: DapurInfoParsed | null; loading?: boolean }) => {
+  if (loading) return <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-md animate-pulse h-[140px]" />;
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-[13px] font-bold text-slate-900 uppercase tracking-tight">Hubungi Dapur</h3>
+          <p className="text-[10px] text-slate-500 font-medium tracking-tight mt-0.5">Koordinasi & Bantuan</p>
+        </div>
+      </div>
+
+      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 mb-4 transition-all">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Dapur Penyaji</p>
+          <p className="text-sm font-bold text-slate-900 leading-tight">{dapurInfo?.nama || 'Dapur MBG Central'}</p>
+          {dapurInfo?.alamat && (
+            <p className="text-[10px] text-slate-500 mt-2 leading-relaxed tracking-tight">{dapurInfo.alamat}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+      </div>
+    </div>
+  );
+};
+
+
 const ValidasiTrayPage = () => {
   const router = useRouter();
   const { sekolahInfo, sekolahId } = useSekolahData();
@@ -204,6 +255,9 @@ const ValidasiTrayPage = () => {
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showResult, setShowResult] = useState(false);
 
+  // Dapur Info state
+  const [dapurInfo, setDapurInfo] = useState<DapurInfoParsed | null>(null);
+
   // Current time state for real-time updates
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -216,7 +270,7 @@ const ValidasiTrayPage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch menu harian untuk hari ini
+  // Fetch menu harian untu hari ini
   useEffect(() => {
     const fetchMenus = async () => {
       try {
@@ -243,16 +297,36 @@ const ValidasiTrayPage = () => {
 
         // Handle different response formats
         let menuList: MenuData[] = [];
+        let dapurData = null;
+
         if (data.data) {
           if (Array.isArray(data.data)) {
-            // Response is array
             menuList = data.data;
-          } else if (typeof data.data === 'object' && data.data.id) {
-            // Response is single object
+            // Try to get dapur from first menu item
+            if (data.data[0]?.dapur) {
+              dapurData = data.data[0].dapur;
+            } else if (data.data[0]?.menuPlanning?.dapur) {
+              dapurData = data.data[0].menuPlanning.dapur;
+            }
+          } else if (data.data.menuHarian && Array.isArray(data.data.menuHarian)) {
+            menuList = data.data.menuHarian;
+            dapurData = data.data.dapur;
+          } else if (data.data.id) {
             menuList = [data.data];
+            dapurData = data.data.dapur || data.data.menuPlanning?.dapur;
           }
         } else if (Array.isArray(data)) {
           menuList = data;
+          // Try to get dapur from first menu item
+          if (data[0]?.dapur) {
+            dapurData = data[0].dapur;
+          } else if (data[0]?.menuPlanning?.dapur) {
+            dapurData = data[0].menuPlanning.dapur;
+          }
+        }
+
+        if (dapurData) {
+          setDapurInfo(parseDapurInfo(dapurData));
         }
 
         setMenus(menuList);
@@ -267,7 +341,7 @@ const ValidasiTrayPage = () => {
     };
 
     fetchMenus();
-  }, []);
+  }, [sekolahId]);
 
   const currentMenu = useMemo(() => {
     return menus[currentMenuIndex] || null;
@@ -363,167 +437,220 @@ const ValidasiTrayPage = () => {
   return (
     <SekolahLayout currentPage="validasi-tray">
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-6 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-[#1B263A] mb-2">Validasi Penerimaan Tray</h1>
-            <p className="text-gray-600">Verifikasi tray yang diterima dari dapur</p>
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Validasi Penerimaan Tray</h1>
+            <p className="text-slate-500 font-medium mt-1">Verifikasi tray yang diterima dari dapur untuk hari ini</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="bg-white border border-slate-200 px-4 py-2 rounded-xl shadow-sm flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-[#D0B064]" />
+              <span className="text-sm font-bold text-slate-700">
+                {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </span>
+            </div>
           </div>
         </div>
 
         {menus.length === 0 ? (
           <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-8 text-center">
             <AlertCircle className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-yellow-900 mb-2">Tidak Ada Menu Hari Ini</h3>
             <p className="text-yellow-700">Tidak ada menu yang disiapkan untuk hari ini</p>
           </div>
         ) : (
           <>
-            {/* Combined Card - Menu & Tray Info */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                  {/* Header Section */}
-                  <div className="flex items-start justify-between mb-6 pb-6 border-b border-gray-200">
-                    {/* Menu Title */}
-                    <div>
-                      <h2 className="text-2xl font-bold text-[#1B263A] mb-1">Menu Hari Ini</h2>
-                      {menus.length > 1 && (
-                        <span className="text-sm text-gray-600">
-                          {currentMenuIndex + 1} / {menus.length}
-                        </span>
+            {/* Split Section: Menu Info & Tray Summary */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+              {/* Left Side: Tray Summary Stats */}
+              <div className="xl:col-span-4 space-y-6">
+                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest px-1 min-h-[20px] flex items-center">Ringkasan Pengiriman</h3>
+                <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group ${menuSajikanStatus?.status.status !== 'terlambat' ? 'p-10 md:p-12 min-h-[300px] flex flex-col justify-center' : 'p-6 md:p-8'}`}>
+                  <div className={`absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform ${menuSajikanStatus?.status.status !== 'terlambat' ? 'scale-150' : ''}`}>
+                    <Package className="w-20 h-20 text-slate-900" />
+                  </div>
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className={`p-3 bg-slate-900 rounded-2xl shadow-lg shadow-slate-200 ${menuSajikanStatus?.status.status !== 'terlambat' ? 'scale-125 origin-left' : ''}`}>
+                        <Package className="w-6 h-6 text-[#D0B064]" />
+                      </div>
+                      {wsConnected && (
+                        <div className="flex items-center gap-2 bg-green-50 px-2.5 py-1.5 rounded-xl border border-green-100">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                          <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Live Monitor</span>
+                        </div>
                       )}
                     </div>
-
-                    {/* Total Tray Info - Compact */}
-                    <div className="bg-gradient-to-br from-[#1B263A] to-[#2d3e5f] rounded-xl border-2 border-[#1B263A] px-6 py-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Package className="w-5 h-5 text-[#D0B064]" />
-                        <p className="text-xs font-bold text-white uppercase tracking-wide">Total Tray Dikirim</p>
-                        {wsConnected && (
-                          <div className="flex items-center gap-1 bg-green-500 px-2 py-0.5 rounded-full ml-2">
-                            <Wifi className="w-3 h-3 text-white" />
-                            <span className="text-xs font-bold text-white">Live</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-5xl font-black text-white">
-                          {traySummary?.totalTrayUnik || traySummary?.total || 0}
-                        </p>
-                        <span className="text-xl font-bold text-[#D0B064]">tray</span>
-                      </div>
+                    <div className="flex items-baseline gap-2">
+                      <p className={`${menuSajikanStatus?.status.status !== 'terlambat' ? 'text-8xl' : 'text-6xl'} font-black text-slate-900 tracking-tighter italic transition-all duration-500`}>
+                        {traySummary?.totalTrayUnik || traySummary?.total || 0}
+                      </p>
+                      <span className={`${menuSajikanStatus?.status.status !== 'terlambat' ? 'text-2xl' : 'text-base'} font-black text-[#D0B064] uppercase tracking-widest transition-all duration-500`}>TRAY</span>
                     </div>
+                    <p className="text-xs text-slate-400 mt-3 font-medium">Tray unik terdeteksi alat RFID dapur</p>
                   </div>
+                </div>
 
+                {/* Hubungi Dapur Card - Conditional Display */}
+                {menuSajikanStatus?.status.status === 'terlambat' && (
+                  <HubungiDapurCard dapurInfo={dapurInfo} />
+                )}
+              </div>
+
+              {/* Right Side: Menu Info */}
+              <div className="xl:col-span-8 space-y-6">
+                <div className="flex items-center justify-between px-1 min-h-[20px]">
+                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Informasi Menu Harian</h3>
+                  {menus.length > 1 && (
+                    <div className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
+                      <span className="text-[10px] font-black text-slate-600 tracking-wider">
+                        MENU {currentMenuIndex + 1} / {menus.length}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-8 shadow-sm h-full flex flex-col hover:shadow-md transition-all">
                   {currentMenu && (
-                    <div className="space-y-4 mb-6">
-                      {/* Menu Info */}
-                      <div className="bg-gradient-to-br from-[#1B263A]/5 to-[#D0B064]/5 rounded-xl p-4 border border-[#D0B064]/20">
-                        <h3 className="text-lg font-bold text-[#1B263A] mb-3">{currentMenu.namaMenu}</h3>
+                    <div className="space-y-6 flex-1 flex flex-col justify-between">
+                      {/* Menu Info Grid */}
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-xl font-bold text-[#1B263A]">{currentMenu.namaMenu}</h3>
+                          <span className="bg-[#D0B064]/20 text-[#D0B064] px-3 py-1 rounded-full text-xs font-black uppercase">Aktif</span>
+                        </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          <div>
-                            <p className="text-xs font-semibold text-[#D0B064] uppercase mb-1">Tanggal</p>
-                            <p className="text-sm font-bold text-[#1B263A]">{currentMenu.tanggal}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal</p>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-[#D0B064]" />
+                              <p className="text-sm font-bold text-slate-700">
+                                {Number.isNaN(Date.parse(currentMenu.tanggal))
+                                  ? currentMenu.tanggal
+                                  : new Date(currentMenu.tanggal).toLocaleDateString('id-ID', {
+                                    day: 'numeric',
+                                    month: 'long',
+                                    year: 'numeric'
+                                  })}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-xs font-semibold text-[#D0B064] uppercase mb-1">Jam Masak</p>
-                            <p className="text-sm font-bold text-[#1B263A]">
-                              {currentMenu.jamMulaiMasak} - {currentMenu.jamSelesaiMasak}
-                            </p>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Jam Masak</p>
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4 text-[#D0B064]" />
+                              <p className="text-sm font-bold text-slate-700">
+                                {currentMenu.jamMulaiMasak} - {currentMenu.jamSelesaiMasak}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-xs font-semibold text-[#D0B064] uppercase mb-1">Biaya/Tray</p>
-                            <p className="text-sm font-bold text-[#1B263A]">Rp {currentMenu.biayaPerTray?.toLocaleString()}</p>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Biaya Estimasi</p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-black text-[#1B263A]">Rp {currentMenu.biayaPerTray?.toLocaleString()}</span>
+                              <span className="text-[10px] text-slate-400">/ tray</span>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Waktu Sajikan */}
+                        {/* Waktu Sajikan Alert */}
                         {currentMenu.jamSajikan && menuSajikanStatus && (() => {
                           const statusInfo = menuSajikanStatus.status;
                           const waktuMakan = menuSajikanStatus.waktuMakan;
 
-                          const colorClasses = {
-                            blue: 'bg-blue-100 border-blue-300 text-blue-900',
-                            yellow: 'bg-yellow-100 border-yellow-300 text-yellow-900',
-                            green: 'bg-green-100 border-green-300 text-green-900',
-                            red: 'bg-red-100 border-red-300 text-red-900',
-                            gray: 'bg-gray-100 border-gray-300 text-gray-900'
+                          const themeClasses = {
+                            blue: 'bg-blue-50 border-blue-200 text-blue-900 icon-blue-600',
+                            yellow: 'bg-amber-50 border-amber-200 text-amber-900 icon-amber-600',
+                            green: 'bg-emerald-50 border-emerald-200 text-emerald-900 icon-emerald-600',
+                            red: 'bg-red-50 border-red-200 text-red-900 icon-red-600',
+                            gray: 'bg-slate-100 border-slate-200 text-slate-900 icon-slate-600'
+                          };
+
+                          const iconColors = {
+                            blue: 'text-blue-600',
+                            yellow: 'text-amber-600',
+                            green: 'text-emerald-600',
+                            red: 'text-red-600',
+                            gray: 'text-slate-600'
                           };
 
                           return (
-                            <div className={`mt-4 p-4 rounded-lg border-2 ${colorClasses[statusInfo.color as keyof typeof colorClasses]}`}>
-                              {/* Jam Real-time */}
-                              <div className="mb-3 pb-3 border-b border-current border-opacity-20">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Clock className="w-4 h-4 opacity-75" />
-                                  <p className="text-xs font-semibold uppercase opacity-75">Waktu Sekarang</p>
+                            <div className={`mt-6 p-6 rounded-2xl border ${themeClasses[statusInfo.color as keyof typeof themeClasses]}`}>
+                              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 lg:gap-8">
+                                {/* Left Side: Real-time Clock */}
+                                <div className="flex items-center gap-4 flex-shrink-0">
+                                  <div className={`p-3 bg-white rounded-xl shadow-sm ${iconColors[statusInfo.color as keyof typeof iconColors]}`}>
+                                    <Clock className="w-6 h-6" />
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Waktu Sekarang</p>
+                                    <p className="text-3xl font-black font-mono tracking-tighter">
+                                      {currentTime.toLocaleTimeString('id-ID', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit',
+                                      })}
+                                    </p>
+                                  </div>
                                 </div>
-                                <p className="text-3xl font-black font-mono">
-                                  {currentTime.toLocaleTimeString('id-ID', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    second: '2-digit',
-                                  })}
-                                </p>
-                              </div>
 
-                              {/* Jam Sajikan & Status */}
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <p className="text-xs font-semibold uppercase mb-1 opacity-75">Baik di Sajikan</p>
-                                  <div className="flex items-center gap-2">
-                                    <p className="text-2xl font-black">{currentMenu.jamSajikan}</p>
-                                    <span className="px-2 py-0.5 bg-white/50 rounded text-xs font-bold">
-                                      {waktuMakan}
-                                    </span>
+                                {/* Divider or spacing */}
+                                <div className="hidden xl:block w-px h-12 bg-current opacity-10 flex-shrink-0"></div>
+
+                                {/* Right Side: Target & Status */}
+                                <div className="flex flex-wrap items-center gap-6 xl:gap-8 flex-1 xl:justify-end">
+                                  <div className="min-w-[140px]">
+                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Status Sajian</p>
+                                    <p className="text-xl font-black leading-tight tracking-tight">{statusInfo.message}</p>
                                   </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <AlertCircle className="w-4 h-4" />
-                                    <p className="text-xs font-semibold uppercase opacity-75">Status</p>
+                                  <div className="xl:text-right">
+                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Baik di Sajikan</p>
+                                    <div className="flex items-center gap-2 xl:justify-end mt-0.5">
+                                      <p className="text-2xl font-black leading-none">{currentMenu.jamSajikan}</p>
+                                      <span className="bg-white/50 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tight">
+                                        {waktuMakan}
+                                      </span>
+                                    </div>
                                   </div>
-                                  <p className="text-lg font-black">{statusInfo.message}</p>
                                 </div>
                               </div>
                             </div>
                           );
                         })()}
+                      </div>
 
-                        {/* Nutrition Info */}
-                        <div className="mt-4 pt-4 border-t border-[#D0B064]/20">
-                          <p className="text-xs font-semibold text-[#D0B064] uppercase mb-2">Informasi Gizi</p>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div className="text-sm">
-                              <span className="text-gray-600">Kalori: </span>
-                              <span className="font-bold text-[#1B263A]">{currentMenu.kalori} kcal</span>
-                            </div>
-                            <div className="text-sm">
-                              <span className="text-gray-600">Protein: </span>
-                              <span className="font-bold text-[#1B263A]">{currentMenu.protein}g</span>
-                            </div>
-                            <div className="text-sm">
-                              <span className="text-gray-600">Karbo: </span>
-                              <span className="font-bold text-[#1B263A]">{currentMenu.karbohidrat}g</span>
-                            </div>
-                            <div className="text-sm">
-                              <span className="text-gray-600">Lemak: </span>
-                              <span className="font-bold text-[#1B263A]">{currentMenu.lemak}g</span>
-                            </div>
-                          </div>
+                      {/* Nutrition Info Strip */}
+                      <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 flex flex-wrap items-center gap-x-8 gap-y-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest w-full md:w-auto">Nutrition:</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500 font-bold uppercase tracking-tighter">Calori:</span>
+                          <span className="text-sm font-black text-slate-800">{currentMenu.kalori} kcal</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500 font-bold uppercase tracking-tighter">Protein:</span>
+                          <span className="text-sm font-black text-slate-800">{currentMenu.protein}g</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500 font-bold uppercase tracking-tighter">Carbo:</span>
+                          <span className="text-sm font-black text-slate-800">{currentMenu.karbohidrat}g</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500 font-bold uppercase tracking-tighter">Lemak:</span>
+                          <span className="text-sm font-black text-slate-800">{currentMenu.lemak}g</span>
                         </div>
                       </div>
 
-                      {/* Navigation */}
+                      {/* Navigation Controls */}
                       {menus.length > 1 && (
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center justify-between gap-4 pt-4 mt-auto border-t border-slate-100">
                           <button
                             onClick={handlePrevMenu}
-                            className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                            className="bg-white border border-slate-200 p-3 rounded-xl hover:bg-slate-50 transition-all shadow-sm hover:shadow active:scale-95"
                           >
-                            <ChevronLeft className="w-5 h-5 text-gray-600" />
+                            <ChevronLeft className="w-5 h-5 text-slate-600" />
                           </button>
-                          <div className="flex items-center gap-2 flex-1">
+                          <div className="flex items-center gap-2 flex-1 justify-center">
                             {menus.map((_, idx) => (
                               <button
                                 key={idx}
@@ -531,262 +658,257 @@ const ValidasiTrayPage = () => {
                                   setCurrentMenuIndex(idx);
                                   resetForm();
                                 }}
-                                className={`h-2 rounded-full transition-all ${
-                                  idx === currentMenuIndex ? 'w-8 bg-[#D0B064]' : 'w-2 bg-gray-300'
-                                }`}
+                                className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentMenuIndex ? 'w-10 bg-[#D0B064]' : 'w-2 bg-slate-200'
+                                  }`}
                               />
                             ))}
                           </div>
                           <button
                             onClick={handleNextMenu}
-                            className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                            className="bg-white border border-slate-200 p-3 rounded-xl hover:bg-slate-50 transition-all shadow-sm hover:shadow active:scale-95"
                           >
-                            <ChevronRight className="w-5 h-5 text-gray-600" />
+                            <ChevronRight className="w-5 h-5 text-slate-600" />
                           </button>
                         </div>
                       )}
                     </div>
                   )}
+                </div>
+              </div>
             </div>
 
             {/* Validation Form - Full Width */}
             {!showResult ? (
               <form onSubmit={handleSubmitValidasi} className="space-y-6">
-                    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                      <h3 className="text-lg font-bold text-[#1B263A] mb-6">Form Validasi Tray</h3>
+                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                  <h3 className="text-lg font-bold text-[#1B263A] mb-6">Form Validasi Tray</h3>
 
-                      <div className="space-y-4">
-                        {/* Total Tray Diterima */}
-                        <div>
-                          <label className="block text-sm font-semibold text-[#1B263A] mb-2">
-                            Total Tray Diterima <span className="text-red-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              min="0"
-                              value={totalTrayDiterima}
-                              onChange={(e) => setTotalTrayDiterima(e.target.value ? Number(e.target.value) : '')}
-                              placeholder="Masukkan jumlah tray yang diterima"
-                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D0B064] focus:ring-2 focus:ring-[#D0B064]/20"
-                            />
-                            <Package className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          </div>
-                        </div>
-
-                        {/* Keterangan */}
-                        <div>
-                          <label className="block text-sm font-semibold text-[#1B263A] mb-2">
-                            Keterangan Kondisi Tray
-                          </label>
-                          <textarea
-                            value={keterangan}
-                            onChange={(e) => setKeterangan(e.target.value)}
-                            placeholder="Contoh: Tray diterima dalam kondisi baik, ada beberapa tray yang kotor..."
-                            rows={4}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D0B064] focus:ring-2 focus:ring-[#D0B064]/20 resize-none"
-                          />
-                        </div>
-
-                        {/* Error Message */}
-                        {submitError && (
-                          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                            <p className="text-sm text-red-700">{submitError}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Submit Button */}
-                      <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
-                        <button
-                          type="button"
-                          onClick={resetForm}
-                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                        >
-                          Reset
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={submitting || totalTrayDiterima === ''}
-                          className="flex-1 px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                          {submitting ? (
-                            <>
-                              <Loader className="w-4 h-4 animate-spin" />
-                              Memproses...
-                            </>
-                          ) : (
-                            <>
-                              <Send className="w-4 h-4" />
-                              Validasi Tray
-                            </>
-                          )}
-                        </button>
+                  <div className="space-y-4">
+                    {/* Total Tray Diterima */}
+                    <div>
+                      <label className="block text-sm font-semibold text-[#1B263A] mb-2">
+                        Total Tray Diterima <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          value={totalTrayDiterima}
+                          onChange={(e) => setTotalTrayDiterima(e.target.value ? Number(e.target.value) : '')}
+                          placeholder="Masukkan jumlah tray yang diterima"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D0B064] focus:ring-2 focus:ring-[#D0B064]/20"
+                        />
+                        <Package className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       </div>
                     </div>
-                  </form>
-                ) : (
-                  /* Validation Result */
-                  validationResult && (
-                    <div className="space-y-6">
-                      {/* Status Alert */}
-                      <div
-                        className={`rounded-2xl p-6 border ${
-                          validationResult.statusValidasi === 'SESUAI'
+
+                    {/* Keterangan */}
+                    <div>
+                      <label className="block text-sm font-semibold text-[#1B263A] mb-2">
+                        Keterangan Kondisi Tray
+                      </label>
+                      <textarea
+                        value={keterangan}
+                        onChange={(e) => setKeterangan(e.target.value)}
+                        placeholder="Contoh: Tray diterima dalam kondisi baik, ada beberapa tray yang kotor..."
+                        rows={4}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D0B064] focus:ring-2 focus:ring-[#D0B064]/20 resize-none"
+                      />
+                    </div>
+
+                    {/* Error Message */}
+                    {submitError && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-red-700">{submitError}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting || totalTrayDiterima === ''}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader className="w-4 h-4 animate-spin" />
+                          Memproses...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          Validasi Tray
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              /* Validation Result */
+              validationResult && (
+                <div className="space-y-6">
+                  {/* Status Alert */}
+                  <div
+                    className={`rounded-2xl p-6 border ${validationResult.statusValidasi === 'SESUAI'
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-red-50 border-red-200'
+                      }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      {validationResult.statusValidasi === 'SESUAI' ? (
+                        <CheckCircle className="w-8 h-8 text-green-600 flex-shrink-0 mt-1" />
+                      ) : (
+                        <AlertTriangle className="w-8 h-8 text-red-600 flex-shrink-0 mt-1" />
+                      )}
+                      <div className="flex-1">
+                        <h3
+                          className={`text-lg font-bold mb-2 ${validationResult.statusValidasi === 'SESUAI'
+                            ? 'text-green-900'
+                            : 'text-red-900'
+                            }`}
+                        >
+                          {validationResult.statusValidasi === 'SESUAI'
+                            ? 'Validasi Sesuai'
+                            : 'Validasi Tidak Sesuai'}
+                        </h3>
+                        <p
+                          className={`text-sm ${validationResult.statusValidasi === 'SESUAI'
+                            ? 'text-green-700'
+                            : 'text-red-700'
+                            }`}
+                        >
+                          {validationResult.catatan}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Detail Result */}
+                  <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
+                    {/* Perhitungan Tray */}
+                    <div>
+                      <h4 className="text-lg font-bold text-[#1B263A] mb-4">Perhitungan Tray</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                          <p className="text-xs text-blue-700 font-semibold uppercase mb-1">Seharusnya</p>
+                          <p className="text-3xl font-bold text-blue-900">
+                            {validationResult.perhitunganTray.trayYangSeharusnya}
+                          </p>
+                        </div>
+                        <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                          <p className="text-xs text-purple-700 font-semibold uppercase mb-1">Diterima</p>
+                          <p className="text-3xl font-bold text-purple-900">
+                            {validationResult.perhitunganTray.trayDiterima}
+                          </p>
+                        </div>
+                        <div
+                          className={`rounded-lg p-4 border ${validationResult.perhitunganTray.selisih === 0
                             ? 'bg-green-50 border-green-200'
-                            : 'bg-red-50 border-red-200'
-                        }`}
-                      >
-                        <div className="flex items-start gap-4">
-                          {validationResult.statusValidasi === 'SESUAI' ? (
-                            <CheckCircle className="w-8 h-8 text-green-600 flex-shrink-0 mt-1" />
-                          ) : (
-                            <AlertTriangle className="w-8 h-8 text-red-600 flex-shrink-0 mt-1" />
-                          )}
-                          <div className="flex-1">
-                            <h3
-                              className={`text-lg font-bold mb-2 ${
-                                validationResult.statusValidasi === 'SESUAI'
-                                  ? 'text-green-900'
-                                  : 'text-red-900'
-                              }`}
-                            >
-                              {validationResult.statusValidasi === 'SESUAI'
-                                ? 'Validasi Sesuai'
-                                : 'Validasi Tidak Sesuai'}
-                            </h3>
-                            <p
-                              className={`text-sm ${
-                                validationResult.statusValidasi === 'SESUAI'
-                                  ? 'text-green-700'
-                                  : 'text-red-700'
-                              }`}
-                            >
-                              {validationResult.catatan}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Detail Result */}
-                      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
-                        {/* Perhitungan Tray */}
-                        <div>
-                          <h4 className="text-lg font-bold text-[#1B263A] mb-4">Perhitungan Tray</h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                              <p className="text-xs text-blue-700 font-semibold uppercase mb-1">Seharusnya</p>
-                              <p className="text-3xl font-bold text-blue-900">
-                                {validationResult.perhitunganTray.trayYangSeharusnya}
-                              </p>
-                            </div>
-                            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                              <p className="text-xs text-purple-700 font-semibold uppercase mb-1">Diterima</p>
-                              <p className="text-3xl font-bold text-purple-900">
-                                {validationResult.perhitunganTray.trayDiterima}
-                              </p>
-                            </div>
-                            <div
-                              className={`rounded-lg p-4 border ${
-                                validationResult.perhitunganTray.selisih === 0
-                                  ? 'bg-green-50 border-green-200'
-                                  : 'bg-orange-50 border-orange-200'
-                              }`}
-                            >
-                              <p
-                                className={`text-xs font-semibold uppercase mb-1 ${
-                                  validationResult.perhitunganTray.selisih === 0
-                                    ? 'text-green-700'
-                                    : 'text-orange-700'
-                                }`}
-                              >
-                                Selisih
-                              </p>
-                              <p
-                                className={`text-3xl font-bold ${
-                                  validationResult.perhitunganTray.selisih === 0
-                                    ? 'text-green-900'
-                                    : 'text-orange-900'
-                                }`}
-                              >
-                                {validationResult.perhitunganTray.selisih > 0
-                                  ? '+'
-                                  : ''}
-                                {validationResult.perhitunganTray.selisih}
-                              </p>
-                            </div>
-                            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Clock className="w-4 h-4 text-gray-600" />
-                                <p className="text-xs text-gray-700 font-semibold uppercase">Waktu Validasi</p>
-                              </div>
-                              <p className="text-2xl font-bold text-gray-900 font-mono">
-                                {new Date(validationResult.validasiTime).toLocaleTimeString('id-ID', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  second: '2-digit',
-                                  hour12: false
-                                })}
-                              </p>
-                              <p className="text-xs text-gray-600 mt-1">
-                                {new Date(validationResult.validasiTime).toLocaleDateString('id-ID', {
-                                  weekday: 'long',
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric'
-                                })}
-                              </p>
-                            </div>
-                          </div>
-                          {validationResult.perhitunganTray.peringatan && (
-                            <div className="mt-4 bg-orange-100 border border-orange-300 rounded-lg p-3">
-                              <p className="text-sm font-semibold text-orange-900">
-                                ⚠️ {validationResult.perhitunganTray.peringatan}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Alergi Information */}
-                        {validationResult.analisisAlergi.totalAlergi > 0 && (
-                          <div className="pt-4 border-t border-gray-200">
-                            <h4 className="text-lg font-bold text-[#1B263A] mb-4">Informasi Alergi</h4>
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                              <p className="text-sm font-semibold text-yellow-900 mb-3">
-                                Total Siswa Alergi: {validationResult.analisisAlergi.totalAlergi}
-                              </p>
-                              {validationResult.analisisAlergi.siswaAlergiDetails.length > 0 && (
-                                <div className="space-y-2">
-                                  {validationResult.analisisAlergi.siswaAlergiDetails.map((siswa, idx) => (
-                                    <div key={idx} className="text-sm text-yellow-800">
-                                      • {siswa.nama}: {siswa.alergi}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => {
-                            resetForm();
-                            if (currentMenuIndex < menus.length - 1) {
-                              handleNextMenu();
-                            }
-                          }}
-                          className="flex-1 px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white font-semibold rounded-lg hover:shadow-lg transition-all"
+                            : 'bg-orange-50 border-orange-200'
+                            }`}
                         >
-                          {currentMenuIndex < menus.length - 1 ? 'Validasi Menu Berikutnya' : 'Validasi Selesai'}
-                        </button>
+                          <p
+                            className={`text-xs font-semibold uppercase mb-1 ${validationResult.perhitunganTray.selisih === 0
+                              ? 'text-green-700'
+                              : 'text-orange-700'
+                              }`}
+                          >
+                            Selisih
+                          </p>
+                          <p
+                            className={`text-3xl font-bold ${validationResult.perhitunganTray.selisih === 0
+                              ? 'text-green-900'
+                              : 'text-orange-900'
+                              }`}
+                          >
+                            {validationResult.perhitunganTray.selisih > 0
+                              ? '+'
+                              : ''}
+                            {validationResult.perhitunganTray.selisih}
+                          </p>
+                        </div>
+                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Clock className="w-4 h-4 text-gray-600" />
+                            <p className="text-xs text-gray-700 font-semibold uppercase">Waktu Validasi</p>
+                          </div>
+                          <p className="text-2xl font-bold text-gray-900 font-mono">
+                            {new Date(validationResult.validasiTime).toLocaleTimeString('id-ID', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false
+                            })}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1">
+                            {new Date(validationResult.validasiTime).toLocaleDateString('id-ID', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </p>
+                        </div>
                       </div>
+                      {validationResult.perhitunganTray.peringatan && (
+                        <div className="mt-4 bg-orange-100 border border-orange-300 rounded-lg p-3">
+                          <p className="text-sm font-semibold text-orange-900">
+                            ⚠️ {validationResult.perhitunganTray.peringatan}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  )
-                )}
+
+                    {/* Alergi Information */}
+                    {validationResult.analisisAlergi.totalAlergi > 0 && (
+                      <div className="pt-4 border-t border-gray-200">
+                        <h4 className="text-lg font-bold text-[#1B263A] mb-4">Informasi Alergi</h4>
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                          <p className="text-sm font-semibold text-yellow-900 mb-3">
+                            Total Siswa Alergi: {validationResult.analisisAlergi.totalAlergi}
+                          </p>
+                          {validationResult.analisisAlergi.siswaAlergiDetails.length > 0 && (
+                            <div className="space-y-2">
+                              {validationResult.analisisAlergi.siswaAlergiDetails.map((siswa, idx) => (
+                                <div key={idx} className="text-sm text-yellow-800">
+                                  • {siswa.nama}: {siswa.alergi}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        resetForm();
+                        if (currentMenuIndex < menus.length - 1) {
+                          handleNextMenu();
+                        }
+                      }}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white font-semibold rounded-lg hover:shadow-lg transition-all"
+                    >
+                      {currentMenuIndex < menus.length - 1 ? 'Validasi Menu Berikutnya' : 'Validasi Selesai'}
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
           </>
         )}
       </div>
