@@ -60,7 +60,7 @@ export default function DapurSekolahProximityPage() {
 
   // 🔥 REALTIME HOOK - Load dapur + sekolah dengan auto refresh
   // Only initialize hook once we have both token and dapurId
-  const { dapurInfo, sekolahList, loading, error, refreshData } = useSekolahTerdekatRealtime(
+  const { dapurInfo, sekolahList, loading, error, refreshData, inviteSekolah } = useSekolahTerdekatRealtime(
     authToken || '',
     dapurId || ''
   );
@@ -235,6 +235,17 @@ export default function DapurSekolahProximityPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredSekolah.map(sekolah => {
+              const handleInvite = async () => {
+                if (window.confirm(`Kirim undangan ke ${sekolah.name}?`)) {
+                  const res = await inviteSekolah(sekolah.id);
+                  if (res.success) {
+                    alert(res.message);
+                  } else {
+                    alert('Error: ' + res.message);
+                  }
+                }
+              };
+
               return (
                 <div
                   key={sekolah.id}
@@ -249,16 +260,33 @@ export default function DapurSekolahProximityPage() {
                       {sekolah.alamat && (
                         <p className="text-xs text-gray-500 line-clamp-2 mb-1">{sekolah.alamat}</p>
                       )}
-                      {sekolah.email && (
-                        <p className="text-xs text-gray-500 truncate">{sekolah.email}</p>
-                      )}
                     </div>
-                    {sekolah.isLinked && (
+                    {sekolah.status === 'APPROVED' ? (
                       <div className="ml-2 flex-shrink-0">
-                        <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">
                           <Check className="w-3 h-3" />
+                          AKTIF
                         </div>
                       </div>
+                    ) : sekolah.status === 'PENDING' ? (
+                      <div className="ml-2 flex-shrink-0">
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700">
+                          MENUNGGU
+                        </div>
+                      </div>
+                    ) : sekolah.status === 'REJECTED' ? (
+                      <div className="ml-2 flex-shrink-0">
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
+                          DITOLAK
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleInvite}
+                        className="ml-2 flex-shrink-0 px-3 py-1 rounded-md text-xs font-bold bg-[#D0B064] text-white hover:bg-[#B89B58] transition-colors"
+                      >
+                        UNDANG
+                      </button>
                     )}
                   </div>
 

@@ -28,6 +28,7 @@ function simpleHash(str: string): string {
 function extractArray(data: any): any[] {
   if (Array.isArray(data)) return data
   if (data?.data && Array.isArray(data.data)) return data.data
+  if (data?.data?.data && Array.isArray(data.data.data)) return data.data.data
   if (typeof data === "object") {
     const arr = Object.values(data).find((v) => Array.isArray(v))
     if (arr) return arr as any[]
@@ -198,8 +199,8 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
   const CACHE_KEY = getCacheKey(dapurId)
   const CACHE_EMIT_KEY = getCacheEmitKey(dapurId)
 
-  // Get menu plannings from global context
-  const { menuPlannings: contextPlannings, isLoading: contextLoading } = useDapurContext()
+  // Get menu plannings and sekolah list from global context
+  const { menuPlannings: contextPlannings, sekolahList: contextSekolahList, isLoading: contextLoading } = useDapurContext()
 
   // ✅ Setup listener untuk cache updates dari component lain (dalam tab yang sama)
   useEffect(() => {
@@ -231,10 +232,11 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
 
 
   // ✅ Fetch dapur dashboard data
-  const fetchDapurDashboardData = useCallback(async (contextMenuPlannings: any[]) => {
+  const fetchDapurDashboardData = useCallback(async (contextMenuPlannings: any[], contextSekolahs: any[]) => {
     try {
-      // Use menu plannings from context (global cache)
+      // Use inputs
       const plannings = contextMenuPlannings
+      const sekolahList = contextSekolahs
 
       // ✅ FIXED: Use local time date format for "today"
       const todayString = getTodayDateString()
@@ -277,12 +279,40 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
 
       const requestQueue = new RequestQueue();
 
+      console.log(`[DAPUR DASHBOARD CACHE] 🚀 Starting fetch for ${sekolahList.length} sekolah with ${plannings.length} plannings...`)
+
       const weeklyStats = await Promise.allSettled(
-        plannings.map(async (planning: any) => {
+        sekolahList.map(async (sekolah: any) => {
           try {
+            // Find current/relevant planning for this school
+            const relevantPlanning = plannings.find(p => p.sekolahId === sekolah.id)
+
+            if (!relevantPlanning) {
+              // School has no planning - return basic data with NO_PLANNING status
+              return {
+                id: `NO_PLAN_${sekolah.id}`,
+                sekolahId: sekolah.id,
+                sekolahNama: sekolah.nama || "Unknown",
+                sekolahAlamat: sekolah.alamat || "",
+                status: "NO_PLANNING",
+                completedDays: 0,
+                totalDays: 0,
+                daysLeft: 0,
+                totalMenuCount: 0,
+                allPlanningMenus: []
+              }
+            }
+
+            const planning = relevantPlanning
+
             // ✅ Use planning's date range, not current week!
-            const planningStart = planning.tanggalMulai
-            const planningEnd = planning.tanggalSelesai
+            const planningStart = planning.tanggalMulai || ""
+            const planningEnd = planning.tanggalSelesai || ""
+
+            if (!planningStart || !planningEnd) {
+              console.warn(`[DAPUR DASHBOARD CACHE] Planning ${planning.id} is missing dates:`, { planningStart, planningEnd })
+              return null
+            }
 
             // 🔥 OPTIMIZATION: Queue menu fetch to limit concurrent requests
             const menuRes = await requestQueue.add(() =>
@@ -291,20 +321,21 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
               )
             );
             let menus = extractArray(menuRes?.data || [])
+            console.log(`[DAPUR DASHBOARD CACHE] Found ${menus.length} harian menus for planning ${planning.id}`)
 
             // Skip kalender akademik - holidays not needed for basic calculation
             let holidays: string[] = []
-            allMenus = [...allMenus, ...menus]
 
             // Parse planning dates using local time
             // Extract date part only (handle ISO datetime format)
-            const planningStartStr = planningStart.includes('T') ? planningStart.split('T')[0] : planningStart
-            const planningEndStr = planningEnd.includes('T') ? planningEnd.split('T')[0] : planningEnd
+            const planningStartStr = typeof planningStart === 'string' && planningStart.includes('T') ? planningStart.split('T')[0] : planningStart
+            const planningEndStr = typeof planningEnd === 'string' && planningEnd.includes('T') ? planningEnd.split('T')[0] : planningEnd
 
-            const planningStartDate = new Date(planningStartStr + "T00:00:00")
-            const planningEndDate = new Date(planningEndStr + "T23:59:59")
+            const planningStartDate = new Date(String(planningStartStr) + "T00:00:00")
+            const planningEndDate = new Date(String(planningEndStr) + "T23:59:59")
 
             if (isNaN(planningStartDate.getTime()) || isNaN(planningEndDate.getTime())) {
+              console.warn(`[DAPUR DASHBOARD CACHE] Invalid date range for planning ${planning.id}:`, { planningStartStr, planningEndStr })
               return null
             }
 
@@ -315,11 +346,11 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
                 const dateStr = m.tanggal
                 if (!dateStr) return null
                 // If it's ISO format (has T), just take the date part
-                if (dateStr.includes("T")) {
+                if (typeof dateStr === 'string' && dateStr.includes("T")) {
                   return dateStr.split("T")[0]
                 }
                 // Otherwise assume it's already YYYY-MM-DD
-                return dateStr
+                return String(dateStr)
               }).filter(Boolean)
             )
 
@@ -328,10 +359,10 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
             const holidayDateStrings = new Set(
               holidays.map((h: string) => {
                 if (!h) return null
-                if (h.includes("T")) {
+                if (typeof h === 'string' && h.includes("T")) {
                   return h.split("T")[0]
                 }
-                return h
+                return String(h)
               }).filter(Boolean)
             )
 
@@ -358,15 +389,15 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
               if (adjustedDay >= 1 && adjustedDay <= 6 && !isHoliday) {
                 const dayName = dayNames[adjustedDay - 1]
                 const hasMenu = menuDateStrings.has(dateString)
-                const menuCount = menus.filter((m: any) => {
-                  const mDateStr = m.tanggal?.includes("T") ? m.tanggal.split("T")[0] : m.tanggal
+                const menuCountForDate = menus.filter((m: any) => {
+                  const mDateStr = typeof m.tanggal === 'string' && m.tanggal.includes("T") ? m.tanggal.split("T")[0] : String(m.tanggal)
                   return mDateStr === dateString
                 }).length
 
                 daysStatus.push({
                   day: dayName,
                   completed: hasMenu,
-                  menuCount,
+                  menuCount: menuCountForDate,
                 })
               }
 
@@ -375,13 +406,13 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
 
             // Extract today's menu from this planning
             let planningTodayMenu: any = null
-            const todayMenus = menus.filter((m: any) => {
+            const todayMenusForPlanning = menus.filter((m: any) => {
               const menuDateString = extractMenuDateString(m.tanggal)
               return menuDateString === todayString
             })
-            if (todayMenus.length > 0) {
+            if (todayMenusForPlanning.length > 0) {
               planningTodayMenu = {
-                ...todayMenus[0],
+                ...todayMenusForPlanning[0],
                 sekolahNama: planning.sekolah?.nama || "Unknown",
               }
             }
@@ -406,8 +437,10 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
               status: completedDays === totalDays ? "COMPLETE" : "INCOMPLETE",
               daysLeft: totalDays - completedDays,
               totalMenuCount: menus.length,
+              allPlanningMenus: menus // ✅ Store all menus for this planning to avoid shared race condition
             }
           } catch (err) {
+            console.error(`[DAPUR DASHBOARD CACHE] ❌ Error processing school ${sekolah.id}:`, err)
             return null
           }
         }),
@@ -422,9 +455,13 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
           return a.status === "COMPLETE" ? -1 : 1
         })
 
+      console.log(`[DAPUR DASHBOARD CACHE] ✅ Successfully processed ${validStats.length} plannings out of original ${plannings.length}`)
+
+      // ✅ Rebuild allMenus safely from validStats
+      const safeAllMenus = validStats.flatMap((s: any) => s.allPlanningMenus || [])
       const dateMap: { [key: string]: number } = {}
 
-      allMenus.forEach((menu) => {
+      safeAllMenus.forEach((menu) => {
         if (menu.tanggal) {
           const date = new Date(menu.tanggal).toLocaleDateString("id-ID", {
             weekday: "short",
@@ -436,18 +473,17 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
       })
 
       // Calculate target for today
-      const todayMenus = allMenus.filter((m) => {
+      const todayMenus = safeAllMenus.filter((m) => {
         if (!m.tanggal) return false
         const menuDateString = extractMenuDateString(m.tanggal)
         return menuDateString === todayString
       })
       const totalTargetHariIni = todayMenus.reduce((sum, m) => sum + (m.targetTray || 0), 0)
 
-      // Count unique schools (sekolah yang sama di multiple weeks hanya dihitung 1x)
-      const uniqueSekolahIds = new Set(plannings.map(p => p.sekolahId))
+      // Count total schools from sekolahList
       const newStats = {
         targetHariIni: totalTargetHariIni || 0,
-        totalSekolah: uniqueSekolahIds.size,
+        totalSekolah: sekolahList.length,
       }
 
       const produksiData = Object.entries(dateMap)
@@ -477,24 +513,31 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
       console.error("Error fetching dapur dashboard data:", err)
       throw err
     }
-  }, [contextPlannings])
+  }, [])
 
   // ✅ Load data with cache priority - show cache immediately, fetch background
   const loadData = useCallback(async () => {
     const cacheId = dapurId ? `dapur_dashboard_${dapurId}` : "dapur_dashboard"
 
-    // 1. Check memory cache first (fastest)
     if (globalMemoryCache.has(cacheId)) {
       const cached = globalMemoryCache.get(cacheId)!
       const age = Date.now() - cached.timestamp
 
-      setLoading(false)
-
-      // Refetch in background if expired AND context is loaded
-      if (age >= CACHE_EXPIRY && !contextLoading) {
-        fetchAndUpdateCache(cacheId)
+      // ✅ Check if cache matches current context (school count must be same)
+      const isCacheConsistent = cached.stats.totalSekolah === contextSekolahList.length
+      
+      if (!isCacheConsistent) {
+        console.log("⚠️ [DAPUR DASHBOARD CACHE] Cache inconsistent with context (school count mismatch), skipping cache")
+      } else if (age < CACHE_EXPIRY) {
+        console.log("✅ [DAPUR DASHBOARD CACHE] Using memory cache", { age, expiry: CACHE_EXPIRY })
+        setLoading(false)
+        if (onCacheUpdate) {
+          onCacheUpdate(cached)
+        }
+        return cached
+      } else {
+        console.log("⚠️ [DAPUR DASHBOARD CACHE] Cache expired, will refetch")
       }
-      return cached
     }
 
     // 2. Check localStorage
@@ -505,15 +548,18 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
           const parsed = JSON.parse(localCached) as DapurDashboardData
           const age = Date.now() - parsed.timestamp
 
-          // Show cache immediately (even if stale)
-          globalMemoryCache.set(cacheId, parsed)
-          setLoading(false)
+          // ✅ Check if cache matches current context
+          const isCacheConsistent = parsed.stats.totalSekolah === contextSekolahList.length
 
-          // Refetch in background if expired AND context is loaded
-          if (age >= CACHE_EXPIRY && !contextLoading) {
-            fetchAndUpdateCache(cacheId)
+          if (isCacheConsistent && age < CACHE_EXPIRY) {
+            console.log("✅ [DAPUR DASHBOARD CACHE] Using localStorage cache", { age, expiry: CACHE_EXPIRY })
+            globalMemoryCache.set(cacheId, parsed)
+            setLoading(false)
+            if (onCacheUpdate) {
+              onCacheUpdate(parsed)
+            }
+            return parsed
           }
-          return parsed
         } catch (e) {
           // Failed to parse cache
         }
@@ -528,7 +574,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
       setLoading(false)
       return
     }
-  }, [fetchDapurDashboardData, contextLoading])
+  }, [fetchDapurDashboardData, contextLoading, contextPlannings, contextSekolahList])
 
   // ✅ Fetch and update both memory and localStorage cache
   const fetchAndUpdateCache = useCallback(
@@ -546,7 +592,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
         fetchInProgress.current = true
         setLoading(true)
 
-        const dashboardData = await fetchDapurDashboardData(contextPlannings)
+        const dashboardData = await fetchDapurDashboardData(contextPlannings, contextSekolahList)
 
         // Safety checks
         const validData: DapurDashboardData = {
@@ -566,6 +612,11 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
           localStorage.setItem(CACHE_KEY, JSON.stringify(validData))
         }
 
+        // ✅ Notify caller
+        if (onCacheUpdate) {
+          onCacheUpdate(validData)
+        }
+
         return validData
       } catch (err) {
         setError(err instanceof Error ? err.message : "Gagal memuat data")
@@ -575,7 +626,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
         setLoading(false)
       }
     },
-    [fetchDapurDashboardData, contextLoading, contextPlannings]
+    [fetchDapurDashboardData, contextLoading, contextPlannings, contextSekolahList, onCacheUpdate, CACHE_KEY]
   )
 
   // ✅ Clear cache
@@ -597,7 +648,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
   const backgroundRefresh = useCallback(
     async (cacheId: string, onSuccess?: (data: DapurDashboardData) => void) => {
       try {
-        const freshData = await fetchDapurDashboardData(contextPlannings)
+        const freshData = await fetchDapurDashboardData(contextPlannings, contextSekolahList)
 
         // Safety checks
         const cachedData: DapurDashboardData = {
@@ -626,13 +677,27 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
           }
         }
 
+        // ✅ Trigger global onCacheUpdate if provided
+        if (onCacheUpdate) {
+          onCacheUpdate(cachedData)
+        }
+
         return cachedData
       } catch (err) {
         // Background refresh failed - don't throw
+        console.warn("[DAPUR DASHBOARD CACHE] ⚠️ Background refresh failed:", err)
       }
     },
-    [fetchDapurDashboardData, contextPlannings]
+    [fetchDapurDashboardData, contextPlannings, contextSekolahList, onCacheUpdate, CACHE_KEY]
   )
+
+  // ✅ Auto-load data when context is ready or context data changes
+  useEffect(() => {
+    if (!contextLoading) {
+      console.log("[DAPUR DASHBOARD CACHE] 🔄 Context ready or changed - triggering loadData()")
+      loadData()
+    }
+  }, [contextLoading, contextPlannings, contextSekolahList, loadData])
 
   // ✅ Update cache dengan data baru (optimistic + background refresh)
   const updateCache = useCallback(

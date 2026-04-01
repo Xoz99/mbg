@@ -6,6 +6,8 @@ import DapurLayout from "@/components/layout/DapurLayout"
 import { useDapurDashboardCache } from "@/lib/hooks/useDapurDashboardCache"
 import { useProduksiCache } from "@/lib/hooks/useProduksiCache"
 import { useTraySummaryRealtime } from "@/lib/hooks/useTraySummaryRealtime"
+import { useDapurContext } from "@/lib/context/DapurContext"
+import Skeleton from "@/components/ui/Skeleton"
 import {
   CheckCircle,
   TrendingUp,
@@ -19,39 +21,44 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 const REFRESH_INTERVAL = 120000
 const SkeletonLoader = () => (
   <div className="space-y-6">
-    {/* Header Skeleton */}
-    <div className="h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg w-1/3 animate-shimmer"></div>
-
     {/* Daftar Sekolah Skeleton */}
     <div className="rounded-xl border border-[#D0B064]/20 bg-white p-6 shadow-sm space-y-3">
-      <div className="h-6 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg w-1/4 animate-shimmer mb-4"></div>
-      {[...Array(3)].map((_, i) => (
-        <div key={i} className="space-y-2 p-4 border border-gray-100 rounded-lg">
-          <div className="h-5 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer w-2/3"></div>
-          <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer w-full"></div>
-          <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer w-3/4"></div>
-        </div>
+      <div className="flex items-center gap-2 mb-4">
+        <Skeleton className="w-10 h-10 rounded-lg" />
+        <Skeleton className="h-6 w-1/4" />
+      </div>
+      {[...Array(2)].map((_, i) => (
+        <Skeleton key={i} className="h-16 w-full rounded-lg" />
       ))}
     </div>
 
-    {/* Production Chart & Target Skeleton */}
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-        <div className="h-6 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg w-1/3 animate-shimmer"></div>
-        <div className="space-y-2">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-16 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer"></div>
-          ))}
+      {/* Total Tray Skeleton */}
+      <div className="rounded-2xl border border-[#D0B064]/20 bg-white p-6 shadow-sm space-y-6">
+        <div className="flex justify-between items-start">
+          <div className="space-y-2 w-2/3">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+          <Skeleton className="w-12 h-12 rounded-lg" />
         </div>
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-24 w-full rounded-xl" />
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm space-y-4">
-        <div className="h-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg w-1/2 animate-shimmer"></div>
-        <div className="h-20 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer"></div>
-        <div className="space-y-2">
-          {[...Array(2)].map((_, i) => (
-            <div key={i} className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer"></div>
-          ))}
+      {/* Target Produksi Skeleton */}
+      <div className="rounded-2xl border border-[#D0B064]/20 bg-white p-8 shadow-sm space-y-6">
+        <div className="flex justify-between items-start">
+          <div className="space-y-2 w-1/2">
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-3 w-1/3" />
+          </div>
+          <Skeleton className="w-12 h-12 rounded-xl" />
+        </div>
+        <Skeleton className="h-20 w-3/4" />
+        <div className="space-y-3 border-t border-gray-100 pt-6">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       </div>
     </div>
@@ -172,13 +179,17 @@ const DashboardDapur = () => {
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
+        console.log("🔄 [DashboardDapur] Calling loadData()...");
         const data = await loadData()
         if (data) {
+          console.log(`✅ [DashboardDapur] Received data: ${data.menuPlanningData?.length} plannings`);
           setMenuPlanningData(data.menuPlanningData || [])
           setStats(data.stats || { targetHariIni: 0, totalSekolah: 0 })
+        } else {
+          console.warn("⚠️ [DashboardDapur] loadData() returned no data");
         }
       } catch (err) {
-        console.error("Failed to load dashboard data:", err)
+        console.error("❌ [DashboardDapur] Failed to load dashboard data:", err)
       }
     }
 
@@ -198,13 +209,18 @@ const DashboardDapur = () => {
     }
   }, [refreshData])
 
-  // 🔥 OPTIMIZATION: Show dashboard as soon as dashboard data loads (don't wait for produksi)
+  // ✅ Combined loading state
+  const { isLoading: contextLoading } = useDapurContext()
+  const isActuallyLoading = dashboardLoading || contextLoading || !isLoadingComplete
+
+  // 🔥 OPTIMIZATION: Show dashboard as soon as dashboard data loads
   useEffect(() => {
-    // Dashboard can render with just dashboard data, produksi batches will update carousel separately
-    if (!dashboardLoading && menuPlanningData.length > 0) {
-      setIsLoadingComplete(true)
+    if (!dashboardLoading && !contextLoading) {
+      // Delay setting complete a tiny bit to avoid flickering if data is very fast
+      const timer = setTimeout(() => setIsLoadingComplete(true), 100)
+      return () => clearTimeout(timer)
     }
-  }, [dashboardLoading, menuPlanningData])
+  }, [dashboardLoading, contextLoading])
 
   return (
     <DapurLayout currentPage="dashboard">
@@ -217,7 +233,7 @@ const DashboardDapur = () => {
         </div>
 
         <>
-          {!isLoadingComplete ? (
+          {isActuallyLoading ? (
             <SkeletonLoader />
           ) : (
             <>

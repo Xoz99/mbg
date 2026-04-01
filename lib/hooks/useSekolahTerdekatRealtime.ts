@@ -15,6 +15,7 @@ interface SekolahWithDistance {
   siswaCount?: number
   distance: number
   isLinked?: boolean
+  status?: string // PENDING, APPROVED, REJECTED
 }
 
 interface DapurInfo {
@@ -157,17 +158,22 @@ export const useSekolahTerdekatRealtime = (token: string, dapurId: string) => {
         sekolahListData = sekolahData
       }
 
-      // 3️⃣ Get linked sekolah IDs
-      let linkedSekolahIds: string[] = []
-      if (dapur.linkedSekolah && Array.isArray(dapur.linkedSekolah)) {
-        linkedSekolahIds = dapur.linkedSekolah.map((s: any) => s.id || s)
-      } else if (dapur.sekolah && Array.isArray(dapur.sekolah)) {
-        linkedSekolahIds = dapur.sekolah.map((s: any) => s.id || s)
-      } else if (dapur.DapurSekolah && Array.isArray(dapur.DapurSekolah)) {
-        linkedSekolahIds = dapur.DapurSekolah.map((ds: any) => ds.sekolahId || ds.id)
+      // 3️⃣ Get linked sekolah info (including status)
+      const linkedMap = new Map<string, string>() // sekolahId -> status
+      const extractLinks = (links: any[]) => {
+        if (!Array.isArray(links)) return
+        links.forEach((link: any) => {
+          const id = link.sekolahId || link.sekolah?.id || (typeof link === 'string' ? link : link.id)
+          const status = link.status || 'PENDING' // Use real status from backend, default to PENDING
+          if (id) linkedMap.set(id, status)
+        })
       }
 
-      console.log('[SEKOLAH TERDEKAT] Linked sekolah:', linkedSekolahIds)
+      if (dapur.sekolahDilayani) extractLinks(dapur.sekolahDilayani)
+      else if (dapur.linkedSekolah) extractLinks(dapur.linkedSekolah)
+      else if (dapur.sekolah) extractLinks(dapur.sekolah)
+
+      console.log('[SEKOLAH TERDEKAT] Linked sekolah count:', linkedMap.size)
 
       // 4️⃣ Calculate distances
       let sekolahWithDistance = sekolahListData
@@ -186,7 +192,8 @@ export const useSekolahTerdekatRealtime = (token: string, dapurId: string) => {
             s.latitude || 0,
             s.longitude || 0
           ) * 100) / 100,
-          isLinked: linkedSekolahIds.includes(s.id),
+          isLinked: linkedMap.has(s.id),
+          status: linkedMap.get(s.id),
         }))
         .sort((a: SekolahWithDistance, b: SekolahWithDistance) => a.distance - b.distance)
 
@@ -273,6 +280,34 @@ export const useSekolahTerdekatRealtime = (token: string, dapurId: string) => {
     console.log('[SEKOLAH TERDEKAT] ✅ Updated sekolah linked status:', sekolahId, isLinked)
   }, [])
 
+  // 🔥 Invite sekolah
+  const inviteSekolah = useCallback(async (sekolahId: string) => {
+    if (!token || !dapurId) return { success: false, message: 'Auth info error' }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sekolah/${sekolahId}/link-dapur`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ dapurId }),
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        setSekolahList(prev =>
+          prev.map(s => (s.id === sekolahId ? { ...s, isLinked: true, status: 'PENDING' } : s))
+        )
+        return { success: true, message: 'Undangan berhasil dikirim' }
+      } else {
+        throw new Error(data.message || 'Gagal mengirim undangan')
+      }
+    } catch (err: any) {
+      return { success: false, message: err.message }
+    }
+  }, [token, dapurId])
+
   return {
     dapurInfo,
     sekolahList,
@@ -280,5 +315,6 @@ export const useSekolahTerdekatRealtime = (token: string, dapurId: string) => {
     error,
     refreshData,
     updateSekolahLinked,
+    inviteSekolah,
   }
 }

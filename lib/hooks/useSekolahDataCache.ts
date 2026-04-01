@@ -26,6 +26,7 @@ interface SekolahCachedData {
   kalenderData: any[]
   kalenderReminder: any | null
   menuHariIni: any | null
+  invitations: any[] // NEW: Incoming kitchen invitations
   hash: string
   timestamp: number
 }
@@ -39,6 +40,7 @@ interface SekolahData {
   kalenderData: any[]
   kalenderReminder: any | null
   menuHariIni: any | null
+  invitations: any[] // NEW: Incoming kitchen invitations
 }
 
 // ✅ UNIFIED Global memory cache (single source of truth for all pages)
@@ -613,6 +615,30 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
     }
   }, [])
 
+  // ✅ Fetch incoming kitchen invitations
+  const fetchInvitationsReturn = useCallback(async (schoolId: string, token: string) => {
+    try {
+      console.time("fetchInvitations")
+      const response = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/invitations`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) return []
+
+      const data = await response.json()
+      const invitations = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
+      
+      console.timeEnd("fetchInvitations")
+      return invitations
+    } catch (err) {
+      console.error("Error fetching invitations:", err)
+      return []
+    }
+  }, [])
+
   // ✅ Main fetch function (full refresh from API)
   const fetchAllDataFull = useCallback(
     async (schoolId: string, token: string): Promise<SekolahData> => {
@@ -648,10 +674,11 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
         // 5. Fetch pengiriman, kalender, dan menu in parallel
         console.log("[FETCH ALL] Step 5: Fetching pengiriman, kalender, menu in parallel...")
-        const [pengirimanResult, kalenderResult, menuResult] = await Promise.all([
+        const [pengirimanResult, kalenderResult, menuResult, invitationsResult] = await Promise.all([
           fetchPengirimanDataReturn(schoolId, token),
           fetchKalenderAkademikReturn(token),
           fetchMenuHariIniReturn(token),
+          fetchInvitationsReturn(schoolId, token),
         ])
         console.log("[FETCH ALL] ✅ All parallel fetches complete")
 
@@ -664,6 +691,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
           kalenderData: kalenderResult.list,
           kalenderReminder: kalenderResult.reminder || pengirimanResult,
           menuHariIni: menuResult,
+          invitations: invitationsResult,
         }
 
         console.timeEnd("Total Unified Fetch Time")
@@ -681,6 +709,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
       fetchPengirimanDataReturn,
       fetchKalenderAkademikReturn,
       fetchMenuHariIniReturn,
+      fetchInvitationsReturn,
     ]
   )
 
@@ -771,6 +800,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
         const kalenderData = Array.isArray(data.kalenderData) ? data.kalenderData : []
         const kalenderReminder = data.kalenderReminder || null
         const menuHariIni = data.menuHariIni || null
+        const invitations = Array.isArray(data.invitations) ? data.invitations : []
 
         const newHash = simpleHash(
           JSON.stringify({
@@ -782,6 +812,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
             kalenderData,
             kalenderReminder,
             menuHariIni,
+            invitations,
           })
         )
         const cachedData: SekolahCachedData = {
@@ -793,6 +824,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
           kalenderData,
           kalenderReminder,
           menuHariIni,
+          invitations,
           hash: newHash,
           timestamp: Date.now(),
         }
@@ -869,6 +901,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
           kalenderData: [],
           kalenderReminder: null,
           menuHariIni: null,
+          invitations: [],
           hash: "",
           timestamp: Date.now(),
         }
@@ -884,6 +917,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
         kalenderData: newData.kalenderData ?? cachedData.kalenderData,
         kalenderReminder: newData.kalenderReminder ?? cachedData.kalenderReminder,
         menuHariIni: newData.menuHariIni ?? cachedData.menuHariIni,
+        invitations: newData.invitations ?? (cachedData as any).invitations ?? [],
         hash: simpleHash(
           JSON.stringify({
             siswaData: newData.siswaData ?? cachedData.siswaData,
@@ -894,6 +928,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
             kalenderData: newData.kalenderData ?? cachedData.kalenderData,
             kalenderReminder: newData.kalenderReminder ?? cachedData.kalenderReminder,
             menuHariIni: newData.menuHariIni ?? cachedData.menuHariIni,
+            invitations: newData.invitations ?? (cachedData as any).invitations ?? [],
           })
         ),
         timestamp: Date.now(),
@@ -920,6 +955,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
         kalenderData: Array.isArray(updatedData.kalenderData) ? updatedData.kalenderData : [],
         kalenderReminder: updatedData.kalenderReminder,
         menuHariIni: updatedData.menuHariIni,
+        invitations: Array.isArray((updatedData as any).invitations) ? (updatedData as any).invitations : [],
         hash: updatedData.hash,
         timestamp: updatedData.timestamp,
       }
@@ -938,6 +974,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
             kalenderData: Array.isArray(freshData.kalenderData) ? freshData.kalenderData : [],
             kalenderReminder: freshData.kalenderReminder,
             menuHariIni: freshData.menuHariIni,
+            invitations: Array.isArray((freshData as any).invitations) ? (freshData as any).invitations : [],
             hash: freshData.hash,
             timestamp: freshData.timestamp,
           }
@@ -984,6 +1021,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
             kalenderData,
             kalenderReminder,
             menuHariIni,
+            invitations: Array.isArray((freshData as any).invitations) ? (freshData as any).invitations : [],
           })
         )
         const cachedData: SekolahCachedData = {
@@ -995,6 +1033,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
           kalenderData,
           kalenderReminder,
           menuHariIni,
+          invitations: Array.isArray((freshData as any).invitations) ? (freshData as any).invitations : [],
           hash: newHash,
           timestamp: Date.now(),
         }

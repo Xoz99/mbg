@@ -503,6 +503,7 @@ const DashboardSekolah = () => {
     { hari: "Jumat", hadir: 0, tidakHadir: 0 },
   ])
   const [menuHariIni, setMenuHariIni] = useState<any>(null)
+  const [invitations, setInvitations] = useState<any[]>([])
 
   // ✅ Callback ketika unified cache ter-update dari page lain (instant sync!)
   const handleCacheUpdate = useCallback((cachedData: any) => {
@@ -569,9 +570,10 @@ const DashboardSekolah = () => {
     }
 
     setMenuHariIni(cachedData.menuHariIni || null)
+    setInvitations(cachedData.invitations || [])
   }, [])
 
-  const { loading, error, loadData } = useSekolahDataCache(handleCacheUpdate)
+  const { loading, error, loadData, refreshData } = useSekolahDataCache(handleCacheUpdate)
 
   const [credentialsReady, setCredentialsReady] = useState(false)
 
@@ -734,6 +736,67 @@ const DashboardSekolah = () => {
     }
   }, [credentialsReady, loadData, handleCacheUpdate]) // Re-run when credentialsReady changes
 
+  const handleApproveInvitation = async (dapurId: string) => {
+    const schoolId = localStorage.getItem("sekolahId")
+    const token = localStorage.getItem("authToken")
+    if (!schoolId || !token) return
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/approve-dapur/${dapurId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "APPROVED" }),
+      })
+
+      if (res.ok) {
+        alert("Undangan disetujui!")
+        // Update local state and cache
+        const updatedInvitations = invitations.filter((inv: any) => inv.dapurId !== dapurId)
+        setInvitations(updatedInvitations)
+        // Force refresh all data to sync Sekolah-Dapur link and clear processed invitations from cache
+        refreshData(schoolId, token)
+      } else {
+        const data = await res.json()
+        alert("Gagal menyetujui: " + (data.message || "Error unknown"))
+      }
+    } catch (err) {
+      console.error(err)
+      alert("Terjadi kesalahan")
+    }
+  }
+
+  const handleRejectInvitation = async (dapurId: string) => {
+    if (!window.confirm("Tolak undangan ini?")) return
+
+    const schoolId = localStorage.getItem("sekolahId")
+    const token = localStorage.getItem("authToken")
+    if (!schoolId || !token) return
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sekolah/${schoolId}/approve-dapur/${dapurId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "REJECTED" }),
+      })
+
+      if (res.ok) {
+        alert("Undangan ditolak")
+        const updatedInvitations = invitations.filter((inv: any) => inv.dapurId !== dapurId)
+        setInvitations(updatedInvitations)
+        // Force refresh all data to clear processed invitations from cache
+        refreshData(schoolId, token)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   if (loading) {
     return (
       <SekolahLayout currentPage="dashboard">
@@ -828,6 +891,40 @@ const DashboardSekolah = () => {
                   <p className="text-xs md:text-sm font-bold">{menuHariIni.jamMulaiMasak} - {menuHariIni.jamSelesaiMasak}</p>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ Undangan Masuk Section (New Features) */}
+        {invitations.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-sm">
+            <h3 className="text-lg font-bold text-amber-900 mb-4 flex items-center gap-2">
+              <Bell className="w-5 h-5 text-amber-600" />
+              Undangan Kerjasama Dapur ({invitations.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {invitations.map((inv) => (
+                <div key={inv.dapurId} className="bg-white border border-amber-100 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-slate-900">{inv.dapur?.nama || "Dapur MBG"}</p>
+                    <p className="text-xs text-slate-500 truncate max-w-[200px]">{inv.dapur?.alamat || "Alamat tidak tersedia"}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleRejectInvitation(inv.dapurId)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50"
+                    >
+                      TOLAK
+                    </button>
+                    <button
+                      onClick={() => handleApproveInvitation(inv.dapurId)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#D0B064] text-white hover:bg-[#B89B58]"
+                    >
+                      SETUJUI
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

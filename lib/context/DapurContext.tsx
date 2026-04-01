@@ -21,6 +21,7 @@ interface DashboardStats {
 interface DapurContextType {
   // Data
   menuPlannings: MenuPlanning[]
+  sekolahList: any[]
   isLoading: boolean
   error: string | null
 
@@ -68,35 +69,38 @@ function extractArray(data: any): any[] {
 
 export function DapurProvider({ children }: { children: ReactNode }) {
   const [menuPlannings, setMenuPlannings] = useState<MenuPlanning[]>([])
+  const [sekolahList, setSekolahList] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const hasInitialized = useRef(false)
 
-  // Fetch menu plannings sekali saja
+  // Fetch menu plannings dan sekolah dilayani
   const fetchMenuPlannings = useCallback(async () => {
     try {
-      console.log('🔄 [DapurContext] Starting fetch menu plannings...');
+      console.log('🔄 [DapurContext] Starting fetch context data...');
       setIsLoading(true)
       setError(null)
 
-      const planningRes = await apiCall<any>('/api/menu-planning?limit=100&page=1')
-      const plannings = extractArray(planningRes.data || [])
-      setMenuPlannings(plannings)
+      // Fetch in parallel
+      const [planningRes, sekolahRes] = await Promise.all([
+        apiCall<any>('/api/menu-planning?limit=100&page=1'),
+        apiCall<any>('/api/dapur/sekolah-dilayani')
+      ])
 
-      if (plannings.length > 0) {
-        console.log(`✅ [DapurContext] Menu plannings loaded: ${plannings.length} items`)
-        console.log('[DapurContext] Sample planning:', {
-          id: plannings[0].id,
-          sekolah: plannings[0].sekolah?.nama,
-          mingguanKe: plannings[0].mingguanKe
-        })
-      } else {
-        console.warn('⚠️ [DapurContext] No menu plannings returned from API')
-      }
+      const plannings = extractArray(planningRes.data || [])
+      const allSekolahs = extractArray(sekolahRes?.data || [])
+      
+      // ✅ Only show APPROVED schools on the dashboard
+      const approvedSekolahs = allSekolahs.filter(s => s.status === 'APPROVED')
+
+      setMenuPlannings(plannings)
+      setSekolahList(approvedSekolahs)
+
+      console.log(`✅ [DapurContext] Data loaded: ${plannings.length} plannings, ${approvedSekolahs.length}/${allSekolahs.length} approved sekolah`)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load menu plannings'
+      const message = err instanceof Error ? err.message : 'Failed to load context data'
       setError(message)
-      console.error('❌ [DapurContext] Error fetching menu plannings:', err)
+      console.error('❌ [DapurContext] Error fetching data:', err)
     } finally {
       setIsLoading(false)
     }
@@ -128,6 +132,7 @@ export function DapurProvider({ children }: { children: ReactNode }) {
 
   const value: DapurContextType = {
     menuPlannings,
+    sekolahList,
     isLoading,
     error,
     refetchMenuPlannings,
