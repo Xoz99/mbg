@@ -261,33 +261,25 @@ export default function DapurSekolahProximityPage() {
                         <p className="text-xs text-gray-500 line-clamp-2 mb-1">{sekolah.alamat}</p>
                       )}
                     </div>
-                    {sekolah.status === 'APPROVED' ? (
-                      <div className="ml-2 flex-shrink-0">
+                    <div className="ml-2 flex-shrink-0">
+                      {sekolah.isLinked && sekolah.status === 'APPROVED' ? (
                         <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">
                           <Check className="w-3 h-3" />
                           AKTIF
                         </div>
-                      </div>
-                    ) : sekolah.status === 'PENDING' ? (
-                      <div className="ml-2 flex-shrink-0">
+                      ) : sekolah.isLinked && sekolah.status === 'PENDING' ? (
                         <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700">
                           MENUNGGU
                         </div>
-                      </div>
-                    ) : sekolah.status === 'REJECTED' ? (
-                      <div className="ml-2 flex-shrink-0">
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
-                          DITOLAK
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={handleInvite}
-                        className="ml-2 flex-shrink-0 px-3 py-1 rounded-md text-xs font-bold bg-[#D0B064] text-white hover:bg-[#B89B58] transition-colors"
-                      >
-                        UNDANG
-                      </button>
-                    )}
+                      ) : (
+                        <button
+                          onClick={handleInvite}
+                          className="bg-[#D0B064] text-white px-3 py-1 rounded-md text-xs font-bold hover:bg-[#B89B58] transition-colors shadow-sm"
+                        >
+                          {sekolah.status === 'REJECTED' ? 'UNDANG LAGI' : 'UNDANG'}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Distance & Siswa */}
