@@ -3,8 +3,8 @@ import { cacheEmitter } from "@/lib/utils/cacheEmitter"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 const CACHE_EMIT_KEY = "sekolah_unified_cache_update"
-const CACHE_KEY_PREFIX = "sekolah_unified_cache" // Added _PREFIX to clarify it's a base key
-const CACHE_EXPIRY = 5 * 60 * 1000 // 5 minutes (increased from 1 min for better performance + multi-account safety)
+const CACHE_KEY_PREFIX = "sekolah_unified_cache_v2" // Versioned key to force refresh after updates
+const CACHE_EXPIRY = 5 * 60 * 1000 // 5 minutes (restored to original)
 
 // ✅ Simple hash function untuk compare data changes
 function simpleHash(str: string): string {
@@ -629,12 +629,14 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
       if (!response.ok) return []
 
       const data = await response.json()
+      console.log(`[FETCH INVITATIONS] API Response for school ${schoolId}:`, data)
       const invitations = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
       
+      console.log(`[FETCH INVITATIONS] Normalised invitations for school ${schoolId}:`, invitations)
       console.timeEnd("fetchInvitations")
       return invitations
     } catch (err) {
-      console.error("Error fetching invitations:", err)
+      console.error("[FETCH INVITATIONS] ❌ Error fetching invitations:", err)
       return []
     }
   }, [])

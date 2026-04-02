@@ -164,6 +164,31 @@ export const useTraySummaryRealtime = (sekolahId: string) => {
     loading,
     error,
     refresh,
+    updateManualCount: async (harianId: string, count: number) => {
+      try {
+        const token = typeof window !== 'undefined'
+          ? localStorage.getItem('mbg_token') || localStorage.getItem('authToken')
+          : ''
+
+        const response = await fetch(`${API_BASE_URL}/api/menu-harian/${harianId}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ realisasiTrayDapur: count }),
+        })
+
+        if (!response.ok) throw new Error('Gagal update manual count')
+        
+        // Refresh after update
+        fetchTraySummary()
+        return true
+      } catch (err) {
+        console.error('[TraySummary] Gagal update manual count:', err)
+        return false
+      }
+    },
     isConnected: wsRef.current?.readyState === WebSocket.OPEN,
   }
 }

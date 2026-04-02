@@ -308,6 +308,33 @@ export const useSekolahTerdekatRealtime = (token: string, dapurId: string) => {
     }
   }, [token, dapurId])
 
+  // 🔥 Disconnect sekolah
+  const disconnectSekolah = useCallback(async (sekolahId: string) => {
+    if (!token || !dapurId) return { success: false, message: 'Auth info error' }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sekolah/${sekolahId}/link-dapur/${dapurId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        setSekolahList(prev =>
+          prev.map(s => (s.id === sekolahId ? { ...s, isLinked: false, status: undefined } : s))
+        )
+        return { success: true, message: 'Hubungan berhasil diputuskan' }
+      } else {
+        throw new Error(data.message || 'Gagal memutuskan hubungan')
+      }
+    } catch (err: any) {
+      return { success: false, message: err.message }
+    }
+  }, [token, dapurId])
+
   return {
     dapurInfo,
     sekolahList,
@@ -316,5 +343,6 @@ export const useSekolahTerdekatRealtime = (token: string, dapurId: string) => {
     refreshData,
     updateSekolahLinked,
     inviteSekolah,
+    disconnectSekolah,
   }
 }

@@ -16,6 +16,7 @@ import {
   Heart,
   AlertTriangle,
   MapPin,
+  RotateCw,
 } from "lucide-react"
 import {
   BarChart,
@@ -571,6 +572,7 @@ const DashboardSekolah = () => {
 
     setMenuHariIni(cachedData.menuHariIni || null)
     setInvitations(cachedData.invitations || [])
+    console.log("[DASHBOARD] ✅ State updated from cache. Invitations count:", (cachedData.invitations || []).length)
   }, [])
 
   const { loading, error, loadData, refreshData } = useSekolahDataCache(handleCacheUpdate)
@@ -854,9 +856,26 @@ const DashboardSekolah = () => {
     <SekolahLayout currentPage="dashboard">
       <div className="space-y-8">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2 tracking-tight">Dashboard PIC Sekolah</h1>
-          <p className="text-slate-600 text-base md:text-lg">Monitoring Distribusi Makanan Bergizi & Status Gizi Siswa</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2 tracking-tight">Dashboard PIC Sekolah</h1>
+            <p className="text-slate-600 text-base md:text-lg font-medium">Monitoring Distribusi Makanan Bergizi & Status Gizi Siswa</p>
+          </div>
+          <button
+            onClick={() => {
+              const schoolId = localStorage.getItem("sekolahId")
+              const token = localStorage.getItem("authToken")
+              if (schoolId && token) {
+                console.log("[DASHBOARD] 🔄 Manual refresh triggered")
+                refreshData(schoolId, token)
+              }
+            }}
+            disabled={loading}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 active:bg-slate-100 transition-all shadow-sm disabled:opacity-50 min-w-[140px]"
+          >
+            <RotateCw className={`w-4 h-4 text-[#D0B064] ${loading ? 'animate-spin' : ''}`} />
+            Refresh Data
+          </button>
         </div>
 
         {/* Menu Harian Card */}

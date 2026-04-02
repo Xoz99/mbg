@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import DapurLayout from '@/components/layout/DapurLayout';
 import { useSekolahTerdekatRealtime } from '@/lib/hooks/useSekolahTerdekatRealtime';
 import {
-  MapPin, RefreshCw, Check, AlertCircle
+  MapPin, RefreshCw, Check, AlertCircle, Trash2
 } from 'lucide-react';
 
 interface Sekolah {
@@ -60,7 +60,7 @@ export default function DapurSekolahProximityPage() {
 
   // 🔥 REALTIME HOOK - Load dapur + sekolah dengan auto refresh
   // Only initialize hook once we have both token and dapurId
-  const { dapurInfo, sekolahList, loading, error, refreshData, inviteSekolah } = useSekolahTerdekatRealtime(
+  const { dapurInfo, sekolahList, loading, error, refreshData, inviteSekolah, disconnectSekolah } = useSekolahTerdekatRealtime(
     authToken || '',
     dapurId || ''
   );
@@ -246,6 +246,17 @@ export default function DapurSekolahProximityPage() {
                 }
               };
 
+              const handleDisconnect = async () => {
+                if (window.confirm(`Apakah Anda yakin ingin memutuskan hubungan dengan ${sekolah.name}?`)) {
+                  const res = await disconnectSekolah(sekolah.id);
+                  if (res.success) {
+                    alert(res.message);
+                  } else {
+                    alert('Error: ' + res.message);
+                  }
+                }
+              };
+
               return (
                 <div
                   key={sekolah.id}
@@ -262,14 +273,25 @@ export default function DapurSekolahProximityPage() {
                       )}
                     </div>
                     <div className="ml-2 flex-shrink-0">
-                      {sekolah.isLinked && sekolah.status === 'APPROVED' ? (
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">
-                          <Check className="w-3 h-3" />
-                          AKTIF
-                        </div>
-                      ) : sekolah.isLinked && sekolah.status === 'PENDING' ? (
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700">
-                          MENUNGGU
+                      {sekolah.isLinked && sekolah.status !== 'REJECTED' ? (
+                        <div className="flex flex-col items-end gap-2">
+                          {sekolah.status === 'APPROVED' ? (
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">
+                              <Check className="w-3 h-3" />
+                              AKTIF
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700">
+                              MENUNGGU
+                            </div>
+                          )}
+                          <button
+                            onClick={handleDisconnect}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            PUTUS
+                          </button>
                         </div>
                       ) : (
                         <button

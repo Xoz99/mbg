@@ -483,7 +483,9 @@ const ValidasiTrayPage = () => {
                     </div>
                     <div className="flex items-baseline gap-2">
                       <p className={`${menuSajikanStatus?.status.status !== 'terlambat' ? 'text-8xl' : 'text-6xl'} font-black text-slate-900 tracking-tighter italic transition-all duration-500`}>
-                        {traySummary?.totalTrayUnik || traySummary?.total || 0}
+                        {traySummary?.manualTrayCount !== null && traySummary?.manualTrayCount !== undefined
+                          ? traySummary.manualTrayCount
+                          : (traySummary?.totalTrayUnik || traySummary?.total || 0)}
                       </p>
                       <span className={`${menuSajikanStatus?.status.status !== 'terlambat' ? 'text-2xl' : 'text-base'} font-black text-[#D0B064] uppercase tracking-widest transition-all duration-500`}>TRAY</span>
                     </div>

@@ -64,7 +64,7 @@ export const useMenuCache = (onCacheUpdate?: (data: MenuData) => void) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fetchInProgress = useRef(false)
-  const { menuPlannings: contextMenuPlannings, isLoading: contextLoading } = useDapurContext()
+  const { menuPlannings: contextMenuPlannings, sekolahList: contextSekolahList, isLoading: contextLoading } = useDapurContext()
 
   useEffect(() => {
     const unsubscribe = cacheEmitter.subscribe(CACHE_EMIT_KEY, (data: MenuData) => {
@@ -82,22 +82,11 @@ export const useMenuCache = (onCacheUpdate?: (data: MenuData) => void) => {
       console.log("[MENU CACHE] Starting fetch...")
       console.time("fetchMenu")
 
-      // Get menu plannings from context (already loaded globally)
+      // Get data from context (already loaded and filtered globally)
       const menuPlannings = contextMenuPlannings
-      console.log("[MENU CACHE] Got menuPlannings from context:", menuPlannings.length)
-
-      // Fetch sekolah list
-      const sekolahRes = await apiCall<any>("/api/sekolah?limit=100&page=1")
-      console.log("[MENU CACHE] Sekolah response:", sekolahRes)
-      // Handle nested data structure: response.data.data
-      const sekolahList = Array.isArray(sekolahRes?.data?.data)
-        ? sekolahRes.data.data
-        : Array.isArray(sekolahRes?.data)
-          ? sekolahRes.data
-          : Array.isArray(sekolahRes)
-            ? sekolahRes
-            : []
-      console.log("[MENU CACHE] Extracted sekolahList:", sekolahList)
+      const sekolahList = contextSekolahList
+      
+      console.log("[MENU CACHE] Got from context - Plannings:", menuPlannings.length, "Sekolah:", sekolahList.length)
 
       // Calculate stats
       const totalMenuPlanning = menuPlannings.length
@@ -143,16 +132,15 @@ export const useMenuCache = (onCacheUpdate?: (data: MenuData) => void) => {
 
       if (age < CACHE_EXPIRY) {
         console.log("✅ [MENU CACHE] Using memory cache (fresh)")
-        console.log("✅ [MENU CACHE] Calling onCacheUpdate with:", cached)
+        // 🔥 CRITICAL: Always use current filtered sekolahList from context
+        const dataWithFreshSekolah = { ...cached, sekolahList: contextSekolahList }
+        console.log("✅ [MENU CACHE] Calling onCacheUpdate with fresh sekolahList:", contextSekolahList.length)
         setLoading(false)
         // ✅ Emit callback saat cache hit
         if (onCacheUpdate) {
-          console.log("[MENU CACHE] onCacheUpdate exists, calling it...")
-          onCacheUpdate(cached)
-        } else {
-          console.log("[MENU CACHE] WARNING: onCacheUpdate is not defined!")
+          onCacheUpdate(dataWithFreshSekolah)
         }
-        return cached
+        return dataWithFreshSekolah
       }
     }
 
@@ -165,23 +153,25 @@ export const useMenuCache = (onCacheUpdate?: (data: MenuData) => void) => {
 
           if (age < CACHE_EXPIRY) {
             console.log("✅ [MENU CACHE] Using localStorage cache (fresh)")
-            globalMemoryCache.set(cacheId, parsed)
+            const dataWithFreshSekolah = { ...parsed, sekolahList: contextSekolahList }
+            globalMemoryCache.set(cacheId, dataWithFreshSekolah)
             setLoading(false)
             // ✅ Emit callback saat cache hit
             if (onCacheUpdate) {
-              onCacheUpdate(parsed)
+              onCacheUpdate(dataWithFreshSekolah)
             }
-            return parsed
+            return dataWithFreshSekolah
           } else if (age < CACHE_EXPIRY * 2) {
             console.log("⚠️ [MENU CACHE] Using stale cache, refetching in background")
+            const dataWithFreshSekolah = { ...parsed, sekolahList: contextSekolahList }
             setLoading(false)
-            globalMemoryCache.set(cacheId, parsed)
-            // ✅ Emit callback dengan stale data
+            globalMemoryCache.set(cacheId, dataWithFreshSekolah)
+            // ✅ Emit callback dengan stale data + fresh sekolah list
             if (onCacheUpdate) {
-              onCacheUpdate(parsed)
+              onCacheUpdate(dataWithFreshSekolah)
             }
             fetchAndUpdateCache(cacheId)
-            return parsed
+            return dataWithFreshSekolah
           }
         } catch (e) {
           console.warn("[MENU CACHE] Failed to parse localStorage cache")
@@ -205,11 +195,12 @@ export const useMenuCache = (onCacheUpdate?: (data: MenuData) => void) => {
 
         const menuData = await fetchMenuData()
 
+        // 🔥 ALWAYS sync with context sekolahList to ensure filtering is active
         const validData: MenuData = {
           menuPlannings: Array.isArray(menuData.menuPlannings) ? menuData.menuPlannings : [],
-          sekolahList: Array.isArray(menuData.sekolahList) ? menuData.sekolahList : [],
+          sekolahList: contextSekolahList, // Use context list instead of API response
           stats: menuData.stats,
-          hash: simpleHash(JSON.stringify(menuData)),
+          hash: simpleHash(JSON.stringify({ ...menuData, sekolahList: contextSekolahList })),
           timestamp: Date.now(),
         }
 
@@ -219,11 +210,10 @@ export const useMenuCache = (onCacheUpdate?: (data: MenuData) => void) => {
           localStorage.setItem(CACHE_KEY, JSON.stringify(validData))
         }
 
-        console.log("✅ [MENU CACHE] Data updated and cached")
+        console.log("✅ [MENU CACHE] Data updated and cached (with context sekolah syncing)")
 
         // ✅ Emit callback untuk update UI
         if (onCacheUpdate) {
-          console.log("[MENU CACHE] Emitting callback with data:", validData)
           onCacheUpdate(validData)
         }
 

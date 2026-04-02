@@ -15,6 +15,9 @@ import {
   ArrowUp,
   ChevronDown,
   Wifi,
+  Edit2,
+  Save,
+  X,
 } from 'lucide-react'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
@@ -90,7 +93,12 @@ const DashboardDapur = () => {
   const [sekolahDetails, setSekolahDetails] = useState<{ [key: string]: any }>({})
   const [loadingDetail, setLoadingDetail] = useState<{ [key: string]: boolean }>({})
   const [selectedSekolahId, setSelectedSekolahId] = useState<string>("")
-  const { traySummary, loading: loadingTraySummary, isConnected: wsConnected } = useTraySummaryRealtime(selectedSekolahId)
+  const { traySummary, loading: loadingTraySummary, isConnected: wsConnected, updateManualCount } = useTraySummaryRealtime(selectedSekolahId)
+  
+  // ✅ State for Manual Tray Input
+  const [isEditingTray, setIsEditingTray] = useState(false)
+  const [manualTrayInputValue, setManualTrayInputValue] = useState<string>("")
+  const [isSavingManualTray, setIsSavingManualTray] = useState(false)
 
   // Fetch sekolah detail saat expand
   const fetchSekolahDetail = useCallback(async (sekolahId: string) => {
@@ -375,15 +383,88 @@ const DashboardDapur = () => {
                       <p className="text-sm text-blue-600">Loading data tray...</p>
                     </div>
                   ) : selectedSekolahId && traySummary ? (
-                    <div className="bg-gradient-to-br from-green-50 to-green-100/50 rounded-lg p-6 border border-green-200">
-                      <p className="text-sm text-green-700 font-medium">Total Tray Siap Dikirim</p>
-                      <p className="text-5xl font-black text-green-700 mt-4">
-                        {traySummary?.totalTrayUnik !== undefined && traySummary?.totalTrayUnik !== null
-                          ? traySummary.totalTrayUnik
-                          : traySummary?.total !== undefined && traySummary?.total !== null
-                            ? traySummary.total
-                            : 0}
-                      </p>
+                    <div className="bg-gradient-to-br from-green-50 to-green-100/50 rounded-lg p-6 border border-green-200 relative group">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-green-700 font-medium">Total Tray Siap Dikirim</p>
+                        
+                        {/* Edit Button */}
+                        {!isEditingTray && (
+                          <button 
+                            onClick={() => {
+                              setIsEditingTray(true)
+                              setManualTrayInputValue(String(traySummary?.manualTrayCount ?? traySummary?.totalTrayUnik ?? 0))
+                            }}
+                            className="p-1.5 text-green-600 hover:bg-green-200/50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                            title="Input Manual"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {isEditingTray ? (
+                        <div className="mt-4 flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={manualTrayInputValue}
+                            onChange={(e) => setManualTrayInputValue(e.target.value)}
+                            className="w-24 px-3 py-2 text-2xl font-bold text-green-800 bg-white border-2 border-green-300 rounded-lg focus:outline-none focus:border-green-500"
+                            autoFocus
+                          />
+                          <button
+                            onClick={async () => {
+                              // 🔥 Fallback: Jika rfid summary tidak mengembalikan menuHarianId, 
+                              // coba cari dari data planning yang sudah di-load dashboard
+                              let harianId = traySummary?.menuHarianId
+                              
+                              if (!harianId && selectedSekolahId) {
+                                const planning = menuPlanningData.find(p => p.sekolahId === selectedSekolahId)
+                                if (planning?.todayMenu?.id) {
+                                  harianId = planning.todayMenu.id
+                                  console.log('Using fallback harianId from planning:', harianId)
+                                }
+                              }
+
+                              if (!harianId) {
+                                alert("Gagal menyimpan: ID Menu Harian tidak ditemukan. Pastikan menu untuk hari ini sudah terencana.")
+                                return
+                              }
+                              
+                              setIsSavingManualTray(true)
+                              try {
+                                const success = await updateManualCount(harianId, parseInt(manualTrayInputValue))
+                                if (success) {
+                                  setIsEditingTray(false)
+                                }
+                              } catch (err) {
+                                console.error("Error saving manual count:", err)
+                              } finally {
+                                setIsSavingManualTray(false)
+                              }
+                            }}
+                            disabled={isSavingManualTray}
+                            className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                          >
+                            {isSavingManualTray ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-5 h-5" />}
+                          </button>
+                          <button
+                            onClick={() => setIsEditingTray(false)}
+                            className="p-2 bg-white text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-5xl font-black text-green-700 mt-4 flex items-baseline gap-2">
+                          {traySummary?.manualTrayCount !== null && traySummary?.manualTrayCount !== undefined
+                            ? traySummary.manualTrayCount 
+                            : (traySummary?.totalTrayUnik !== undefined && traySummary?.totalTrayUnik !== null
+                                ? traySummary.totalTrayUnik
+                                : traySummary?.total !== undefined && traySummary?.total !== null
+                                  ? traySummary.total
+                                  : 0)}
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="bg-gray-50 rounded-lg p-6 border border-gray-200 text-center">
