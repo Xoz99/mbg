@@ -30,10 +30,10 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 const SkeletonCard = () => (
-  <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100 animate-pulse">
-    <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-100 rounded-full w-24 mb-2"></div>
-    <div className="h-8 bg-gradient-to-r from-gray-300 to-gray-200 rounded-lg w-16 mb-2"></div>
-    <div className="h-3 bg-gradient-to-r from-gray-200 to-gray-100 rounded-full w-32"></div>
+  <div className="animate-pulse py-3">
+    <div className="h-3 w-16 bg-gray-200 rounded mb-2" />
+    <div className="h-7 w-10 bg-gray-200 rounded mb-1" />
+    <div className="h-3 w-24 bg-gray-100 rounded" />
   </div>
 )
 
@@ -124,13 +124,13 @@ const Chip = ({ label, onDelete, variant = "default" }: any) => {
 }
 
 const StatCard = ({ title, value, subtitle, color, icon: Icon }: any) => (
-  <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all">
-    <div className="flex items-start justify-between mb-2">
-      <p className="text-sm font-semibold text-gray-600">{title}</p>
-      {Icon && <Icon className={`w-5 h-5 ${color}`} />}
+  <div className="py-3">
+    <div className="flex items-center gap-2 mb-1">
+      {Icon && <Icon className={`w-4 h-4 ${color}`} />}
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
     </div>
-    <p className={`text-3xl font-bold mb-1 ${color}`}>{value}</p>
-    <p className="text-xs text-gray-500">{subtitle}</p>
+    <p className={`text-2xl font-bold text-gray-900 mb-0.5`}>{value}</p>
+    <p className="text-xs text-gray-400">{subtitle}</p>
   </div>
 )
 
@@ -855,40 +855,25 @@ const DataSiswa = () => {
   if (loading && siswaData.length === 0) {
     return (
       <SekolahLayout currentPage="siswa">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Data Siswa</h1>
-          <p className="text-gray-600 font-medium">Monitoring Gizi & Pencegahan Stunting</p>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Data Siswa</h1>
+          <p className="text-sm text-gray-500 mt-1">Monitoring gizi & pencegahan stunting</p>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          {[...Array(5)].map((_, i) => (
-            <SkeletonCard key={i} />
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 border border-gray-100 rounded-xl p-5 mb-6">
+          {[...Array(5)].map((_, i) => <SkeletonCard key={i} />)}
         </div>
-
-        <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Foto</th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">NIS</th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Nama Siswa</th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Kelas</th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">L/P</th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Umur</th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">TB</th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">BB</th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Status Gizi</th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...Array(10)].map((_, i) => (
-                  <SkeletonTableRow key={i} />
-                ))}
-              </tbody>
-            </table>
+        <div className="border border-gray-100 rounded-xl overflow-hidden">
+          <div className="divide-y divide-gray-100">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-3 animate-pulse">
+                <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <div className="h-3.5 w-28 bg-gray-200 rounded" />
+                  <div className="h-3 w-48 bg-gray-100 rounded" />
+                </div>
+                <div className="h-5 w-16 bg-gray-200 rounded" />
+              </div>
+            ))}
           </div>
         </div>
       </SekolahLayout>
@@ -899,9 +884,9 @@ const DataSiswa = () => {
     return (
       <SekolahLayout currentPage="siswa">
         <div className="flex items-center justify-center h-96">
-          <div className="text-center max-w-md">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <p className="text-red-600 mb-4 font-semibold">{error}</p>
+          <div className="text-center">
+            <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+            <p className="text-sm text-gray-700 font-medium mb-4">{error}</p>
             <button
               onClick={() => {
                 const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
@@ -912,7 +897,7 @@ const DataSiswa = () => {
                   setCredentialsReady(true)
                 }
               }}
-              className="px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold"
+              className="px-4 py-2 bg-[#1B263A] text-white text-sm rounded-lg hover:bg-[#2A3749] transition-colors font-medium"
             >
               Coba Lagi
             </button>
@@ -924,10 +909,10 @@ const DataSiswa = () => {
 
   return (
     <SekolahLayout currentPage="siswa">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="flex items-end justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Data Siswa</h1>
-          <p className="text-gray-600 font-medium">Monitoring Gizi & Pencegahan Stunting</p>
+          <h1 className="text-2xl font-bold text-gray-900">Data Siswa</h1>
+          <p className="text-sm text-gray-500 mt-1">Monitoring gizi & pencegahan stunting</p>
         </div>
         <button
           onClick={() => {
@@ -946,70 +931,38 @@ const DataSiswa = () => {
             setPhotoPreview("")
             setShowAddModal(true)
           }}
-          className="flex items-center gap-2 px-5 py-3 bg-[#1B263A] text-white rounded-xl hover:bg-[#243B55] hover:shadow-lg hover:-translate-y-0.5 transition-all font-semibold shadow-md"
-          >
-          <Plus className="w-5 h-5" />
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#1B263A] text-white text-sm rounded-lg hover:bg-[#2A3749] transition-colors font-medium"
+        >
+          <Plus className="w-4 h-4" />
           Tambah Siswa
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <StatCard
-          title="Total Siswa"
-          value={stats.total}
-          subtitle="Siswa terdaftar"
-          color="text-cyan-600"
-          icon={User}
-        />
-        <StatCard
-          title="Gizi Normal"
-          value={stats.normal}
-          subtitle={`${stats.total > 0 ? Math.round((stats.normal / stats.total) * 100) : 0}% dari total`}
-          color="text-emerald-600"
-          icon={TrendingUp}
-        />
-        <StatCard
-          title="Gizi Kurang"
-          value={stats.giziKurang}
-          subtitle="Perlu perhatian"
-          color="text-amber-600"
-          icon={AlertTriangle}
-        />
-        <StatCard
-          title="Gizi Buruk"
-          value={stats.giziBuruk}
-          subtitle="Prioritas tinggi"
-          color="text-red-600"
-          icon={AlertCircle}
-        />
-        <StatCard
-          title="Berisiko Stunting"
-          value={stats.stunted}
-          subtitle="Memerlukan intervensi"
-          color="text-orange-600"
-          icon={AlertTriangle}
-        />
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-6 gap-y-1 border border-gray-100 rounded-xl p-5 bg-white mb-6">
+        <StatCard title="Total Siswa" value={stats.total} subtitle="Siswa terdaftar" color="text-[#1B263A]" icon={User} />
+        <StatCard title="Gizi Normal" value={stats.normal} subtitle={`${stats.total > 0 ? Math.round((stats.normal / stats.total) * 100) : 0}% dari total`} color="text-emerald-600" icon={TrendingUp} />
+        <StatCard title="Gizi Kurang" value={stats.giziKurang} subtitle="Perlu perhatian" color="text-amber-600" icon={AlertTriangle} />
+        <StatCard title="Gizi Buruk" value={stats.giziBuruk} subtitle="Prioritas tinggi" color="text-red-600" icon={AlertCircle} />
+        <StatCard title="Risiko Stunting" value={stats.stunted} subtitle="Perlu intervensi" color="text-orange-600" icon={AlertTriangle} />
       </div>
 
       {stats.stunted > 0 && (
-        <div className="bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-500 p-5 mb-6 rounded-r-xl shadow-sm">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-6 h-6 text-red-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="font-bold text-red-900 text-lg">Perhatian!</p>
-              <p className="text-sm text-red-700 mt-1">
-                Terdapat {stats.stunted} siswa berisiko stunting yang memerlukan perhatian khusus.
-              </p>
-            </div>
+        <div className="flex items-center gap-3 p-4 border border-red-200 rounded-xl mb-6">
+          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Perhatian</p>
+            <p className="text-xs text-gray-600">
+              Terdapat {stats.stunted} siswa berisiko stunting yang memerlukan perhatian khusus.
+            </p>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="md:col-span-2">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Cari nama atau NIS..."
@@ -1018,7 +971,7 @@ const DataSiswa = () => {
                   setSearchTerm(e.target.value)
                   setCurrentPage(1)
                 }}
-                className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all"
+                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
               />
             </div>
           </div>
@@ -1029,7 +982,7 @@ const DataSiswa = () => {
                 setFilterKelas(e.target.value)
                 setCurrentPage(1)
               }}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
             >
               <option value="semua">Semua Kelas</option>
               {kelasData.map((kelas) => (
@@ -1046,7 +999,7 @@ const DataSiswa = () => {
                 setFilterStatus(e.target.value)
                 setCurrentPage(1)
               }}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
             >
               <option value="semua">Semua Status</option>
               <option value="NORMAL">Normal</option>
@@ -1057,24 +1010,24 @@ const DataSiswa = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+      <div className="border border-gray-100 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-              <tr>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Foto</th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">NIS</th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Nama</th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Kelas</th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">L/P</th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Umur</th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">TB</th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">BB</th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Status</th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Aksi</th>
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Foto</th>
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">NIS</th>
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Nama</th>
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Kelas</th>
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">L/P</th>
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Umur</th>
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">TB</th>
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">BB</th>
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-100">
               {paginatedData.map((siswa) => {
                 let fotoSrc = siswa.fotoUrl || ""
                 if (fotoSrc && !fotoSrc.startsWith("data:") && !fotoSrc.startsWith("http")) {
@@ -1082,56 +1035,55 @@ const DataSiswa = () => {
                 }
 
                 return (
-                  <tr key={siswa.id} className="border-b border-gray-100 hover:bg-cyan-50 transition-colors">
-                    <td className="py-4 px-4">
+                  <tr key={siswa.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3 px-4">
                       {fotoSrc ? (
                         <img
                           src={fotoSrc || "/placeholder.svg"}
                           alt={siswa.nama}
-                          className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 shadow-sm"
+                          className="w-8 h-8 rounded-full object-cover border border-gray-200"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-100 to-blue-100 flex items-center justify-center text-lg border-2 border-gray-200">
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm">
                           {siswa.jenisKelamin === "LAKI_LAKI" ? "👨" : "👩"}
                         </div>
                       )}
                     </td>
-                    <td className="py-4 px-4 text-sm text-gray-900 font-semibold">{siswa.nis}</td>
-                    <td className="py-4 px-4 text-sm font-medium text-gray-900">{siswa.nama}</td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{siswa.kelas}</td>
-                    <td className="py-4 px-4 text-sm text-gray-600">
+                    <td className="py-3 px-4 text-sm text-gray-900 font-medium">{siswa.nis}</td>
+                    <td className="py-3 px-4 text-sm text-gray-900">{siswa.nama}</td>
+                    <td className="py-3 px-4 text-sm text-gray-600">{siswa.kelas}</td>
+                    <td className="py-3 px-4 text-sm text-gray-600">
                       {siswa.jenisKelamin === "LAKI_LAKI" ? "L" : "P"}
                     </td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{siswa.umur} th</td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{siswa.tinggiBadan} cm</td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{siswa.beratBadan} kg</td>
-                    <td className="py-4 px-4">
+                    <td className="py-3 px-4 text-sm text-gray-600">{siswa.umur} th</td>
+                    <td className="py-3 px-4 text-sm text-gray-600">{siswa.tinggiBadan} cm</td>
+                    <td className="py-3 px-4 text-sm text-gray-600">{siswa.beratBadan} kg</td>
+                    <td className="py-3 px-4">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(siswa.statusGizi)}`}
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(siswa.statusGizi)}`}
                       >
                         {displayStatusText(siswa.statusGizi)}
                       </span>
                     </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-2">
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleOpenDetailModal(siswa)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-cyan-50 text-cyan-700 rounded-lg hover:bg-cyan-100 transition-colors text-sm font-medium border border-cyan-200"
-                          title="Lihat Detail"
+                          className="p-1.5 text-gray-500 hover:text-[#1B263A] hover:bg-gray-100 rounded-lg transition-colors"
+                          title="Detail"
                         >
                           <Eye className="w-4 h-4" />
-                          Detail
                         </button>
                         <button
                           onClick={() => handleOpenEditModal(siswa)}
-                          className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors border border-amber-200"
+                          className="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-gray-100 rounded-lg transition-colors"
                           title="Edit"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteSiswa(siswa.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
+                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-colors"
                           title="Hapus"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1145,28 +1097,27 @@ const DataSiswa = () => {
           </table>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-          <p className="text-sm text-gray-600 font-medium">
-            Menampilkan {(currentPage - 1) * itemsPerPage + 1} -{" "}
-            {Math.min(currentPage * itemsPerPage, filteredData.length)} dari {filteredData.length} siswa
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+          <p className="text-xs text-gray-500">
+            {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredData.length)} dari {filteredData.length}
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-sm text-gray-600 font-semibold">
-              Hal {currentPage} / {totalPages || 1}
+            <span className="text-xs text-gray-600 font-medium">
+              {currentPage} / {totalPages || 1}
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages || 1, p + 1))}
               disabled={currentPage === totalPages || totalPages === 0}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>

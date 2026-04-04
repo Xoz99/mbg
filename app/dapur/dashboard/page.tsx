@@ -24,45 +24,27 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 const REFRESH_INTERVAL = 120000
 const SkeletonLoader = () => (
   <div className="space-y-6">
-    {/* Daftar Sekolah Skeleton */}
-    <div className="rounded-xl border border-[#D0B064]/20 bg-white p-6 shadow-sm space-y-3">
-      <div className="flex items-center gap-2 mb-4">
-        <Skeleton className="w-10 h-10 rounded-lg" />
-        <Skeleton className="h-6 w-1/4" />
-      </div>
+    <div className="space-y-3">
       {[...Array(2)].map((_, i) => (
-        <Skeleton key={i} className="h-16 w-full rounded-lg" />
+        <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-100 animate-pulse">
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-40 bg-gray-200 rounded" />
+            <div className="h-3 w-64 bg-gray-100 rounded" />
+          </div>
+          <div className="w-5 h-5 bg-gray-200 rounded" />
+        </div>
       ))}
     </div>
-
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Total Tray Skeleton */}
-      <div className="rounded-2xl border border-[#D0B064]/20 bg-white p-6 shadow-sm space-y-6">
-        <div className="flex justify-between items-start">
-          <div className="space-y-2 w-2/3">
-            <Skeleton className="h-6 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-          <Skeleton className="w-12 h-12 rounded-lg" />
-        </div>
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-24 w-full rounded-xl" />
+      <div className="space-y-4 animate-pulse">
+        <div className="h-5 w-48 bg-gray-200 rounded" />
+        <div className="h-10 w-full bg-gray-100 rounded-lg" />
+        <div className="h-20 w-full bg-gray-50 rounded-lg" />
       </div>
-
-      {/* Target Produksi Skeleton */}
-      <div className="rounded-2xl border border-[#D0B064]/20 bg-white p-8 shadow-sm space-y-6">
-        <div className="flex justify-between items-start">
-          <div className="space-y-2 w-1/2">
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-3 w-1/3" />
-          </div>
-          <Skeleton className="w-12 h-12 rounded-xl" />
-        </div>
-        <Skeleton className="h-20 w-3/4" />
-        <div className="space-y-3 border-t border-gray-100 pt-6">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-        </div>
+      <div className="space-y-4 animate-pulse">
+        <div className="h-5 w-32 bg-gray-200 rounded" />
+        <div className="h-16 w-24 bg-gray-100 rounded" />
+        <div className="h-4 w-48 bg-gray-50 rounded" />
       </div>
     </div>
   </div>
@@ -232,12 +214,11 @@ const DashboardDapur = () => {
 
   return (
     <DapurLayout currentPage="dashboard">
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-[#1B263A]">Dashboard Dapur</h1>
-            <p className="text-sm text-[#1B263A]/60 mt-2">Selamat datang, {userInfo.dapurName}</p>
-          </div>
+      <div className="space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard Dapur</h1>
+          <p className="text-sm text-gray-500 mt-1">Selamat datang, {userInfo.dapurName}</p>
         </div>
 
         <>
@@ -245,23 +226,20 @@ const DashboardDapur = () => {
             <SkeletonLoader />
           ) : (
             <>
-              {/* Daftar Sekolah Section */}
-              <div className="rounded-xl border border-[#D0B064]/40 bg-gradient-to-br from-[#1B263A]/5 to-[#D0B064]/5 p-6 shadow-sm">
-                <div className="flex items-center gap-2 mb-6">
-                  <div className="p-2 bg-[#D0B064]/20 rounded-lg">
-                    <CheckCircle2 className="w-5 h-5 text-[#D0B064]" />
-                  </div>
-                  <h4 className="font-bold text-[#1B263A]">
-                    Daftar Sekolah ({Array.from(new Map(menuPlanningData.map(p => [p.sekolahId, p])).values()).length})
-                  </h4>
-                </div>
-                <div className="space-y-3">
+              {/* Daftar Sekolah */}
+              <div>
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">
+                  Daftar Sekolah ({Array.from(new Map(menuPlanningData.map(p => [p.sekolahId, p])).values()).length})
+                </h2>
+                <div className="space-y-2">
                   {Array.from(new Map(menuPlanningData.map(p => [p.sekolahId, p])).values()).map((planning) => {
                     const isExpanded = expandedSekolahId === planning.sekolahId
                     return (
                       <div
                         key={planning.sekolahId}
-                        className="bg-white border border-[#D0B064]/30 rounded-lg shadow-sm hover:shadow-md hover:border-[#D0B064] transition-all cursor-pointer"
+                        className={`border rounded-xl transition-all cursor-pointer ${
+                          isExpanded ? 'border-[#D0B064] bg-[#D0B064]/5' : 'border-[#D0B064]/30 hover:border-[#D0B064]/60'
+                        }`}
                         onClick={() => {
                           if (!isExpanded) {
                             fetchSekolahDetail(planning.sekolahId)
@@ -269,64 +247,57 @@ const DashboardDapur = () => {
                           setExpandedSekolahId(isExpanded ? null : planning.sekolahId)
                         }}
                       >
-                        <div className="p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              <p className="font-bold text-[#1B263A] text-base">{planning.sekolahNama}</p>
+                        <div className="px-4 py-3">
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-gray-900 text-sm">{planning.sekolahNama}</p>
                               {!isExpanded && (
-                                <p className="text-sm text-[#1B263A]/70 mt-1 line-clamp-1">{planning.sekolahAlamat}</p>
+                                <p className="text-xs text-gray-500 mt-0.5 truncate">{planning.sekolahAlamat}</p>
                               )}
                             </div>
-                            <div className="flex-shrink-0">
-                              <ChevronDown
-                                className={`w-5 h-5 text-[#D0B064] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                              />
-                            </div>
+                            <ChevronDown
+                              className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${
+                                isExpanded ? 'rotate-180' : ''
+                              }`}
+                            />
                           </div>
 
                           {isExpanded && (
-                            <div className="mt-4 pt-4 border-t border-[#D0B064]/20 space-y-3">
-                              {/* Alamat */}
+                            <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
                               <div>
-                                <p className="text-xs font-bold text-[#D0B064] uppercase">Alamat</p>
-                                <p className="text-sm text-[#1B263A] mt-1">{planning.sekolahAlamat || sekolahDetails[planning.sekolahId]?.alamat || "—"}</p>
+                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Alamat</p>
+                                <p className="text-sm text-gray-900 mt-0.5">{planning.sekolahAlamat || sekolahDetails[planning.sekolahId]?.alamat || "—"}</p>
                               </div>
 
-                              {/* PIC Info - Dari fetch detail atau planning data */}
                               {loadingDetail[planning.sekolahId] ? (
-                                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200 animate-pulse">
-                                  <p className="text-sm text-blue-600">Loading data PIC...</p>
-                                </div>
+                                <p className="text-xs text-gray-400 animate-pulse">Memuat data PIC...</p>
                               ) : (
                                 (() => {
-                                  // Try to get PIC from fetched detail first, then fallback to planning data
                                   const detailData = sekolahDetails[planning.sekolahId]
                                   const picList = detailData?.picSekolah || planning.picSekolah
                                   const pic = picList?.[0] || picList
 
                                   return pic ? (
-                                    <div className="bg-[#D0B064]/10 rounded-lg p-3 border border-[#D0B064]/20">
-                                      <p className="text-xs font-bold text-[#D0B064] uppercase mb-2">Person In Charge</p>
-                                      <div className="space-y-1">
-                                        <p className="text-sm text-[#1B263A]">
-                                          <span className="font-medium">Nama:</span> {pic.name || pic.namaLengkap || "—"}
+                                    <div className="bg-white border border-gray-100 rounded-lg p-3">
+                                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Person In Charge</p>
+                                      <div className="space-y-1 text-sm">
+                                        <p className="text-gray-900">
+                                          <span className="text-gray-500">Nama:</span> {pic.name || pic.namaLengkap || "—"}
                                         </p>
                                         {(pic.phone || pic.noHp) && (
-                                          <p className="text-sm text-[#1B263A]">
-                                            <span className="font-medium">Telepon:</span> {pic.phone || pic.noHp || "—"}
+                                          <p className="text-gray-900">
+                                            <span className="text-gray-500">Telepon:</span> {pic.phone || pic.noHp}
                                           </p>
                                         )}
                                         {pic.email && (
-                                          <p className="text-sm text-[#1B263A]">
-                                            <span className="font-medium">Email:</span> {pic.email || "—"}
+                                          <p className="text-gray-900">
+                                            <span className="text-gray-500">Email:</span> {pic.email}
                                           </p>
                                         )}
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className="bg-gray-100 rounded-lg p-3">
-                                      <p className="text-sm text-[#1B263A]/60">Data PIC tidak tersedia</p>
-                                    </div>
+                                    <p className="text-xs text-gray-400">Data PIC tidak tersedia</p>
                                   )
                                 })()
                               )}
@@ -339,34 +310,27 @@ const DashboardDapur = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Total Tray Siap Dikirim (Left) */}
-                <div className="rounded-2xl border border-[#D0B064]/20 bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h4 className="font-bold text-[#1B263A] text-lg">Total Tray Siap Dikirim</h4>
-                      <p className="text-sm text-[#1B263A]/60 mt-1">Status pengiriman tray per sekolah</p>
-                    </div>
-                    <div className="p-3 bg-[#D0B064]/20 rounded-lg">
-                      <TrendingUp className="w-5 h-5 text-[#D0B064]" />
-                    </div>
-                  </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                {/* Total Tray Siap Dikirim */}
+                <div className="border border-[#D0B064]/30 rounded-xl p-6 bg-white flex flex-col">
+                  <h2 className="text-sm font-bold text-[#1B263A] uppercase tracking-wider mb-1">Total Tray Siap Dikirim</h2>
+                  <p className="text-xs text-gray-500 mb-4">Status pengiriman tray per sekolah</p>
 
                   {/* Dropdown Sekolah */}
-                  <div className="mb-6">
+                  <div className="mb-5">
                     <div className="flex items-center justify-between mb-2">
-                      <label className="block text-sm font-medium text-[#1B263A]">Pilih Sekolah</label>
+                      <label className="text-sm font-medium text-gray-700">Pilih Sekolah</label>
                       {selectedSekolahId && wsConnected && (
                         <div className="flex items-center gap-1">
-                          <Wifi className="w-4 h-4 text-green-600" />
-                          <span className="text-xs text-green-600">Realtime</span>
+                          <Wifi className="w-3.5 h-3.5 text-green-500" />
+                          <span className="text-xs text-green-600 font-medium">Live</span>
                         </div>
                       )}
                     </div>
                     <select
                       value={selectedSekolahId}
                       onChange={(e) => setSelectedSekolahId(e.target.value)}
-                      className="w-full px-4 py-2 border border-[#D0B064]/30 rounded-lg bg-white text-[#1B263A] focus:outline-none focus:border-[#D0B064] focus:ring-2 focus:ring-[#D0B064]/20"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
                     >
                       <option value="">-- Pilih Sekolah --</option>
                       {Array.from(new Map(menuPlanningData.map(p => [p.sekolahId, p])).values()).map((planning) => (
@@ -377,24 +341,19 @@ const DashboardDapur = () => {
                     </select>
                   </div>
 
-                  {/* Tray Summary Content */}
                   {loadingTraySummary && !traySummary ? (
-                    <div className="bg-blue-50 rounded-lg p-6 border border-blue-200 text-center">
-                      <p className="text-sm text-blue-600">Loading data tray...</p>
-                    </div>
+                    <p className="text-sm text-[#D0B064] py-6 text-center animate-pulse">Memuat data tray...</p>
                   ) : selectedSekolahId && traySummary ? (
-                    <div className="bg-gradient-to-br from-green-50 to-green-100/50 rounded-lg p-6 border border-green-200 relative group">
+                    <div className="bg-white border border-[#D0B064]/20 rounded-xl p-5">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm text-green-700 font-medium">Total Tray Siap Dikirim</p>
-                        
-                        {/* Edit Button */}
+                        <p className="text-sm font-medium text-gray-600">Total Tray Siap Dikirim</p>
                         {!isEditingTray && (
                           <button 
                             onClick={() => {
                               setIsEditingTray(true)
                               setManualTrayInputValue(String(traySummary?.manualTrayCount ?? traySummary?.totalTrayUnik ?? 0))
                             }}
-                            className="p-1.5 text-green-600 hover:bg-green-200/50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                             title="Input Manual"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -403,39 +362,31 @@ const DashboardDapur = () => {
                       </div>
 
                       {isEditingTray ? (
-                        <div className="mt-4 flex items-center gap-2">
+                        <div className="mt-3 flex items-center gap-2">
                           <input
                             type="number"
                             value={manualTrayInputValue}
                             onChange={(e) => setManualTrayInputValue(e.target.value)}
-                            className="w-24 px-3 py-2 text-2xl font-bold text-green-800 bg-white border-2 border-green-300 rounded-lg focus:outline-none focus:border-green-500"
+                            className="w-20 px-3 py-2 text-xl font-bold text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-300"
                             autoFocus
                           />
                           <button
                             onClick={async () => {
-                              // 🔥 Fallback: Jika rfid summary tidak mengembalikan menuHarianId, 
-                              // coba cari dari data planning yang sudah di-load dashboard
                               let harianId = traySummary?.menuHarianId
-                              
                               if (!harianId && selectedSekolahId) {
                                 const planning = menuPlanningData.find(p => p.sekolahId === selectedSekolahId)
                                 if (planning?.todayMenu?.id) {
                                   harianId = planning.todayMenu.id
-                                  console.log('Using fallback harianId from planning:', harianId)
                                 }
                               }
-
                               if (!harianId) {
-                                alert("Gagal menyimpan: ID Menu Harian tidak ditemukan. Pastikan menu untuk hari ini sudah terencana.")
+                                alert("Gagal menyimpan: ID Menu Harian tidak ditemukan.")
                                 return
                               }
-                              
                               setIsSavingManualTray(true)
                               try {
                                 const success = await updateManualCount(harianId, parseInt(manualTrayInputValue))
-                                if (success) {
-                                  setIsEditingTray(false)
-                                }
+                                if (success) setIsEditingTray(false)
                               } catch (err) {
                                 console.error("Error saving manual count:", err)
                               } finally {
@@ -443,19 +394,19 @@ const DashboardDapur = () => {
                               }
                             }}
                             disabled={isSavingManualTray}
-                            className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                            className="p-2 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] disabled:opacity-50 transition-colors"
                           >
-                            {isSavingManualTray ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-5 h-5" />}
+                            {isSavingManualTray ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
                           </button>
                           <button
                             onClick={() => setIsEditingTray(false)}
-                            className="p-2 bg-white text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+                            className="p-2 text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                           >
-                            <X className="w-5 h-5" />
+                            <X className="w-4 h-4" />
                           </button>
                         </div>
                       ) : (
-                        <p className="text-5xl font-black text-green-700 mt-4 flex items-baseline gap-2">
+                        <p className="text-4xl font-bold text-[#1B263A] mt-2">
                           {traySummary?.manualTrayCount !== null && traySummary?.manualTrayCount !== undefined
                             ? traySummary.manualTrayCount 
                             : (traySummary?.totalTrayUnik !== undefined && traySummary?.totalTrayUnik !== null
@@ -467,55 +418,33 @@ const DashboardDapur = () => {
                       )}
                     </div>
                   ) : (
-                    <div className="bg-gray-50 rounded-lg p-6 border border-gray-200 text-center">
-                      <p className="text-sm text-[#1B263A]/60">Pilih sekolah untuk melihat data tray</p>
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-gray-400">Pilih sekolah untuk melihat data tray</p>
                     </div>
                   )}
                 </div>
 
-                {/* Target Hari Ini Card (Right) - MODERN VERSION */}
-                <div className="rounded-2xl border border-[#D0B064]/40 bg-gradient-to-br from-[#1B263A]/5 via-white to-[#D0B064]/5 p-8 shadow-lg relative overflow-hidden">
-                  {/* Background accent */}
-                  <div className="absolute top-0 right-0 w-40 h-40 bg-[#D0B064]/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#1B263A]/10 rounded-full -ml-16 -mb-16 blur-3xl"></div>
+                {/* Target Hari Ini */}
+                <div className="border border-[#1B263A]/15 rounded-xl p-6 bg-white flex flex-col">
+                  <h2 className="text-sm font-bold text-[#1B263A] uppercase tracking-wider mb-1">Target Produksi</h2>
+                  <p className="text-xs text-gray-500 mb-5">Hari ini</p>
 
-                  <div className="relative z-10">
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-8">
-                      <div>
-                        <p className="text-sm font-semibold text-[#1B263A] uppercase tracking-wide">Target Produksi</p>
-                        <p className="text-[#1B263A]/60 text-xs mt-1">Hari Ini</p>
-                      </div>
-                      <div className="p-3 bg-gradient-to-br from-[#D0B064] to-[#c49a4f] rounded-xl shadow-lg">
-                        <CheckCircle className="w-6 h-6 text-white" />
-                      </div>
+                  <p className="text-5xl font-bold text-[#1B263A] mb-6">
+                    {stats.targetHariIni.toLocaleString()}
+                    <span className="text-base font-medium text-gray-500 ml-2">unit</span>
+                  </p>
+
+                  <div className="space-y-3 pt-4 border-t border-[#1B263A]/10">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[#1B263A]/60">Jumlah Sekolah</span>
+                      <span className="font-bold text-[#1B263A]">{stats.totalSekolah}</span>
                     </div>
-
-                    {/* Main Number */}
-                    <div className="mb-6">
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-7xl font-black bg-gradient-to-r from-[#1B263A] to-[#D0B064] bg-clip-text text-transparent">
-                          {stats.targetHariIni.toLocaleString()}
-                        </p>
-                        <p className="text-lg font-semibold text-[#1B263A]">Unit</p>
-                      </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[#1B263A]/60">Per Sekolah</span>
+                      <span className="font-bold text-[#1B263A]">
+                        {stats.totalSekolah > 0 ? Math.round(stats.targetHariIni / stats.totalSekolah) : 0} unit
+                      </span>
                     </div>
-
-                    {/* Stats Row */}
-                    <div className="space-y-3 mb-6 pb-6 border-b border-[#D0B064]/20">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-[#1B263A]/70">Jumlah Sekolah</span>
-                        <span className="font-bold text-[#1B263A] text-lg">{stats.totalSekolah}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-[#1B263A]/70">Per Sekolah</span>
-                        <span className="font-bold text-[#1B263A] text-lg">
-                          {stats.totalSekolah > 0 ? Math.round(stats.targetHariIni / stats.totalSekolah) : 0} unit
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Growth Indicator Removed (Dummy) */}
                   </div>
                 </div>
               </div>

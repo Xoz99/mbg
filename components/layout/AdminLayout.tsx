@@ -144,69 +144,59 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-[#1B263A] text-white transition-all duration-300 flex flex-col flex-shrink-0`}>
         {/* Logo Section */}
-        <div className="h-[88px] px-6 flex items-center justify-between border-b border-white/10">
+        <div className="h-[88px] px-6 flex items-center justify-between border-b border-white/5">
           {sidebarOpen ? (
             <>
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center flex-shrink-0">
-                  <ShieldAlert className="w-6 h-6 text-white" />
+                <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center overflow-hidden shadow-sm border border-white/10">
+                  <ShieldAlert className="w-5 h-5 text-white" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  {loading ? (
-                    <div className="space-y-2">
-                      <div className="h-4 bg-white/10 rounded w-3/4 animate-pulse"></div>
-                      <div className="h-3 bg-white/10 rounded w-1/2 animate-pulse"></div>
-                    </div>
-                  ) : (
-                    <>
-                      <h2 className="font-bold text-sm line-clamp-1 text-white">SUPER ADMIN</h2>
-                      <p className="text-xs text-red-300 font-semibold">Administrator</p>
-                    </>
-                  )}
+                <div className="min-w-0">
+                  <h2 className="font-bold text-sm text-white tracking-tight uppercase">SUPER ADMIN</h2>
+                  <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest leading-none">ADMINISTRATOR</p>
                 </div>
               </div>
               <button 
                 onClick={() => setSidebarOpen(false)} 
-                className="hover:bg-white/10 p-1 rounded transition-colors"
+                className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-white/50 hover:text-white"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </>
           ) : (
             <button 
               onClick={() => setSidebarOpen(true)} 
-              className="hover:bg-white/10 p-2 rounded mx-auto transition-colors"
+              className="hover:bg-white/10 p-2.5 rounded-lg mx-auto transition-colors text-white/70 hover:text-white border border-white/5"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5" />
             </button>
           )}
         </div>
 
         {/* Info Card */}
         {sidebarOpen && (
-          <div className="mx-3 mt-4 mb-2 bg-white/5 rounded-lg p-3 border border-white/10">
+          <div className="mx-4 mt-6 mb-4 bg-white/5 rounded-xl p-4 border border-white/5">
             {loading ? (
               <div className="space-y-3 animate-pulse">
-                <div className="h-4 bg-white/10 rounded w-3/4"></div>
-                <div className="h-3 bg-white/10 rounded w-2/3"></div>
-                <div className="h-3 bg-white/10 rounded w-1/2"></div>
+                <div className="h-3 bg-white/10 rounded w-3/4"></div>
+                <div className="h-2 bg-white/10 rounded w-1/2"></div>
               </div>
             ) : (
-              <>
-                <div className="flex items-start gap-2 mb-2">
-                  <ShieldAlert className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-400" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-400">Administrator</p>
-                    <p className="font-semibold text-sm text-white truncate">{userInfo.name}</p>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <ShieldAlert className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-1">Administrator</p>
+                    <p className="font-semibold text-xs text-white leading-tight">{userInfo.name}</p>
                   </div>
                 </div>
                 {userInfo.email && (
-                  <div className="pt-2 border-t border-white/10">
-                    <p className="text-xs text-gray-400">Email</p>
-                    <p className="text-xs font-medium text-white truncate">{userInfo.email}</p>
+                  <div className="pt-3 border-t border-white/5">
+                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-1">Email</p>
+                    <p className="text-xs font-semibold text-white/90 truncate">{userInfo.email}</p>
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
@@ -228,10 +218,10 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
                       handleNavigation(item.path);
                     }
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all border-l-4 ${
                     isActive 
-                      ? 'bg-red-500 text-white shadow-lg' 
-                      : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                      ? 'bg-white/5 text-red-500 border-red-500 font-bold' 
+                      : 'text-white/50 border-transparent hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
@@ -319,8 +309,8 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
 
             {/* Right side - Badge */}
             <div className="flex items-center gap-4 ml-auto">
-              <div className="flex items-center gap-3 px-6 py-2.5 rounded-full shadow-lg bg-gradient-to-r from-red-500 to-red-600 text-white">
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold">
+              <div className="flex items-center gap-3 px-6 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white">
+                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
@@ -328,8 +318,8 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
                   )}
                 </div>
                 <div className="text-left hidden md:block">
-                  <p className="text-xs text-white/80 font-medium">SUPERADMIN</p>
-                  <p className="font-bold text-white tracking-wide leading-tight text-sm">{userInfo.name}</p>
+                  <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">SUPERADMIN</p>
+                  <p className="font-bold text-white tracking-wide leading-tight text-sm line-clamp-1">{userInfo.name}</p>
                 </div>
               </div>
             </div>

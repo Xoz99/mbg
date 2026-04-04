@@ -1619,13 +1619,13 @@ export default function MenuPlanningPage() {
           </button>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+        <div className="pb-4 border-b border-gray-200">
           <div className="flex items-center gap-2 mb-3">
             <Filter className="w-5 h-5 text-gray-600" />
             <label className="text-sm font-semibold text-gray-700">Filter per Sekolah:</label>
           </div>
           {cacheLoading ? (
-            <div className="h-12 bg-gray-200 rounded-lg animate-pulse-fast"></div>
+            <div className="h-12 bg-gray-100 animate-pulse-fast"></div>
           ) : (
             <select
               value={selectedSekolahId}
@@ -1633,7 +1633,7 @@ export default function MenuPlanningPage() {
                 setSelectedSekolahId(e.target.value)
                 setSelectedPlanningId("")
               }}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent font-medium"
+              className="w-full px-4 py-3 bg-transparent border-0 border-b border-gray-300 focus:ring-0 focus:border-[#D0B064] font-medium rounded-none"
             >
               <option value="">Semua Sekolah</option>
               {sekolahList && sekolahList.length > 0 ? (
@@ -1648,6 +1648,7 @@ export default function MenuPlanningPage() {
             </select>
           )}
         </div>
+
       </div>
 
       {selectedSekolahId && (alergiList.length > 0 || holidays.length > 0 || loadingAbersensiAndOthers) && (
@@ -1660,35 +1661,35 @@ export default function MenuPlanningPage() {
           ) : (
             <>
               {alergiList.length > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="py-2 border-b border-gray-200 mb-4">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
+                    <AlertCircle className="w-5 h-5 text-gray-600 mt-1 flex-shrink-0" />
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-bold text-blue-900">Alergi Siswa di Sekolah Ini</h3>
-                        <span className="text-xs bg-blue-200 text-blue-900 px-2 py-1 rounded">{alergiPage}/{totalAlergiPages}</span>
+                        <h3 className="font-bold text-gray-900">Alergi Siswa di Sekolah Ini</h3>
+                        <span className="text-xs text-gray-500">{alergiPage}/{totalAlergiPages}</span>
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-1">
                         {paginatedAlergi.map((a, i) => (
-                          <div key={i} className="bg-gray-50 rounded p-2 text-sm">
-                            <span className="font-medium text-blue-900">{a.nama}</span>
-                            <span className="text-blue-600 ml-2">({a.jumlahSiswa} siswa)</span>
+                          <div key={i} className="text-sm">
+                            <span className="font-medium text-gray-800">{a.nama}</span>
+                            <span className="text-gray-500 ml-2">({a.jumlahSiswa} siswa)</span>
                           </div>
                         ))}
                       </div>
                       {totalAlergiPages > 1 && (
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-blue-200">
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
                           <button
                             onClick={() => setAlergiPage(Math.max(1, alergiPage - 1))}
                             disabled={alergiPage === 1}
-                            className="px-3 py-1 text-xs bg-blue-200 text-blue-900 rounded hover:bg-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-3 py-1 text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             ← Sebelumnya
                           </button>
                           <button
                             onClick={() => setAlergiPage(Math.min(totalAlergiPages, alergiPage + 1))}
                             disabled={alergiPage === totalAlergiPages}
-                            className="px-3 py-1 text-xs bg-blue-200 text-blue-900 rounded hover:bg-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-3 py-1 text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Selanjutnya →
                           </button>
@@ -1700,43 +1701,43 @@ export default function MenuPlanningPage() {
               )}
 
               {holidays.length > 0 && (
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="py-2 border-b border-gray-200 mb-4">
                   <div className="flex items-start gap-3">
-                    <Calendar className="w-5 h-5 text-purple-600 mt-1 flex-shrink-0" />
+                    <Calendar className="w-5 h-5 text-gray-600 mt-1 flex-shrink-0" />
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-bold text-purple-900">Hari Libur Sekolah</h3>
-                        <span className="text-xs bg-purple-200 text-purple-900 px-2 py-1 rounded">{holidayPage}/{totalHolidayPages}</span>
+                        <h3 className="font-bold text-gray-900">Hari Libur Sekolah</h3>
+                        <span className="text-xs text-gray-500">{holidayPage}/{totalHolidayPages}</span>
                       </div>
                       <div className="space-y-2">
                         {paginatedHolidays.map((h, i) => {
                           if (!h.tanggal) return null
 
                           return (
-                            <div key={i} className="text-gray-50 rounded p-2 text-sm">
-                              <span className="font-medium text-purple-900">
+                            <div key={i} className="text-sm">
+                              <span className="font-medium text-gray-800">
                                 {formatDateSafe(h.tanggal)}
                               </span>
-                              <p className="text-xs text-purple-600 mt-1">
-                                {h.keterangan || "Hari Libur"}
-                              </p>
+                              <span className="text-gray-500 ml-2">
+                                - {h.keterangan || "Hari Libur"}
+                              </span>
                             </div>
                           )
                         }).filter(Boolean)}
                       </div>
                       {totalHolidayPages > 1 && (
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-purple-200">
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
                           <button
                             onClick={() => setHolidayPage(Math.max(1, holidayPage - 1))}
                             disabled={holidayPage === 1}
-                            className="px-3 py-1 text-xs bg-purple-200 text-purple-900 rounded hover:bg-purple-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-3 py-1 text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             ← Sebelumnya
                           </button>
                           <button
                             onClick={() => setHolidayPage(Math.min(totalHolidayPages, holidayPage + 1))}
                             disabled={holidayPage === totalHolidayPages}
-                            className="px-3 py-1 text-xs bg-purple-200 text-purple-900 rounded hover:bg-purple-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-3 py-1 text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Selanjutnya →
                           </button>
@@ -1778,42 +1779,42 @@ export default function MenuPlanningPage() {
         )
       ) : (
         <>
-          <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] rounded-lg p-6 text-white mb-6 shadow-lg">
-            <div className="mb-6">
-              <p className="text-white/70 text-sm mb-1 font-medium">Sekolah</p>
-              <h2 className="text-2xl font-bold">{currentSekolah?.nama || "Pilih Sekolah"}</h2>
+          <div className="border-b border-gray-200 pb-5 mb-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4">
+              <div>
+                <p className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-1">Daftar Menu Harian</p>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">{currentSekolah?.nama || "Pilih Sekolah"}</h2>
+              </div>
+              
+              {currentPlanning && (
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500">Minggu Ke:</span>
+                    <span className="font-bold text-gray-900">W{currentPlanning.mingguanKe}</span>
+                  </div>
+                  <div className="hidden sm:block text-gray-300">|</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500">Periode:</span>
+                    <span className="font-semibold text-gray-900 whitespace-nowrap">
+                      {formatDateShort(currentPlanning.tanggalMulai)} - {formatDateShort(currentPlanning.tanggalSelesai)}
+                    </span>
+                  </div>
+                  <div className="hidden sm:block text-gray-300">|</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500">Total Menu:</span>
+                    <span className="font-bold text-gray-900">{menuHarianList.length}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {currentPlanning && (
-              <div className="grid grid-cols-3 gap-4 mb-6 pb-6 border-b border-white/20">
-                <div>
-                  <p className="text-white/70 text-xs font-medium">Minggu Ke</p>
-                  <p className="text-3xl font-bold mt-1">W{currentPlanning.mingguanKe}</p>
-                </div>
-                <div>
-                  <p className="text-white/70 text-xs font-medium">Periode</p>
-                  <p className="text-sm font-semibold mt-1">
-                    {formatDateSafe(currentPlanning.tanggalMulai)} - {formatDateSafe(currentPlanning.tanggalSelesai)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-white/70 text-xs font-medium">Total Menu</p>
-                  <p className="text-3xl font-bold mt-1">{menuHarianList.length}</p>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-4">
+            <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col md:flex-row md:items-center gap-4">
               {/* ONGOING WEEKS */}
-              <div>
-                <h3 className="text-sm font-semibold text-white/80 mb-3">Minggu Berlangsung</h3>
+              <div className="flex items-center gap-4 flex-1">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Pilih Minggu:</span>
                 <div className="flex flex-wrap gap-2">
                   {loading ? (
-                    <>
-                      {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="h-10 bg-white/20 rounded-lg w-32 animate-pulse"></div>
-                      ))}
-                    </>
+                    <div className="h-8 bg-gray-100 rounded w-48 animate-pulse"></div>
                   ) : (
                     filteredMenuPlannings
                       .filter((p) => !isWeekCompleted(p.tanggalSelesai))
@@ -1824,26 +1825,27 @@ export default function MenuPlanningPage() {
                               setSelectedPlanningId(planning.id)
                               setDisplayMonth(new Date(planning.tanggalMulai))
                             }}
-                            className={`px-4 py-2 rounded-lg font-medium transition flex flex-col items-start gap-1 ${planning.id === selectedPlanningId
-                              ? "bg-[#D0B064] text-white shadow-lg"
-                              : "bg-white/20 text-white hover:bg-white/30"
+                            className={`px-3 py-1.5 text-sm font-medium transition flex items-center gap-2 rounded-md ${planning.id === selectedPlanningId
+                              ? "bg-gray-900 text-white"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                               }`}
                           >
-                            <span className="text-sm font-semibold">Minggu {planning.mingguanKe}</span>
-                            <span className="text-xs opacity-90">{formatPeriode(planning.tanggalMulai, planning.tanggalSelesai)}</span>
+                            <span>W{planning.mingguanKe}</span>
+                            <span className="text-[10px] opacity-70">({formatDateShort(planning.tanggalMulai)})</span>
                           </button>
+
                           {/* 🗑️ DELETE BUTTON WITH LOADING ANIMATION */}
                           <button
                             onClick={() => handleDeleteMenuPlanning(planning.id)}
                             disabled={isDeleting === planning.id}
-                            className={`absolute -top-2 -right-2 transition rounded-full p-1 shadow-lg flex items-center justify-center ${isDeleting === planning.id
-                              ? "opacity-100 bg-orange-500 cursor-wait"
-                              : "opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600"
+                            className={`absolute -top-2 -right-2 transition rounded-full p-1 shadow-sm flex items-center justify-center ${isDeleting === planning.id
+                              ? "opacity-100 bg-orange-100 text-orange-600 cursor-wait"
+                              : "opacity-0 group-hover:opacity-100 bg-red-100 text-red-600 hover:bg-red-200"
                               }`}
                             title={isDeleting === planning.id ? "Menghapus..." : "Hapus menu planning"}
                           >
                             {isDeleting === planning.id ? (
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
                             ) : (
                               <X className="w-4 h-4" />
                             )}
@@ -1856,10 +1858,10 @@ export default function MenuPlanningPage() {
 
               {/* COMPLETED WEEKS - COLLAPSIBLE */}
               {filteredMenuPlannings.some((p) => isWeekCompleted(p.tanggalSelesai)) && (
-                <div>
+                <div className="pt-4 border-t border-gray-100">
                   <button
                     onClick={() => setShowCompletedWeeks(!showCompletedWeeks)}
-                    className="flex items-center gap-2 text-sm font-semibold text-white/70 hover:text-white transition mb-3"
+                    className="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-800 transition mb-3"
                   >
                     <span>{showCompletedWeeks ? "▼" : "▶"}</span>
                     <span>Minggu Selesai ({filteredMenuPlannings.filter((p) => isWeekCompleted(p.tanggalSelesai)).length})</span>
@@ -1876,21 +1878,20 @@ export default function MenuPlanningPage() {
                                 setSelectedPlanningId(planning.id)
                                 setDisplayMonth(new Date(planning.tanggalMulai))
                               }}
-                              className={`px-4 py-2 rounded-lg font-medium transition flex flex-col items-start gap-1 opacity-60 ${planning.id === selectedPlanningId
-                                ? "bg-[#D0B064] text-white shadow-lg"
-                                : "bg-white/10 text-white hover:bg-white/20"
+                              className={`px-3 py-1.5 text-sm font-medium transition flex items-center gap-2 rounded-md ${planning.id === selectedPlanningId
+                                ? "bg-gray-700 text-white"
+                                : "bg-gray-50 text-gray-400 hover:bg-gray-200"
                                 }`}
                               title="Week selesai (untuk referensi/bukti)"
                             >
-                              <span className="text-sm font-semibold">Minggu {planning.mingguanKe}</span>
-                              <span className="text-xs opacity-90">{formatPeriode(planning.tanggalMulai, planning.tanggalSelesai)}</span>
+                              <span>W{planning.mingguanKe}</span>
                             </button>
                             {/* ⚠️ INFO ICON - tidak bisa dihapus karena bukti */}
                             <div
-                              className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition bg-blue-500 text-white rounded-full p-1 shadow-lg"
+                              className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition bg-blue-100 text-blue-600 rounded-full p-1 shadow-sm"
                               title="Week selesai - tetap disimpan sebagai arsip/bukti"
                             >
-                              <AlertCircle className="w-4 h-4" />
+                              <AlertCircle className="w-3 h-3" />
                             </div>
                           </div>
                         ))}
@@ -1902,8 +1903,8 @@ export default function MenuPlanningPage() {
           </div>
 
           {selectedPlanningId && (
-            <div className="mb-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-[#1B263A]">Menu Harian</h2>
+            <div className="mb-4 flex justify-between items-center bg-gray-50 px-4 py-3 rounded-lg border border-gray-200">
+              <h2 className="text-lg font-bold text-gray-800">Daftar Menu Harian</h2>
               <button
                 onClick={() => {
                   setDisplayMonth(new Date(currentPlanning?.tanggalMulai || new Date()))
@@ -1967,117 +1968,93 @@ export default function MenuPlanningPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="flex flex-col border-t border-gray-200 mt-2">
               {menuHarianList.map((menu) => {
                 const dateKey = normalizeDateString(menu.tanggal) || ""
                 const absensiForDate = absensiAggregatedMap[dateKey]
 
                 return (
-                  <div key={menu.id} className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm hover:shadow-md transition">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-lg text-[#1B263A]">{menu.namaMenu}</h3>
-                          {menu.isBooked && (
-                            <span className="px-2 py-1 bg-green-500 text-white text-xs font-bold rounded-md">
-                              BOOKED
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600">{formatDateSafe(menu.tanggal)}</p>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteMenuHarian(menu.id)}
-                        disabled={isDeletingMenu === menu.id}
-                        className={`p-2 rounded-lg transition flex items-center justify-center ${isDeletingMenu === menu.id
-                          ? "bg-orange-100 text-orange-600 cursor-wait"
-                          : "text-red-600 hover:bg-red-50"
-                          }`}
-                        title={isDeletingMenu === menu.id ? "Menghapus..." : "Hapus menu"}
-                      >
-                        {isDeletingMenu === menu.id ? (
-                          <div className="w-5 h-5 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
-                        ) : (
-                          <Trash2 className="w-5 h-5" />
-                        )}
-                      </button>
-                    </div>
-
-                    {absensiForDate && (
-                      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Users className="w-4 h-4 text-indigo-600" />
-                            <span className="text-sm font-semibold text-indigo-900">
-                              {absensiForDate.jumlahHadirTotal} siswa hadir
-                            </span>
+                  <div key={menu.id} className="py-5 flex flex-col lg:flex-row lg:items-start justify-between border-b border-gray-200 gap-6">
+                    {/* LEft side: Title & Core Info */}
+                    <div className="flex-1 w-full lg:w-1/3">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-bold text-lg text-gray-900 capitalize leading-tight">{menu.namaMenu}</h3>
+                            {menu.isBooked && (
+                              <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                                Booked
+                              </span>
+                            )}
                           </div>
-                          {absensiForDate.jumlahSiswaTotal && absensiForDate.jumlahSiswaTotal > 0 && (
-                            <span className="text-xs text-indigo-600">
-                              dari {absensiForDate.jumlahSiswaTotal} siswa
-                            </span>
+                          <p className="text-sm font-medium text-gray-600">{formatDateSafe(menu.tanggal)}</p>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteMenuHarian(menu.id)}
+                          disabled={isDeletingMenu === menu.id}
+                          className={`p-1.5 rounded-lg transition-colors ml-2 ${isDeletingMenu === menu.id
+                            ? "bg-orange-50 text-orange-500 cursor-wait"
+                            : "bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-700"
+                            }`}
+                          title={isDeletingMenu === menu.id ? "Menghapus..." : "Hapus menu"}
+                        >
+                          {isDeletingMenu === menu.id ? (
+                            <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
                           )}
+                        </button>
+                      </div>
+
+                      {absensiForDate && (
+                        <div className="inline-flex items-center px-2.5 py-1 rounded bg-indigo-50 border border-indigo-100 text-xs text-indigo-700 font-medium my-2">
+                          <Users className="w-3.5 h-3.5 mr-1.5" />
+                          {absensiForDate.jumlahHadirTotal} Siswa Hadir
+                          {absensiForDate.jumlahSiswaTotal ? ` / ${absensiForDate.jumlahSiswaTotal}` : ""}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Right side: Nutrition and Operation Metrics */}
+                    <div className="flex-1 w-full lg:w-2/3 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                      {/* Operational Details */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-1">
+                          <span className="text-gray-500 text-xs">Jam Masak</span>
+                          <span className="font-semibold text-gray-900">{menu.jamMulaiMasak} - {menu.jamSelesaiMasak}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-1">
+                          <span className="text-gray-500 text-xs">Waktu Sajian</span>
+                          <span className="font-semibold text-gray-900">
+                            {(() => {
+                              const m = menu as any;
+                              const displayTime = m.jamSajikan || m.jam_sajikan || m.jamSajian;
+                              return displayTime ? `${displayTime} (${getWaktuMakan(displayTime)})` : "-";
+                            })()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-1">
+                          <span className="text-gray-500 text-xs">Target Tray</span>
+                          <span className="font-semibold text-gray-900">{menu.targetTray}</span>
                         </div>
                       </div>
-                    )}
 
-                    <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
-                      <div className="bg-blue-50 p-2 rounded">
-                        <p className="text-gray-600 text-xs">Jam Masak</p>
-                        <p className="font-semibold text-blue-900">
-                          {menu.jamMulaiMasak} - {menu.jamSelesaiMasak}
-                        </p>
-                      </div>
-                      <div className="bg-green-50 p-2 rounded">
-                        <p className="text-gray-600 text-xs">Biaya/Tray</p>
-                        <p className="font-semibold text-green-900">
-                          Rp {menu.biayaPerTray.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Kalori:</span>
-                        <span className="font-semibold">{menu.kalori} kcal</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Protein:</span>
-                        <span className="font-semibold">{menu.protein}g</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Lemak:</span>
-                        <span className="font-semibold">{menu.lemak}g</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Target Tray:</span>
-                        <span className="font-semibold">{menu.targetTray}biji</span>
-                      </div>
-                      <div className="bg-blue-50 p-2 rounded">
-                        <p className="text-gray-600 text-xs">Baik di sajikan Jam:</p>
-                        <p className="font-semibold text-blue-900">
-                          {(() => {
-                            // 🔥 DEFENSIVE: check multiple potential property names from API
-                            const m = menu as any;
-                            const displayTime = m.jamSajikan || m.jam_sajikan || m.jamSajian;
-
-                            if (displayTime) {
-                              return (
-                                <>
-                                  {displayTime}
-                                  <span className="ml-2 text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded">
-                                    {getWaktuMakan(displayTime)}
-                                  </span>
-                                </>
-                              );
-                            }
-                            return <span className="text-gray-400">Belum ditentukan</span>;
-                          })()}
-                        </p>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Karbohidrat:</span>
-                        <span className="font-semibold">{menu.karbohidrat}g</span>
+                      {/* Nutritional & Cost Details */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-1">
+                          <span className="text-gray-500 text-xs">Biaya / Tray</span>
+                          <span className="font-semibold text-green-700">Rp {menu.biayaPerTray.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-1">
+                          <span className="text-gray-500 text-xs">Makronutrisi</span>
+                          <span className="font-medium text-gray-800 text-xs">
+                            P: {menu.protein}g | L: {menu.lemak}g | K: {menu.karbohidrat}g
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-1">
+                          <span className="text-gray-500 text-xs">Total Kalori</span>
+                          <span className="font-semibold text-gray-900">{menu.kalori} kcal</span>
+                        </div>
                       </div>
                     </div>
                   </div>

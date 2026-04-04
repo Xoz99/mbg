@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import SekolahLayout from "@/components/layout/SekolahLayout"
 import { useSekolahDataCache } from "@/lib/hooks/useSekolahDataCache"
-import { Users, Loader, Camera, CheckCircle, School, X, CheckCircle2, Hash, XCircle, Sparkles, Zap, AlertTriangle, User, Users2, RefreshCw } from "lucide-react"
+import { Users, Loader, Camera, CheckCircle, School, X, CheckCircle2, Hash, XCircle, Sparkles, Zap, AlertTriangle, User, Users2, RefreshCw, Nfc } from "lucide-react"
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 const AbsensiPenerima = () => {
@@ -24,6 +24,15 @@ const AbsensiPenerima = () => {
 
   const [authToken, setAuthToken] = useState("")
   const [sekolahId, setSekolahId] = useState("")
+  const [keterangan, setKeterangan] = useState("")
+  const [statusMakanan, setStatusMakanan] = useState<"habis" | "tidak_habis">("tidak_habis")
+  
+  // State Refs to avoid stale closures in intervals
+  const trayIdRef = useRef(trayId)
+  const stepRef = useRef(step)
+
+  useEffect(() => { trayIdRef.current = trayId }, [trayId])
+  useEffect(() => { stepRef.current = step }, [step])
   const [credentialsReady, setCredentialsReady] = useState(false)
   const [siswaData, setSiswaData] = useState<Array<any>>([])
   const [kelasData, setKelasData] = useState<Array<any>>([])
@@ -298,15 +307,15 @@ const AbsensiPenerima = () => {
       const constraints: MediaStreamConstraints = {
         video: deviceId
           ? {
-              deviceId: { exact: deviceId },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            }
+            deviceId: { exact: deviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          }
           : {
-              facingMode,
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
+            facingMode,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
       }
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
@@ -352,7 +361,7 @@ const AbsensiPenerima = () => {
 
       const video = videoRef.current
       const canvas = canvasRef.current
-      const ctx = canvas.getContext("2d")
+      const ctx = canvas.getContext("2d", { willReadFrequently: true })
 
       if (!ctx) return
 
@@ -455,7 +464,7 @@ const AbsensiPenerima = () => {
 
       const video = videoRef.current
       const canvas = canvasRef.current
-      const ctx = canvas.getContext("2d")
+      const ctx = canvas.getContext("2d", { willReadFrequently: true })
 
       if (!ctx) return
 
@@ -704,6 +713,17 @@ const AbsensiPenerima = () => {
 
           if (detectedTrayId) {
             const trayIdFormatted = String(detectedTrayId).toUpperCase()
+            
+            // Critical Safety Checks:
+            // 1. If we are no longer in the RFID scan step, STOP everything.
+            if (stepRef.current !== "rfid-scan") {
+              stopRfidPolling()
+              return
+            }
+
+            // 2. If the state already has this ID, don't update/log again.
+            if (trayIdFormatted === trayIdRef.current) return;
+
             console.log("[v0] RFID detected instantly:", trayIdFormatted)
 
             if (trayIdFormatted !== lastDetectedRfid) {
@@ -711,6 +731,7 @@ const AbsensiPenerima = () => {
               console.log("[v0] Updating state with RFID:", trayIdFormatted)
 
               setTrayId(trayIdFormatted)
+              // Stop polling immediately once we have a NEW valid ID
               stopRfidPolling()
               setStep("confirm")
             }
@@ -721,6 +742,7 @@ const AbsensiPenerima = () => {
       }
     }
 
+    // Interval is safe with empty dependencies because we use Refs now!
     rfidPollingRef.current = setInterval(pollRfid, 500)
     pollRfid()
   }, [])
@@ -739,6 +761,9 @@ const AbsensiPenerima = () => {
     } else {
       stopRfidPolling()
     }
+    
+    // Proper Cleanup for the listener
+    return () => stopRfidPolling()
   }, [step, startRfidPolling, stopRfidPolling])
 
   const submitPengambilanMakanan = async (menuPhotoData: string) => {
@@ -845,507 +870,394 @@ const AbsensiPenerima = () => {
   }
 
   const StatCard = ({ title, value, subtitle, icon: Icon, color }: any) => (
-    <div className="group relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-300">
-      <div className="absolute inset-0 bg-gradient-to-br from-white via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="relative">
-        <div className="flex items-start justify-between mb-3">
-          <div className={`p-3.5 rounded-xl ${color}`}>
-            <Icon className="w-5 h-5 text-white" />
-          </div>
-          <Zap className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" />
-        </div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{title}</p>
-        <p className="text-3xl font-bold text-gray-900 mb-0.5">{value}</p>
-        <p className="text-xs text-gray-500 font-medium">{subtitle}</p>
+    <div className="py-1">
+      <div className="flex items-center gap-2 mb-0.5">
+        <Icon className={`w-3 h-3 ${color}`} />
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
       </div>
+      <p className="text-lg font-bold text-gray-900 mb-0">{value}</p>
+      <p className="text-[10px] text-gray-400">{subtitle}</p>
     </div>
   )
 
   return (
     <SekolahLayout currentPage="absensi">
       {/* Header */}
-      <div className="mb-8 pt-2">
+      <div className="mb-4 pt-1">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900">Absensi MBG</h1>
-            <p className="text-gray-600 mt-1 text-sm">Deteksi wajah & scan RFID makanan</p>
+            <h1 className="text-2xl font-bold text-gray-900">Absensi MBG</h1>
+            <p className="text-gray-600 mt-0.5 text-xs">Deteksi wajah & scan RFID makanan</p>
           </div>
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-10">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 mb-4 border border-gray-100 rounded-xl p-3 bg-white">
         <StatCard
           title="Total Siswa"
           value={stats.total}
-          subtitle="Siswa terdaftar"
+          subtitle="terdaftar"
           icon={Users}
-          color="bg-gradient-to-br from-blue-500 to-blue-600"
+          color="text-[#1B263A]"
         />
-        <StatCard
-          title="Sudah Absen"
-          value={stats.sudahAbsen}
-          subtitle={`${stats.total > 0 ? Math.round((stats.sudahAbsen / stats.total) * 100) : 0}%`}
-          icon={CheckCircle}
-          color="bg-gradient-to-br from-emerald-500 to-teal-600"
-        />
+
         <StatCard
           title="Laki-laki"
           value={stats.lakiLaki}
-          subtitle="Siswa"
-          icon={Users}
-          color="bg-gradient-to-br from-cyan-500 to-cyan-600"
+          subtitle="siswa"
+          icon={User}
+          color="text-emerald-600"
         />
         <StatCard
           title="Perempuan"
           value={stats.perempuan}
-          subtitle="Siswa"
-          icon={Users}
-          color="bg-gradient-to-br from-rose-500 to-rose-600"
+          subtitle="siswa"
+          icon={User}
+          color="text-pink-600"
         />
         <StatCard
           title="Total Kelas"
           value={stats.totalKelas}
-          subtitle="Kelas aktif"
+          subtitle="aktif"
           icon={School}
-          color="bg-gradient-to-br from-amber-500 to-amber-600"
+          color="text-amber-500"
         />
       </div>
 
       {/* STEP 1: CAMERA FACE */}
-{step === "camera-face" && (
-  <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-    {!cameraReady ? (
-      // Button untuk mulai absen
-      <div className="p-12 text-center">
-        <div className="mb-8">
-          <div className="w-32 h-32 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full mx-auto mb-6 flex items-center justify-center shadow-2xl">
-            <Camera className="w-16 h-16 text-white" />
-          </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-3">Siap untuk Ambil Makanan?</h2>
-          <p className="text-gray-600 text-lg mb-2">Sistem akan mendeteksi wajah Anda secara otomatis</p>
-          <p className="text-gray-500 text-sm">Pastikan wajah Anda terlihat jelas dan pencahayaan cukup</p>
-        </div>
-
-        <button
-          onClick={() => setCameraReady(true)}
-          className="px-10 py-4 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-2xl text-white rounded-2xl transition-all font-bold text-lg flex items-center justify-center gap-3 mx-auto transform hover:scale-105"
-        >
-          <Camera className="w-6 h-6" />
-          Mulai Absen
-        </button>
-      </div>
-    ) : (
-      <>
-        {/* Status Bar */}
-        <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-semibold text-white">Kamera Aktif</span>
-          </div>
-          <span className="text-xs text-gray-400 font-mono">STEP 1</span>
-        </div>
-
-        {/* Camera Container */}
-        <div className="relative bg-black overflow-hidden aspect-video">
-          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-          <canvas ref={canvasRef} className="hidden" />
-
-          {/* Overlay Guide */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className={`w-64 h-64 border-4 rounded-full transition-all duration-300 ${
-                faceDetected
-                  ? "border-[#D0B064] shadow-2xl shadow-[#D0B064]/40 scale-100"
-                  : "border-gray-500 animate-pulse scale-95"
-              }`}
-            >
-              {faceDetected && countdown > 0 && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-white text-6xl font-bold animate-pulse">{countdown}</div>
+      {step === "camera-face" && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          {!cameraReady ? (
+            <div className="p-12 text-center">
+              <div className="mb-8">
+                <div className="w-24 h-24 bg-gray-100 rounded-full mx-auto mb-6 flex items-center justify-center">
+                  <Camera className="w-10 h-10 text-gray-500" />
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Info Badges */}
-          <div className="absolute top-6 right-6 space-y-3">
-            {faceDetected && (
-              <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
-                <CheckCircle className="w-4 h-4" />
-                Wajah Terdeteksi
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Mulai Absen Kamera</h2>
+                <p className="text-gray-600 text-sm mb-1">Sistem akan mendeteksi wajah Anda secara otomatis</p>
+                <p className="text-gray-500 text-xs">Pastikan wajah Anda terlihat jelas dan pencahayaan cukup</p>
               </div>
-            )}
 
-            {!faceDetected && facePosition && (
-              <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg">
-                {facePosition === "too-dark" && "Terlalu gelap"}
-                {facePosition === "too-bright" && "Terlalu terang"}
-              </div>
-            )}
-          </div>
-
-          {/* Instruction */}
-          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
-            <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
-              {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
+              <button
+                onClick={() => setCameraReady(true)}
+                className="px-6 py-3 bg-[#1B263A] text-white rounded-xl hover:bg-[#2A3749] transition-colors font-medium text-sm flex items-center justify-center gap-2 mx-auto"
+              >
+                <Camera className="w-5 h-5" />
+                Mulai Absen
+              </button>
             </div>
-          </div>
-        </div>
-      </>
-    )}
-  </div>
-)}
+          ) : (
+            <>
+              {/* Status Bar */}
+              <div className="bg-[#1B263A] px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-semibold text-white">Kamera Aktif</span>
+                </div>
+                <span className="text-xs text-gray-400 font-mono">FACE DETECT</span>
+              </div>
 
-     {/* STEP 2: PROCESSING FACE */}
-{step === "processing-face" && (
-  <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
-    <div className="mb-6">
-      {facePhoto && (
-        <img
-          src={facePhoto || "/placeholder.svg"}
-          alt="Face"
-          className="w-32 h-32 rounded-full object-cover border-4 border-gray-200 mx-auto shadow-lg"
-        />
-      )}
-    </div>
-    <div className="flex justify-center mb-6">
-      <div className="relative">
-        <div className="absolute inset-0 bg-[#D0B064] rounded-full animate-pulse opacity-20"></div>
-        <div className="relative w-16 h-16 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full flex items-center justify-center">
-          <Sparkles className="w-8 h-8 text-white animate-pulse" />
-        </div>
-      </div>
-    </div>
-    <h2 className="text-2xl font-bold text-gray-900 mb-2">Mengenali Wajah...</h2>
-    <p className="text-gray-600 text-sm mb-6">Menganalisis dengan AI Detection Face</p>
-    <div className="flex justify-center gap-1.5">
-      <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"></div>
-      <div
-        className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
-        style={{ animationDelay: "0.1s" }}
-      ></div>
-      <div
-        className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
-        style={{ animationDelay: "0.2s" }}
-      ></div>
-    </div>
-  </div>
-)}
+              {/* Camera Container */}
+              <div className="relative bg-black overflow-hidden w-full h-[350px] md:h-[450px]">
+                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                <canvas ref={canvasRef} className="hidden" />
 
-     {/* STEP 2.5: DUPLICATE WARNING */}
-{step === "duplicate-warning" && duplicateSiswaInfo && (
-  <div className="max-w-2xl mx-auto">
-    <div className="bg-white rounded-2xl shadow-2xl border-2 border-red-500 overflow-hidden">
-      {/* Header - Alert */}
-      <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4">
-        <div className="flex items-center gap-3">
-          <XCircle className="w-6 h-6 text-white flex-shrink-0" />
-          <div>
-            <span className="text-sm font-bold text-white block">⚠️ SISWA SUDAH ABSEN</span>
-            <p className="text-xs text-red-100 mt-1">Siswa ini telah mencatat pengambilan makanan hari ini</p>
-          </div>
-        </div>
-      </div>
+                {/* Overlay Guide */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div
+                    className={`w-64 h-64 border-2 rounded-full transition-all duration-300 ${faceDetected
+                      ? "border-emerald-400 scale-100"
+                      : "border-gray-400 opacity-50 scale-95"
+                      }`}
+                  >
+                    {faceDetected && countdown > 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-white text-6xl font-bold animate-pulse">{countdown}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-      {/* Content */}
-      <div className="p-8">
-        {/* Student Info */}
-        <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl p-6 mb-8 border-2 border-red-200">
-          {/* Header dengan Info */}
-          <div className="mb-4">
-            <h3 className="text-xl font-bold text-gray-900">{duplicateSiswaInfo.nama}</h3>
-            <p className="text-sm text-gray-600">{duplicateSiswaInfo.kelas}</p>
-            <p className="text-xs text-gray-500">NIS: {duplicateSiswaInfo.nis}</p>
-          </div>
+                {/* Info Badges */}
+                <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+                  {faceDetected && (
+                    <div className="bg-emerald-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Terdeteksi
+                    </div>
+                  )}
 
-          {/* Photo Comparison Grid */}
-          <div className="flex items-center justify-center gap-4 mb-4">
-            {/* Foto Siswa dari Database - LEFT */}
-            <div className="text-center">
-              <p className="text-xs font-bold text-gray-600 mb-2">👤 Foto Siswa DB</p>
-              {duplicateSiswaInfo.fotoUrl ? (
-                <img
-                  src={duplicateSiswaInfo.fotoUrl || "/placeholder.svg"}
-                  alt="Foto Siswa"
-                  className="w-28 h-28 rounded-full object-cover border-4 border-red-400 shadow-lg"
-                />
-              ) : (
-                <div className="w-28 h-28 rounded-full bg-gray-200 border-4 border-red-400 flex items-center justify-center">
-                  {duplicateSiswaInfo.jenisKelamin === "LAKI_LAKI" ? (
-                    <Users2 className="w-14 h-14 text-gray-500" />
-                  ) : (
-                    <User className="w-14 h-14 text-gray-500" />
+                  {!faceDetected && facePosition && (
+                    <div className="bg-amber-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium">
+                      {facePosition === "too-dark" && "Terlalu gelap"}
+                      {facePosition === "too-bright" && "Terlalu terang"}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* Divider with Warning Icon */}
-            <div className="flex flex-col items-center gap-1">
-              <AlertTriangle className="w-10 h-10 text-red-500 animate-pulse" />
-              <p className="text-xs text-red-600 font-semibold">Duplikat</p>
-            </div>
-
-            {/* Foto dari Kamera - RIGHT */}
-            <div className="text-center">
-              <p className="text-xs font-bold text-gray-600 mb-2">📷 Foto Deteksi</p>
-              {facePhoto && (
-                <img
-                  src={facePhoto || "/placeholder.svg"}
-                  alt="Foto Validasi"
-                  className="w-28 h-28 rounded-full object-cover border-4 border-red-400 shadow-lg"
-                />
-              )}
-            </div>
-          </div>
-
-          {duplicateSiswaInfo.alergi && duplicateSiswaInfo.alergi.length > 0 && (
-            <div className="mt-4 bg-red-50 rounded-lg p-3 border-l-4 border-red-500">
-              <p className="text-xs text-red-700 font-bold">⚠️ ALERGI TERDAFTAR</p>
-              <p className="text-sm text-red-800 font-semibold mt-1">{duplicateSiswaInfo.alergi.join(", ")}</p>
-            </div>
+                {/* Instruction */}
+                <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
+                  <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
+                    {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </div>
+      )}
 
-        {/* Message */}
-        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-lg mb-8">
-          <p className="text-sm text-gray-700">
-            <span className="font-bold text-gray-900">{duplicateSiswaInfo.nama}</span> sudah tercatat absen pada hari ini.
-            <br />
-            <span className="text-xs text-gray-600 mt-2 block">Apakah Anda ingin melanjutkan atau memulai ulang dengan siswa lain?</span>
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => {
-              handleReset()
-            }}
-            className="px-6 py-3 bg-gray-200 text-gray-900 rounded-xl hover:bg-gray-300 transition-colors font-bold flex items-center justify-center gap-2"
-          >
-            <X className="w-5 h-5" />
-            Mulai Ulang
-          </button>
-          <button
-            onClick={() => {
-              setSelectedSiswa(duplicateSiswaInfo)
-              setStep("rfid-scan")
-            }}
-            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:shadow-lg text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2"
-          >
-            <CheckCircle className="w-5 h-5" />
-            Lanjutkan Anyway
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
-
-     {/* STEP 3: RFID SCAN */}
-{step === "rfid-scan" && selectedSiswa && (
-  <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-    {/* Success Header */}
-    <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4">
-      <div className="flex items-center gap-2">
-        <CheckCircle className="w-5 h-5 text-white" />
-        <span className="text-sm font-semibold text-white">Wajah Berhasil Dikenali</span>
-      </div>
-    </div>
-
-    {/* Content */}
-    <div className="p-8">
-      {/* Student Info & Photo Comparison */}
-      <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 mb-8 border-2 border-[#D0B064]/30">
-        {/* Header dengan Info */}
-        <div className="mb-4">
-          <h3 className="text-xl font-bold text-gray-900">{selectedSiswa.nama}</h3>
-          <p className="text-sm text-gray-600">{selectedSiswa.kelas}</p>
-          <p className="text-xs text-gray-500">NIS: {selectedSiswa.nis}</p>
-        </div>
-
-        {/* Photo Comparison Grid */}
-        <div className="flex items-center justify-center gap-6 mb-4">
-          {/* Foto Siswa dari Database - LEFT */}
-          <div className="text-center">
-            <p className="text-xs font-bold text-gray-600 mb-3">👤 Foto Siswa di DB</p>
-            {selectedSiswa.fotoUrl ? (
-              <img
-                src={selectedSiswa.fotoUrl || "/placeholder.svg"}
-                alt="Foto Siswa"
-                className="w-32 h-32 rounded-full object-cover border-4 border-[#D0B064] shadow-lg"
-              />
-            ) : (
-              <div className="w-32 h-32 rounded-full bg-gray-200 border-4 border-[#D0B064] flex items-center justify-center">
-                {selectedSiswa.jenisKelamin === "LAKI_LAKI" ? (
-                  <Users2 className="w-16 h-16 text-gray-500" />
-                ) : (
-                  <User className="w-16 h-16 text-gray-500" />
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Divider with Valid Icon */}
-          <div className="flex flex-col items-center gap-2">
-            <CheckCircle className="w-12 h-12 text-[#D0B064] animate-pulse" />
-            <p className="text-xs text-[#C9A355] font-semibold">Valid</p>
-          </div>
-
-          {/* Foto dari Kamera - RIGHT */}
-          <div className="text-center">
-            <p className="text-xs font-bold text-gray-600 mb-3">📷 Foto Deteksi Wajah</p>
+      {/* STEP 2: PROCESSING FACE */}
+      {step === "processing-face" && (
+        <div className="w-full bg-white rounded-xl border border-gray-100 p-12 text-center">
+          <div className="mb-6">
             {facePhoto && (
               <img
                 src={facePhoto || "/placeholder.svg"}
-                alt="Foto Validasi"
-                className="w-32 h-32 rounded-full object-cover border-4 border-[#D0B064] shadow-lg"
+                alt="Face"
+                className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 mx-auto"
               />
             )}
           </div>
+          <div className="flex justify-center mb-6">
+            <Loader className="w-8 h-8 text-[#1B263A] animate-spin" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Memproses Wajah...</h2>
+          <p className="text-gray-500 text-sm">Mohon tunggu sebentar</p>
         </div>
+      )}
 
-        {/* Verification Status */}
-        <div className="bg-white rounded-lg p-3 mb-4 border-2 border-[#D0B064]/30">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-[#D0B064] flex-shrink-0" />
-            <p className="text-sm font-semibold text-[#C9A355]">✓ Wajah cocok dengan data siswa di database</p>
-          </div>
-        </div>
-
-        {selectedSiswa.alergi && selectedSiswa.alergi.length > 0 && (
-          <div className="bg-red-50 rounded-lg p-3 border-l-4 border-red-500">
-            <p className="text-xs text-red-700 font-bold">⚠️ ALERGI TERDAFTAR</p>
-            <p className="text-sm text-red-800 font-semibold mt-1">{selectedSiswa.alergi.join(", ")}</p>
-          </div>
-        )}
-      </div>
-
-      {/* RFID Scan Section */}
-      <div className="text-center mb-8">
-        <div className="relative w-32 h-32 mx-auto mb-6">
-          <div className="absolute inset-0 border-4 border-[#D0B064]/30 rounded-full animate-ping"></div>
-          <div className="absolute inset-2 border-4 border-[#D0B064]/50 rounded-full animate-pulse"></div>
-          <div className="absolute inset-0 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full flex items-center justify-center shadow-xl">
-            <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-4c-2.2 0-4 1.8-4 4h2c0-1.1.9-2 2-2s2 .9 2 2h2c0-2.2-1.8-4-4-4zm0-4c-3.3 0-6 2.7-6 6h2c0-2.2 1.8-4 4-4s4 1.8 4 4h2c0-3.3-2.7-6-6-6zm0-4C7.6 6 4 9.6 4 14h2c0-3.3 2.7-6 6-6s6 2.7 6 6h2c0-4.4-3.6-8-8-8z" />
-            </svg>
-          </div>
-        </div>
-        <h3 className="text-xl font-bold text-gray-900 mb-2">Tempelkan RFID Tray</h3>
-        <p className="text-gray-600 text-sm">Dekatkan tray ke pembaca RFID</p>
-
-        {isScanning && (
-          <div className="mt-6 flex justify-center items-center gap-2">
-            <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"></div>
-            <div
-              className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
-              style={{ animationDelay: "0.1s" }}
-            ></div>
-            <div
-              className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"
-              style={{ animationDelay: "0.2s" }}
-            ></div>
-            <span className="text-sm text-[#C9A355] font-semibold ml-2">Menunggu scan...</span>
-          </div>
-        )}
-      </div>
-
-      {/* Manual Input Fallback */}
-      <button
-        onClick={() => setStep("input-tray")}
-        className="w-full text-center py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors font-medium text-sm border border-gray-200"
-      >
-        atau input manual
-      </button>
-    </div>
-  </div>
-)}
-
-      {/* STEP 4: INPUT TRAY ID */}
-      {step === "input-tray" && selectedSiswa && (
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4">
-              <div className="flex items-center gap-2">
-                <Hash className="w-5 h-5 text-white" />
-                <span className="text-sm font-semibold text-white">MASUKKAN ID TRAY</span>
+      {/* STEP 2.5: DUPLICATE WARNING */}
+      {step === "duplicate-warning" && duplicateSiswaInfo && (
+        <div className="w-full mx-auto">
+          <div className="bg-white rounded-xl border border-red-500 overflow-hidden">
+            {/* Header - Alert */}
+            <div className="bg-red-50 px-5 py-3 border-b border-red-100">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                <div>
+                  <span className="text-sm font-bold text-red-800 block">SISWA SUDAH ABSEN</span>
+                  <p className="text-xs text-red-600 mt-1">Siswa ini telah mencatat pengambilan makanan hari ini</p>
+                </div>
               </div>
             </div>
 
             {/* Content */}
-            <div className="p-8">
+            <div className="p-6">
               {/* Student Info */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">{selectedSiswa.nama}</h3>
-                <p className="text-sm text-gray-600">{selectedSiswa.kelas} • NIS {selectedSiswa.nis}</p>
+              <div className="border border-red-100 bg-red-50/50 rounded-xl p-5 mb-6">
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold text-gray-900">{duplicateSiswaInfo.nama}</h3>
+                  <p className="text-sm text-gray-600">{duplicateSiswaInfo.kelas}</p>
+                  <p className="text-xs text-gray-500">NIS: {duplicateSiswaInfo.nis}</p>
+                </div>
 
                 {/* Photo Comparison Grid */}
-                <div className="flex items-center justify-center gap-3 my-4">
-                  {/* Foto Siswa dari Database - LEFT */}
+                <div className="flex items-center justify-center gap-6 mb-4">
                   <div className="text-center">
-                    <p className="text-xs font-bold text-gray-600 mb-2">👤 Foto Siswa DB</p>
-                    {selectedSiswa.fotoUrl ? (
+                    {duplicateSiswaInfo.fotoUrl ? (
                       <img
-                        src={selectedSiswa.fotoUrl || "/placeholder.svg"}
+                        src={duplicateSiswaInfo.fotoUrl || "/placeholder.svg"}
                         alt="Foto Siswa"
-                        className="w-24 h-24 rounded-full object-cover border-3 border-[#D0B064] shadow-md"
+                        className="w-20 h-20 rounded-lg object-cover bg-white border border-gray-200"
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded-full bg-gray-200 border-3 border-[#D0B064] flex items-center justify-center">
-                        {selectedSiswa.jenisKelamin === "LAKI_LAKI" ? (
-                          <Users2 className="w-12 h-12 text-gray-500" />
-                        ) : (
-                          <User className="w-12 h-12 text-gray-500" />
-                        )}
+                      <div className="w-20 h-20 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+                        <User className="w-8 h-8 text-gray-400" />
                       </div>
                     )}
+                    <p className="text-xs font-semibold text-gray-500 mt-2">Foto Data Base</p>
                   </div>
 
-                  {/* Divider with Valid Icon */}
                   <div className="flex flex-col items-center gap-1">
-                    <CheckCircle className="w-8 h-8 text-[#D0B064]" />
-                    <p className="text-xs text-[#C9A355] font-semibold">✓</p>
+                    <AlertTriangle className="w-6 h-6 text-red-500" />
+                    <p className="text-[10px] text-red-600 font-bold uppercase">Duplikat</p>
                   </div>
 
-                  {/* Foto dari Kamera - RIGHT */}
                   <div className="text-center">
-                    <p className="text-xs font-bold text-gray-600 mb-2">📷 Foto Deteksi</p>
                     {facePhoto && (
                       <img
                         src={facePhoto || "/placeholder.svg"}
-                        alt="Foto Deteksi"
-                        className="w-24 h-24 rounded-full object-cover border-3 border-[#D0B064] shadow-md"
+                        alt="Foto Validasi"
+                        className="w-20 h-20 rounded-lg object-cover bg-white border border-gray-200"
                       />
                     )}
+                    <p className="text-xs font-semibold text-gray-500 mt-2">Deteksi</p>
                   </div>
                 </div>
 
-                {selectedSiswa.alergi && selectedSiswa.alergi.length > 0 && (
-                  <div className="bg-red-50 rounded-lg p-3 border-l-4 border-red-500 mt-4">
-                    <p className="text-xs text-red-700 font-bold">⚠️ ALERGI</p>
-                    <p className="text-sm text-red-800">{selectedSiswa.alergi.join(", ")}</p>
+                {duplicateSiswaInfo.alergi && duplicateSiswaInfo.alergi.length > 0 && (
+                  <div className="mt-4 bg-red-50 rounded-lg p-3 border-l-4 border-red-500">
+                    <p className="text-xs text-red-700 font-bold mb-1">Alergi Terdaftar</p>
+                    <p className="text-sm text-red-800 font-medium">{duplicateSiswaInfo.alergi.join(", ")}</p>
                   </div>
                 )}
               </div>
 
-              {/* Input */}
-              <div className="mb-8">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">ID TRAY</label>
+              {/* Message */}
+              <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg mb-6 text-sm text-amber-900">
+                <p>
+                  <span className="font-bold">{duplicateSiswaInfo.nama}</span> sudah tercatat absen hari ini.
+                  <br />
+                  Lanjutkan untuk menimpa, atau mulai ulang untuk scan siswa lain.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleReset()}
+                  className="px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  <X className="w-4 h-4" />
+                  Mulai Ulang
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedSiswa(duplicateSiswaInfo)
+                    setStep("rfid-scan")
+                  }}
+                  className="px-4 py-2 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Lanjutkan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: RFID SCAN */}
+      {step === "rfid-scan" && selectedSiswa && (
+        <div className="w-full bg-white rounded-xl border border-gray-100 overflow-hidden mx-auto">
+          <div className="bg-emerald-50 px-5 py-3 border-b border-emerald-100">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-semibold text-emerald-800">Wajah Dikenali</span>
+            </div>
+          </div>
+
+          <div className="p-4">
+            <div className="text-center border border-gray-100 bg-gray-50 rounded-xl p-3 mb-4">
+              <h3 className="text-xl font-bold text-gray-900 mb-1">{selectedSiswa.nama}</h3>
+              <p className="text-sm text-gray-500 mb-1">{selectedSiswa.kelas}</p>
+              <p className="text-xs text-gray-400 mb-4">NIS: {selectedSiswa.nis}</p>
+
+              <div className="flex justify-center items-center gap-6 my-4">
+                <div>
+                  {selectedSiswa.fotoUrl ? (
+                    <img
+                      src={selectedSiswa.fotoUrl || "/placeholder.svg"}
+                      alt="Foto"
+                      className="w-20 h-20 rounded-lg object-cover bg-white border border-gray-200"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+                      <User className="w-8 h-8 text-gray-400" />
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">Foto Data Base</p>
+                </div>
+
+                <div className="flex items-center gap-2 text-emerald-500">
+                  <div className="w-4 h-px bg-emerald-200"></div>
+                  <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                  <div className="w-4 h-px bg-emerald-200"></div>
+                </div>
+
+                <div>
+                  {facePhoto && (
+                    <img
+                      src={facePhoto || "/placeholder.svg"}
+                      alt="Deteksi"
+                      className="w-20 h-20 rounded-lg object-cover bg-white border border-gray-200"
+                    />
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">Deteksi</p>
+                </div>
+              </div>
+
+              {selectedSiswa.alergi && selectedSiswa.alergi.length > 0 && (
+                <div className="bg-red-50 rounded-lg p-3 border-l-4 border-red-500 text-left mt-4">
+                  <p className="text-xs text-red-700 font-bold">ALERGI TERDAFTAR</p>
+                  <p className="text-sm text-red-800 font-medium mt-1">{selectedSiswa.alergi.join(", ")}</p>
+                </div>
+              )}
+            </div>
+
+            {/* RFID Scan Section */}
+            <div className="text-center mb-6">
+              <div className="relative w-32 h-32 mx-auto mb-6 bg-white rounded-full flex flex-col items-center justify-center border-2 border-gray-100 shadow-xl shadow-gray-100/50">
+                {isScanning && (
+                  <div className="absolute inset-0 border border-[#1B263A] rounded-full animate-ping opacity-20"></div>
+                )}
+                <Nfc className="w-8 h-8 text-[#1B263A]" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Tempelkan RFID Tray</h3>
+              <p className="text-gray-500 text-xs">Dekatkan tray ke pembaca RFID</p>
+
+              {isScanning && (
+                <div className="mt-4 flex justify-center items-center gap-2">
+                  <Loader className="w-4 h-4 text-[#1B263A] animate-spin" />
+                  <span className="text-sm text-[#1B263A] font-medium">Menunggu scan...</span>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setStep("input-tray")}
+              className="w-full text-center py-2 text-gray-500 hover:text-gray-900 transition-colors text-xs underline"
+            >
+              Input tray manual
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 4: INPUT TRAY ID */}
+      {step === "input-tray" && selectedSiswa && (
+        <div className="w-full mx-auto">
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <div className="bg-[#1B263A] px-5 py-3">
+              <div className="flex items-center gap-2">
+                <Nfc className="w-4 h-4 text-white" />
+                <span className="text-sm font-semibold text-white">MASUKKAN ID TRAY</span>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-6 border border-gray-100 bg-gray-50 p-4 rounded-xl">
+                {selectedSiswa.fotoUrl ? (
+                  <img
+                    src={selectedSiswa.fotoUrl || "/placeholder.svg"}
+                    alt="Foto Siswa"
+                    className="w-16 h-16 rounded-lg object-cover border border-gray-200"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+                    <User className="w-6 h-6 text-gray-400" />
+                  </div>
+                )}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-0.5">{selectedSiswa.nama}</h3>
+                  <p className="text-sm text-gray-500">{selectedSiswa.kelas} • NIS {selectedSiswa.nis}</p>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">ID TRAY</label>
                 <input
                   type="text"
                   value={trayId}
                   onChange={(e) => setTrayId(e.target.value.toUpperCase())}
                   placeholder="Contoh: TRAY001"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-[#D0B064] focus:border-transparent text-lg font-mono text-center transition-all"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#1B263A] focus:border-[#1B263A] font-mono text-lg transition-all"
                   autoFocus
                 />
               </div>
 
-              {/* Actions */}
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => {
@@ -1356,14 +1268,14 @@ const AbsensiPenerima = () => {
                     setIsPreparationActive(false)
                     setStep("camera-face")
                   }}
-                  className="px-4 py-3 bg-gray-200 text-gray-900 rounded-xl hover:bg-gray-300 transition-colors font-semibold"
+                  className="px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
                 >
-                  Ulangi
+                  Batal
                 </button>
                 <button
                   onClick={handleTraySubmit}
                   disabled={!trayId.trim()}
-                  className="px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-lg text-white rounded-xl transition-all font-semibold disabled:opacity-50"
+                  className="px-4 py-2 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition-colors text-sm font-medium disabled:opacity-50"
                 >
                   Lanjut
                 </button>
@@ -1374,287 +1286,271 @@ const AbsensiPenerima = () => {
       )}
 
       {/* STEP 5: CONFIRM */}
-{step === "confirm" && (
-  <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-    {/* Header */}
-    <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4">
-      <span className="text-sm font-semibold text-white">STEP 5 - KONFIRMASI DATA</span>
-    </div>
-
-    <div className="p-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">Verifikasi Data</h2>
-
-      {/* Photo Preview */}
-      {facePhoto && (
-        <div className="mb-8 text-center">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Foto Wajah</p>
-          <img
-            src={facePhoto || "/placeholder.svg"}
-            alt="Face preview"
-            className="w-32 h-32 rounded-full object-cover border-4 border-gray-300 mx-auto shadow-lg"
-          />
-        </div>
-      )}
-
-      {/* Tray Info */}
-      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 mb-8 border border-gray-200">
-        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">🍱 ID TRAY</p>
-        <p className="text-3xl font-bold text-gray-900 font-mono">{trayId}</p>
-      </div>
-
-      <p className="text-lg font-bold text-gray-900 text-center mb-8">Lanjut ke foto makanan?</p>
-
-      {/* Actions */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={handleConfirmNo}
-          className="px-6 py-3 bg-gray-200 text-gray-900 rounded-xl hover:bg-gray-300 transition-colors font-bold flex items-center justify-center gap-2"
-        >
-          <X className="w-5 h-5" />
-          Batal
-        </button>
-        <button
-          onClick={handleConfirmYes}
-          className="px-6 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-lg text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2"
-        >
-          <CheckCircle className="w-5 h-5" />
-          Lanjut
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-{/* STEP 6: CAMERA MENU */}
-{step === "camera-menu" && (
-  <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-    {/* Status Bar */}
-    <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 flex items-center justify-between gap-4">
-      <div className="flex items-center gap-2">
-        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-        <span className="text-sm font-semibold text-white">Kamera Aktif</span>
-      </div>
-
-      {/* Camera Selector di Header */}
-      <div className="flex items-center gap-3">
-        {availableCameras.length > 0 && (
-          <>
-            <select
-              value={selectedCameraId}
-              onChange={(e) => {
-                setSelectedCameraId(e.target.value)
-                stopCamera(true) // Keep preparation countdown running
-                setTimeout(() => {
-                  startCamera("environment", e.target.value)
-                }, 100)
-              }}
-              className="px-3 py-1.5 border border-gray-600 bg-gray-800 text-white rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-            >
-              {availableCameras.map((camera, index) => (
-                <option key={camera.deviceId} value={camera.deviceId}>
-                  {camera.label || `Camera ${index + 1}`}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                enumerateCameras()
-              }}
-              className="p-1.5 text-white hover:text-emerald-400 hover:bg-gray-700 rounded-lg transition-colors"
-              title="Refresh cameras"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </>
-        )}
-        <span className="text-xs text-gray-400 font-mono">STEP 6</span>
-      </div>
-    </div>
-
-    {/* Camera */}
-    <div className="relative bg-black overflow-hidden aspect-video">
-      <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-      <canvas ref={canvasRef} className="hidden" />
-
-      {/* Detection Overlay Guide */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div
-          className={`w-96 h-64 border-4 rounded-2xl transition-all duration-300 ${
-            isPreparationActive
-              ? "border-blue-500 shadow-2xl shadow-blue-500/40 scale-100"
-              : foodConditionOk
-                ? "border-[#D0B064] shadow-2xl shadow-[#D0B064]/40 scale-100"
-                : "border-gray-500 animate-pulse scale-95"
-          }`}
-        >
-          {/* Preparation Countdown */}
-          {isPreparationActive && preparationCountdown > 0 && (
-            <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
-              <div className="text-white text-9xl font-bold animate-pulse">{preparationCountdown}</div>
-              <div className="text-white text-xl font-semibold bg-black/50 px-4 py-2 rounded-lg">
-                Persiapan Camera
+      {step === "confirm" && (
+        <div className="w-full mx-auto">
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <div className="bg-[#1B263A] px-5 py-3">
+              <div className="flex items-center gap-2">
+                <Nfc className="w-4 h-4 text-white" />
+                <span className="text-sm font-semibold text-white">KONFIRMASI TRAY</span>
               </div>
             </div>
-          )}
-          {/* Capture Countdown */}
-          {!isPreparationActive && isMenuCountdownActive && menuCountdown > 0 && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-white text-9xl font-bold animate-pulse">{menuCountdown}</div>
+
+            <div className="p-6 text-center">
+              <Nfc className="w-8 h-8 text-gray-400 mx-auto mb-4" />
+              <p className="text-sm text-gray-500 mb-1">ID TRAY</p>
+              <p className="text-3xl font-bold text-gray-900 font-mono mb-6">{trayId}</p>
+
+              <p className="text-sm font-medium text-gray-700 mb-6">Lanjut ke foto makanan?</p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={handleConfirmNo}
+                  className="px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleConfirmYes}
+                  className="px-4 py-2 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition-colors text-sm font-medium"
+                >
+                  Lanjut Kamera
+                </button>
+              </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
-
-      {/* Status Badges */}
-      <div className="absolute top-6 right-6 space-y-3">
-        {isPreparationActive && (
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
-            <Camera className="w-4 h-4" />
-            Persiapan {preparationCountdown}s
-          </div>
-        )}
-
-        {!isPreparationActive && foodConditionOk && (
-          <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
-            <CheckCircle className="w-4 h-4" />
-            Kondisi Baik
-          </div>
-        )}
-
-        {!isPreparationActive && !foodConditionOk && foodCondition && (
-          <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg">
-            {foodCondition === "too-dark" && "⚫ Terlalu Gelap"}
-            {foodCondition === "too-bright" && "⚪ Terlalu Terang"}
-          </div>
-        )}
-      </div>
-
-      {/* Switch Camera Button - Floating */}
-      {availableCameras.length > 1 && (
-        <button
-          onClick={() => {
-            const currentIndex = availableCameras.findIndex((cam) => cam.deviceId === selectedCameraId)
-            const nextIndex = (currentIndex + 1) % availableCameras.length
-            const nextCamera = availableCameras[nextIndex]
-            setSelectedCameraId(nextCamera.deviceId)
-            stopCamera(true) // Keep preparation countdown running
-            setTimeout(() => {
-              startCamera("environment", nextCamera.deviceId)
-            }, 100)
-          }}
-          className="absolute bottom-6 right-6 bg-black/70 hover:bg-black/90 text-white px-5 py-3 rounded-full text-sm font-semibold flex items-center gap-2 transition-all shadow-lg"
-        >
-          <Camera className="w-5 h-5" />
-          Switch Camera
-        </button>
       )}
-    </div>
-  </div>
-)}
+      {/* STEP 6: CAMERA MENU */}
+      {step === "camera-menu" && (
+        <div className="w-full bg-white rounded-xl border border-gray-100 overflow-hidden">
+          {/* Status Bar */}
+          <div className="bg-[#1B263A] px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-sm font-semibold text-white">Kamera Aktif</span>
+            </div>
 
-{/* STEP 7: SUBMITTING */}
-{step === "submitting" && (
-  <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
-    <div className="relative w-16 h-16 mx-auto mb-6">
-      <div className="absolute inset-0 bg-[#D0B064] rounded-full animate-ping opacity-20"></div>
-      <Loader className="w-full h-full animate-spin text-[#D0B064] relative" />
-    </div>
-    <h2 className="text-xl font-bold text-gray-900 mb-2">Menyimpan Data...</h2>
-    <p className="text-gray-600 text-sm">Sistem sedang memproses informasi</p>
-  </div>
-)}
+            {/* Camera Selector di Header */}
+            <div className="flex items-center gap-3">
+              {availableCameras.length > 0 && (
+                <>
+                  <select
+                    value={selectedCameraId}
+                    onChange={(e) => {
+                      setSelectedCameraId(e.target.value)
+                      stopCamera(true) // Keep preparation countdown running
+                      setTimeout(() => {
+                        startCamera("environment", e.target.value)
+                      }, 100)
+                    }}
+                    className="px-3 py-1.5 border border-gray-600 bg-gray-800 text-white rounded-lg text-xs font-medium focus:ring-1 focus:ring-emerald-500 focus:border-transparent transition-all outline-none"
+                  >
+                    {availableCameras.map((camera, index) => (
+                      <option key={camera.deviceId} value={camera.deviceId}>
+                        {camera.label || `Camera ${index + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      enumerateCameras()
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+                    title="Refresh cameras"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+              <span className="text-xs text-gray-400 font-mono">MENU DETECT</span>
+            </div>
+          </div>
 
-{/* STEP 8: RESULT */}
-{step === "result" && (
-  <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-    {/* Header */}
-    <div
-      className={`bg-gradient-to-r ${validationResult?.success ? "from-[#D0B064] to-[#C9A355]" : "from-red-500 to-red-600"} px-6 py-4`}
-    >
-      <div className="flex items-center gap-2">
-        {validationResult?.success ? (
-          <>
-            <CheckCircle2 className="w-5 h-5 text-white" />
-            <span className="text-sm font-semibold text-white">Berhasil Disimpan</span>
-          </>
-        ) : (
-          <>
-            <XCircle className="w-5 h-5 text-white" />
-            <span className="text-sm font-semibold text-white">Gagal Disimpan</span>
-          </>
-        )}
-      </div>
-    </div>
+          {/* Camera */}
+          <div className="relative bg-black overflow-hidden w-full h-[350px] md:h-[450px]">
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            <canvas ref={canvasRef} className="hidden" />
 
-    {/* Content */}
-    <div className="p-8">
-      <div className="text-center mb-8">
-        <div
-          className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
-            validationResult?.success ? "bg-amber-100" : "bg-red-100"
+            {/* Detection Overlay Guide */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div
+                className={`w-96 h-64 border-2 rounded-xl transition-all duration-300 ${isPreparationActive
+                  ? "border-blue-400 scale-100"
+                  : foodConditionOk
+                ? "border-emerald-400 scale-100"
+              : "border-gray-500 opacity-50 scale-95"
           }`}
         >
-          {validationResult?.success ? (
-            <CheckCircle2 className="w-12 h-12 text-[#D0B064]" />
-          ) : (
-            <XCircle className="w-12 h-12 text-red-600" />
+              {/* Preparation Countdown */}
+              {isPreparationActive && preparationCountdown > 0 && (
+                <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
+                  <div className="text-white text-9xl font-bold animate-pulse">{preparationCountdown}</div>
+                  <div className="text-white text-sm font-semibold bg-black/60 px-4 py-2 rounded-lg backdrop-blur">
+                    Persiapan Frame
+                  </div>
+                </div>
+              )}
+              {/* Capture Countdown */}
+              {!isPreparationActive && isMenuCountdownActive && menuCountdown > 0 && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-white text-9xl font-bold animate-pulse">{menuCountdown}</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Status Badges */}
+          <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+            {isPreparationActive && (
+              <div className="bg-blue-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5" />
+                Persiapan {preparationCountdown}s
+              </div>
+            )}
+
+            {!isPreparationActive && foodConditionOk && (
+              <div className="bg-emerald-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Kondisi Baik
+              </div>
+            )}
+
+            {!isPreparationActive && !foodConditionOk && foodCondition && (
+              <div className="bg-amber-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                {foodCondition === "too-dark" && "Terlalu gelap"}
+                {foodCondition === "too-bright" && "Terlalu terang"}
+              </div>
+            )}
+          </div>
+
+          {/* Switch Camera Button - Floating */}
+          {availableCameras.length > 1 && (
+            <button
+              onClick={() => {
+                const currentIndex = availableCameras.findIndex((cam) => cam.deviceId === selectedCameraId)
+                const nextIndex = (currentIndex + 1) % availableCameras.length
+                const nextCamera = availableCameras[nextIndex]
+                setSelectedCameraId(nextCamera.deviceId)
+                stopCamera(true) // Keep preparation countdown running
+                setTimeout(() => {
+                  startCamera("environment", nextCamera.deviceId)
+                }, 100)
+              }}
+              className="absolute bottom-6 right-6 bg-black/60 hover:bg-black/80 backdrop-blur text-white px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all border border-gray-600"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Ganti Kamera
+            </button>
           )}
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          {validationResult?.success ? "Berhasil!" : "Gagal!"}
-        </h2>
-        <p className="text-gray-600">{validationResult?.message}</p>
-      </div>
-
-      {/* Success Info */}
-      {validationResult?.success && validationResult?.siswa && (
-        <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 mb-6 border-2 border-[#D0B064]/30">
-          <p className="text-xs font-bold text-[#C9A355] mb-3">✓ DATA TERSIMPAN</p>
-          <p className="text-xl font-bold text-gray-900 mb-1">{validationResult.siswa.nama}</p>
-          <p className="text-sm text-gray-600 mb-3">
-            {validationResult.siswa.kelas} • NIS {validationResult.siswa.nis}
-          </p>
-          <p className="text-lg font-mono font-bold text-[#C9A355] mb-3">🍱 {trayId}</p>
-          {validationResult.siswa.alergi && validationResult.siswa.alergi.length > 0 && (
-            <div className="pt-3 border-t border-[#D0B064]/30">
-              <p className="text-xs text-gray-700">⚠️ Alergi: {validationResult.siswa.alergi.join(", ")}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Photo Grid */}
-      {(facePhoto || menuPhoto) && (
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          {facePhoto && (
-            <div>
-              <p className="text-xs font-semibold text-gray-600 mb-2">Foto Wajah</p>
-              <img
-                src={facePhoto || "/placeholder.svg"}
-                alt="Face"
-                className="w-full rounded-xl border-2 border-gray-200"
-              />
-            </div>
-          )}
-          {menuPhoto && (
-            <div>
-              <p className="text-xs font-semibold text-gray-600 mb-2">Foto Makanan</p>
-              <img
-                src={menuPhoto || "/placeholder.svg"}
-                alt="Menu"
-                className="w-full rounded-xl border-2 border-gray-200"
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      <p className="text-center text-gray-500 text-xs">Kembali otomatis dalam 5 detik...</p>
-    </div>
   </div>
-)}
+  )
+}
+
+{/* STEP 7: SUBMITTING */ }
+{
+  step === "submitting" && (
+    <div className="w-full bg-white rounded-xl border border-gray-100 p-12 text-center mx-auto">
+      <Loader className="w-8 h-8 text-[#1B263A] animate-spin mx-auto mb-4" />
+      <h2 className="text-lg font-bold text-gray-900 mb-1">Menyimpan Data...</h2>
+      <p className="text-gray-500 text-sm">Sistem sedang merekam absensi</p>
+    </div>
+  )
+}
+
+{/* STEP 8: RESULT */ }
+{
+  step === "result" && (
+    <div className="w-full mx-auto">
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div
+          className={`px-5 py-3 border-b ${validationResult?.success ? "bg-emerald-50 border-emerald-100" : "bg-red-50 border-red-100"}`}
+        >
+          <div className="flex items-center gap-2">
+            {validationResult?.success ? (
+              <>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span className="text-sm font-semibold text-emerald-800">Berhasil Disimpan</span>
+              </>
+            ) : (
+              <>
+                <XCircle className="w-4 h-4 text-red-600" />
+                <span className="text-sm font-semibold text-red-800">Gagal Disimpan</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="p-4">
+          <div className="text-center mb-4">
+            {validationResult?.success ? (
+              <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
+            ) : (
+              <XCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
+            )}
+            <h2 className="text-xl font-bold text-gray-900 mb-1">
+              {validationResult?.success ? "Absen Berhasil!" : "Gagal!"}
+            </h2>
+            <p className="text-gray-500 text-sm">{validationResult?.message}</p>
+          </div>
+
+          {validationResult?.success && validationResult?.siswa && (
+            <div className="border border-gray-100 bg-gray-50 rounded-xl p-5 text-center mb-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-1">{validationResult.siswa.nama}</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                {validationResult.siswa.kelas} • NIS {validationResult.siswa.nis}
+              </p>
+              <div className="inline-block bg-white border border-gray-200 px-4 py-2 rounded-lg font-mono font-bold text-[#1B263A] mb-4">
+                🍱 {trayId}
+              </div>
+              {validationResult.siswa.alergi && validationResult.siswa.alergi.length > 0 && (
+                <div className="bg-red-50 rounded-lg p-3 text-left">
+                  <p className="text-xs text-red-700 font-bold mb-1">Alergi Terdaftar</p>
+                  <p className="text-sm text-red-800">{validationResult.siswa.alergi.join(", ")}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {(facePhoto || menuPhoto) && (
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              {facePhoto && (
+                <div>
+                  <img
+                    src={facePhoto || "/placeholder.svg"}
+                    alt="Face"
+                    className="w-full aspect-square object-cover rounded-xl border border-gray-200 bg-gray-50"
+                  />
+                  <p className="text-xs text-center font-medium text-gray-500 mt-2">Wajah</p>
+                </div>
+              )}
+              {menuPhoto && (
+                <div>
+                  <img
+                    src={menuPhoto || "/placeholder.svg"}
+                    alt="Menu"
+                    className="w-full aspect-square object-cover rounded-xl border border-gray-200 bg-gray-50"
+                  />
+                  <p className="text-xs text-center font-medium text-gray-500 mt-2">Makanan</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="text-center">
+            <p className="inline-block px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
+              Kembali otomatis dalam 5 detik
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
     </SekolahLayout>
   )
 }

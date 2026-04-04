@@ -42,8 +42,8 @@ const SkeletonDriverCard = () => (
 );
 
 const SkeletonListHeader = () => (
-  <div className="p-6 border-b border-gray-100" style={{ backgroundColor: '#1B263A' }}>
-    <div className="h-6 bg-gray-700 rounded w-1/3 animate-pulse"></div>
+  <div className="mb-4">
+    <div className="h-6 bg-gray-200 rounded w-1/3 animate-pulse"></div>
   </div>
 );
 
@@ -294,32 +294,29 @@ const CreateDriverPage = () => {
         )}
 
         {/* Main Content - Two Column Layout */}
-        <div className="grid lg:grid-cols-3 gap-6 items-start">
+        <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start mt-8 border-t border-gray-200 pt-8">
           {/* Left - Create Driver Form */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
-              {/* Form Header */}
-              <div className="p-6 border-b border-gray-100" style={{ backgroundColor: '#1B263A' }}>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Plus className="w-5 h-5" />
-                  Tambah Driver Baru
-                </h2>
-              </div>
+          <div className="lg:col-span-8">
+            <div className="mb-6 pb-4 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-gray-400" />
+                Tambah Driver Baru
+              </h2>
+            </div>
 
-              {/* Form Content */}
-              <div className="p-8">
-                <form onSubmit={handleCreateDriver} className="space-y-6">
-                  {/* Email */}
-                  <div>
-                    <label className="block text-sm font-semibold mb-2" style={{ color: '#1B263A' }}>
-                      <Mail className="w-4 h-4 inline mr-2" />
-                      Email <span style={{ color: '#D0B064' }}>*</span>
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={form.email}
-                      onChange={handleInputChange}
+            {/* Form Content */}
+            <form onSubmit={handleCreateDriver} className="space-y-5">
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-semibold mb-1.5 text-gray-700">
+                  <Mail className="w-4 h-4 inline mr-2 text-gray-400" />
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleInputChange}
                       placeholder="driver@example.com"
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none transition-all"
                       style={{ 
@@ -330,156 +327,140 @@ const CreateDriverPage = () => {
                     />
                   </div>
 
-                  {/* Nama */}
-                  <div>
-                    <label className="block text-sm font-semibold mb-2" style={{ color: '#1B263A' }}>
-                      <User className="w-4 h-4 inline mr-2" />
-                      Nama Driver <span style={{ color: '#D0B064' }}>*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={form.name}
-                      onChange={handleInputChange}
-                      placeholder="Nama Driver"
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none transition-all"
-                      style={{ 
-                        borderColor: form.name ? '#D0B064' : '#e5e7eb',
-                        '--tw-ring-color': '#D0B064'
-                      } as any}
-                      required
-                    />
-                  </div>
+              {/* Nama */}
+              <div>
+                <label className="block text-sm font-semibold mb-1.5 text-gray-700">
+                  <User className="w-4 h-4 inline mr-2 text-gray-400" />
+                  Nama Driver <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={form.name}
+                  onChange={handleInputChange}
+                  placeholder="Nama Driver"
+                  className="w-full px-4 py-2 border border-gray-200 rounded focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-all"
+                  required
+                />
+              </div>
 
-                  {/* Phone */}
-                  <div>
-                    <label className="block text-sm font-semibold mb-2" style={{ color: '#1B263A' }}>
-                      <Phone className="w-4 h-4 inline mr-2" />
-                      Nomor Telepon <span style={{ color: '#D0B064' }}>*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={form.phone}
-                      onChange={handleInputChange}
-                      placeholder="08123456789"
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none transition-all"
-                      style={{ 
-                        borderColor: form.phone ? '#D0B064' : '#e5e7eb',
-                        '--tw-ring-color': '#D0B064'
-                      } as any}
-                      required
-                    />
-                  </div>
+              {/* Phone */}
+              <div>
+                <label className="block text-sm font-semibold mb-1.5 text-gray-700">
+                  <Phone className="w-4 h-4 inline mr-2 text-gray-400" />
+                  Nomor Telepon <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={form.phone}
+                  onChange={handleInputChange}
+                  placeholder="08123456789"
+                  className="w-full px-4 py-2 border border-gray-200 rounded focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-all"
+                  required
+                />
+              </div>
 
-                  {/* Nomor Kendaraan */}
-                  <div>
-                    <label className="block text-sm font-semibold mb-2" style={{ color: '#1B263A' }}>
-                      <Truck className="w-4 h-4 inline mr-2" />
-                      Nomor Kendaraan <span style={{ color: '#D0B064' }}>*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="nomorKendaraan"
-                      value={form.nomorKendaraan}
-                      onChange={handleInputChange}
-                      placeholder="B 1234 CD"
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none transition-all"
-                      style={{ 
-                        borderColor: form.nomorKendaraan ? '#D0B064' : '#e5e7eb',
-                        '--tw-ring-color': '#D0B064'
-                      } as any}
-                      required
-                    />
-                  </div>
+              {/* Nomor Kendaraan */}
+              <div>
+                <label className="block text-sm font-semibold mb-1.5 text-gray-700">
+                  <Truck className="w-4 h-4 inline mr-2 text-gray-400" />
+                  Nomor Kendaraan <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="nomorKendaraan"
+                  value={form.nomorKendaraan}
+                  onChange={handleInputChange}
+                  placeholder="B 1234 CD"
+                  className="w-full px-4 py-2 border border-gray-200 rounded focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-all"
+                  required
+                />
+              </div>
 
-                  {/* Password */}
-                  <div>
-                    <label className="block text-sm font-semibold mb-2" style={{ color: '#1B263A' }}>
-                      <Key className="w-4 h-4 inline mr-2" />
-                      Password <span style={{ color: '#D0B064' }}>*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        name="password"
-                        value={form.password}
-                        onChange={handleInputChange}
-                        placeholder="Minimal 6 karakter"
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none transition-all pr-10"
-                        style={{ 
-                          borderColor: form.password ? '#D0B064' : '#e5e7eb',
-                          '--tw-ring-color': '#D0B064'
-                        } as any}
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="w-5 h-5" />
-                        ) : (
-                          <Eye className="w-5 h-5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Submit Button */}
+              {/* Password */}
+              <div>
+                <label className="block text-sm font-semibold mb-1.5 text-gray-700">
+                  <Key className="w-4 h-4 inline mr-2 text-gray-400" />
+                  Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={form.password}
+                    onChange={handleInputChange}
+                    placeholder="Minimal 6 karakter"
+                    className="w-full px-4 py-2 border border-gray-200 rounded focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-all pr-10"
+                    required
+                  />
                   <button
-                    type="submit"
-                    disabled={submitting}
-                    style={{ 
-                      backgroundColor: submitting ? '#d1d5db' : '#D0B064',
-                      color: submitting ? '#6b7280' : '#F2F9F8'
-                    }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all duration-200 hover:shadow-lg mt-8"
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-[10px] text-gray-400 hover:text-gray-600"
                   >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Membuat Driver...
-                      </>
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
                     ) : (
-                      <>
-                        <Plus className="w-5 h-5" />
-                        Buat Driver
-                      </>
+                      <Eye className="w-4 h-4" />
                     )}
                   </button>
-                </form>
+                </div>
               </div>
-            </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={submitting}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded font-bold transition-all duration-200 mt-6 ${
+                  submitting 
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                    : 'bg-[#1B263A] text-white hover:bg-[#2A3749]'
+                }`}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    Simpan Driver
+                  </>
+                )}
+              </button>
+            </form>
           </div>
 
           {/* Right - Drivers List */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100 sticky top-0">
+          <div className="lg:col-span-4">
+            <div className="sticky top-0">
               {/* List Header */}
               {loading ? (
                 <SkeletonListHeader />
               ) : (
-                <div className="p-6 border-b border-gray-100" style={{ backgroundColor: '#1B263A' }}>
-                  <h2 className="text-lg font-bold text-white mb-4">
-                    Driver List <span style={{ color: '#D0B064' }}>({filteredDrivers.length})</span>
-                  </h2>
+                <div className="mb-4 pb-4 border-b border-gray-100 flex flex-col gap-3">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-lg font-bold text-gray-900">
+                      Driver List <span className="text-gray-400 text-sm font-medium">({filteredDrivers.length})</span>
+                    </h2>
+                  </div>
                   
                   {/* Search Input */}
                   <div className="relative">
-                    <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <Search className="absolute left-3 top-[10px] w-4 h-4 text-gray-400" />
                     <input
                       type="text"
                       placeholder="Cari driver..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-9 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#D0B064] transition-all"
+                      className="w-full pl-9 pr-9 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400 focus:bg-white transition-all text-sm"
                     />
                     {searchQuery && (
                       <button
                         onClick={() => setSearchQuery('')}
-                        className="absolute right-3 top-3 text-gray-400 hover:text-white transition-colors"
+                        className="absolute right-3 top-[10px] text-gray-400 hover:text-gray-600 transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -489,7 +470,7 @@ const CreateDriverPage = () => {
               )}
 
               {/* List Body */}
-              <div className="p-4 max-h-[calc(100vh-300px)] overflow-y-auto custom-scrollbar">
+              <div className="max-h-[calc(100vh-250px)] overflow-y-auto custom-scrollbar pr-2">
                 {loading ? (
                   // Skeleton Loading
                   <div className="space-y-3">
@@ -512,30 +493,29 @@ const CreateDriverPage = () => {
                   </div>
                 ) : (
                   // Drivers List
-                  <div className="space-y-3">
+                  <div className="space-y-0">
                     {filteredDrivers.map((driver) => (
                       <div 
                         key={driver.id} 
-                        className="p-4 rounded-lg border border-gray-100 hover:border-amber-200 transition-all duration-200 bg-gradient-to-br from-gray-50 to-white group"
+                        className="py-4 border-b border-gray-100 hover:bg-gray-50 transition-colors group px-2"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#D0B064' }}></div>
                               <p className="font-semibold text-gray-900 truncate text-sm">{driver.name}</p>
                             </div>
-                            <p className="text-xs text-gray-500 truncate">{driver.email}</p>
-                            <p className="text-xs text-gray-500 truncate">{driver.phone}</p>
+                            <p className="text-xs text-gray-500 mb-0.5">{driver.email}</p>
+                            <p className="text-xs text-gray-500">{driver.phone}</p>
                             {driver.nomorKendaraan && (
-                              <p className="text-xs font-medium mt-2 px-2 py-1 rounded-full inline-block" 
-                                 style={{ backgroundColor: '#fef9f3', color: '#D0B064' }}>
-                                🚗 {driver.nomorKendaraan}
+                              <p className="text-xs font-semibold mt-2 inline-flex items-center gap-1.5 text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
+                                <Truck className="w-3 h-3 text-gray-500" />
+                                {driver.nomorKendaraan}
                               </p>
                             )}
                           </div>
                           <button
                             onClick={() => handleDeleteDriver(driver.id)}
-                            className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
+                            className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
                             title="Hapus driver"
                           >
                             <Trash2 className="w-4 h-4" />

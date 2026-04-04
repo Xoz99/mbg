@@ -73,11 +73,11 @@ const SkeletonCard = () => (
 );
 
 const SkeletonTrayCard = () => (
-  <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 p-6 shadow-sm animate-pulse">
+  <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm animate-pulse">
     <div className="space-y-3">
-      <div className="h-5 bg-blue-200 rounded w-1/3"></div>
-      <div className="h-12 bg-blue-200 rounded w-1/4"></div>
-      <div className="h-4 bg-blue-100 rounded w-1/2"></div>
+      <div className="h-5 bg-gray-100 rounded w-1/3"></div>
+      <div className="h-12 bg-gray-200 rounded w-1/4"></div>
+      <div className="h-4 bg-gray-50 rounded w-1/2"></div>
     </div>
   </div>
 );
@@ -465,31 +465,31 @@ const ValidasiTrayPage = () => {
               {/* Left Side: Tray Summary Stats */}
               <div className="xl:col-span-4 space-y-6">
                 <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest px-1 min-h-[20px] flex items-center">Ringkasan Pengiriman</h3>
-                <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group ${menuSajikanStatus?.status.status !== 'terlambat' ? 'p-10 md:p-12 min-h-[300px] flex flex-col justify-center' : 'p-6 md:p-8'}`}>
+                <div className={`bg-white rounded-xl border border-gray-100 shadow-sm relative overflow-hidden group ${menuSajikanStatus?.status.status !== 'terlambat' ? 'p-10 md:p-12 min-h-[300px] flex flex-col justify-center' : 'p-6 md:p-8'}`}>
                   <div className={`absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform ${menuSajikanStatus?.status.status !== 'terlambat' ? 'scale-150' : ''}`}>
-                    <Package className="w-20 h-20 text-slate-900" />
+                    <Package className="w-20 h-20 text-gray-900" />
                   </div>
                   <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-6">
-                      <div className={`p-3 bg-slate-900 rounded-2xl shadow-lg shadow-slate-200 ${menuSajikanStatus?.status.status !== 'terlambat' ? 'scale-125 origin-left' : ''}`}>
-                        <Package className="w-6 h-6 text-[#D0B064]" />
+                      <div className={`p-3 bg-gray-50 border border-gray-100 rounded-xl ${menuSajikanStatus?.status.status !== 'terlambat' ? 'scale-125 origin-left' : ''}`}>
+                        <Package className="w-6 h-6 text-[#1B263A]" />
                       </div>
                       {wsConnected && (
-                        <div className="flex items-center gap-2 bg-green-50 px-2.5 py-1.5 rounded-xl border border-green-100">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                          <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Live Monitor</span>
+                        <div className="flex items-center gap-2 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-100">
+                          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                          <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Live Monitor</span>
                         </div>
                       )}
                     </div>
                     <div className="flex items-baseline gap-2">
-                      <p className={`${menuSajikanStatus?.status.status !== 'terlambat' ? 'text-8xl' : 'text-6xl'} font-black text-slate-900 tracking-tighter italic transition-all duration-500`}>
+                      <p className={`${menuSajikanStatus?.status.status !== 'terlambat' ? 'text-8xl' : 'text-6xl'} font-black text-gray-900 tracking-tighter italic transition-all duration-500`}>
                         {traySummary?.manualTrayCount !== null && traySummary?.manualTrayCount !== undefined
                           ? traySummary.manualTrayCount
                           : (traySummary?.totalTrayUnik || traySummary?.total || 0)}
                       </p>
-                      <span className={`${menuSajikanStatus?.status.status !== 'terlambat' ? 'text-2xl' : 'text-base'} font-black text-[#D0B064] uppercase tracking-widest transition-all duration-500`}>TRAY</span>
+                      <span className={`${menuSajikanStatus?.status.status !== 'terlambat' ? 'text-2xl' : 'text-base'} font-bold text-gray-500 uppercase tracking-widest transition-all duration-500`}>TRAY</span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-3 font-medium">Tray unik terdeteksi alat RFID dapur</p>
+                    <p className="text-xs text-gray-500 mt-3 font-medium">Tray unik terdeteksi alat RFID dapur</p>
                   </div>
                 </div>
 
@@ -512,14 +512,14 @@ const ValidasiTrayPage = () => {
                   )}
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-8 shadow-sm h-full flex flex-col hover:shadow-md transition-all">
+                <div className="bg-white rounded-xl border border-gray-100 p-6 md:p-8 h-full flex flex-col">
                   {currentMenu && (
                     <div className="space-y-6 flex-1 flex flex-col justify-between">
                       {/* Menu Info Grid */}
-                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                      <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
                         <div className="flex items-center justify-between mb-4">
                           <h3 className="text-xl font-bold text-[#1B263A]">{currentMenu.namaMenu}</h3>
-                          <span className="bg-[#D0B064]/20 text-[#D0B064] px-3 py-1 rounded-full text-xs font-black uppercase">Aktif</span>
+                          <span className="bg-emerald-50 border border-emerald-100 text-emerald-600 px-3 py-1 rounded-lg text-xs font-bold uppercase">Aktif</span>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -682,7 +682,7 @@ const ValidasiTrayPage = () => {
             {/* Validation Form - Full Width */}
             {!showResult ? (
               <form onSubmit={handleSubmitValidasi} className="space-y-6">
-                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
                   <h3 className="text-lg font-bold text-[#1B263A] mb-6">Form Validasi Tray</h3>
 
                   <div className="space-y-4">
@@ -739,7 +739,7 @@ const ValidasiTrayPage = () => {
                     <button
                       type="submit"
                       disabled={submitting || totalTrayDiterima === ''}
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-3 bg-[#1B263A] text-white font-semibold rounded-lg hover:bg-[#2A3749] transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {submitting ? (
                         <>
@@ -797,7 +797,7 @@ const ValidasiTrayPage = () => {
                   </div>
 
                   {/* Detail Result */}
-                  <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
+                  <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">
                     {/* Perhitungan Tray */}
                     <div>
                       <h4 className="text-lg font-bold text-[#1B263A] mb-4">Perhitungan Tray</h4>
@@ -840,7 +840,7 @@ const ValidasiTrayPage = () => {
                             {validationResult.perhitunganTray.selisih}
                           </p>
                         </div>
-                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
+                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
                           <div className="flex items-center gap-2 mb-2">
                             <Clock className="w-4 h-4 text-gray-600" />
                             <p className="text-xs text-gray-700 font-semibold uppercase">Waktu Validasi</p>
@@ -894,7 +894,6 @@ const ValidasiTrayPage = () => {
                     )}
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="flex gap-3">
                     <button
                       onClick={() => {
@@ -903,7 +902,7 @@ const ValidasiTrayPage = () => {
                           handleNextMenu();
                         }
                       }}
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white font-semibold rounded-lg hover:shadow-lg transition-all"
+                      className="flex-1 px-4 py-3 bg-[#1B263A] border border-[#1B263A] text-white font-semibold rounded-lg hover:bg-[#2A3749] transition-colors"
                     >
                       {currentMenuIndex < menus.length - 1 ? 'Validasi Menu Berikutnya' : 'Validasi Selesai'}
                     </button>

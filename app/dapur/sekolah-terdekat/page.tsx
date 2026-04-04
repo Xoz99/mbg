@@ -156,36 +156,37 @@ export default function DapurSekolahProximityPage() {
           </div>
         </div>
 
-        {/* Dapur Info Card */}
+        {/* Dapur Info Header */}
         {dapurInfo && (
-          <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] rounded-lg p-6 text-white shadow-lg">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <p className="text-white/70 text-sm mb-1 font-medium">DAPUR</p>
-                <h2 className="text-2xl font-bold">{dapurInfo.nama}</h2>
-              </div>
-              <MapPin className="w-8 h-8 text-white/50" />
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end pb-5 mb-6 border-b border-gray-200 gap-4 mt-2">
+            <div>
+              <p className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" />
+                Lokasi Dapur Aktif
+              </p>
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">{dapurInfo.nama}</h2>
             </div>
-
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/20">
+            
+            <div className="flex items-center gap-6 text-sm">
               <div>
-                <p className="text-white/70 text-xs font-medium">SEKOLAH DALAM RADIUS</p>
-                <p className="text-3xl font-bold mt-1">{filteredSekolah.length}</p>
+                <p className="text-gray-500 text-xs mb-0.5">Sekolah Ditemukan</p>
+                <p className="font-bold text-gray-900 text-xl">{filteredSekolah.length}</p>
               </div>
+              <div className="w-px h-10 bg-gray-200 hidden sm:block"></div>
               <div>
-                <p className="text-white/70 text-xs font-medium">RADIUS</p>
-                <p className="text-3xl font-bold mt-1">{radiusKm} km</p>
+                <p className="text-gray-500 text-xs mb-0.5">Radius Aktif</p>
+                <p className="font-bold text-[#D0B064] text-xl">{radiusKm} <span className="text-sm font-medium text-gray-500">km</span></p>
               </div>
             </div>
           </div>
         )}
 
         {/* Radius Control */}
-        <div className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-          <label className="block text-sm font-semibold text-gray-700 mb-3">
-            Atur Radius Pencarian (km)
+        <div className="py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center gap-6 mb-6">
+          <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+            Atur Radius Pencarian
           </label>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-1">
             <input
               type="range"
               min="1"
@@ -194,14 +195,13 @@ export default function DapurSekolahProximityPage() {
               onChange={(e) => {
                 setRadiusKm(parseInt(e.target.value));
               }}
-              className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
               style={{
                 background: `linear-gradient(to right, #D0B064 0%, #D0B064 ${((radiusKm - 1) / 19) * 100}%, #e5e7eb ${((radiusKm - 1) / 19) * 100}%, #e5e7eb 100%)`
               }}
             />
-            <div className="text-center min-w-[80px]">
-              <p className="text-2xl font-bold text-[#D0B064]">{radiusKm}</p>
-              <p className="text-xs text-gray-600">km</p>
+            <div className="text-center min-w-[40px] hidden md:block">
+              <p className="text-lg font-bold text-gray-700">{radiusKm}<span className="text-xs font-normal">km</span></p>
             </div>
           </div>
         </div>
@@ -233,7 +233,14 @@ export default function DapurSekolahProximityPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex flex-col border-t border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 py-3 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:grid">
+              <div className="md:col-span-5">Nama & Alamat Sekolah</div>
+              <div className="md:col-span-2 text-center">Jarak</div>
+              <div className="md:col-span-2 text-center">Siswa</div>
+              <div className="md:col-span-3 text-right">Status / Aksi</div>
+            </div>
+
             {filteredSekolah.map(sekolah => {
               const handleInvite = async () => {
                 if (window.confirm(`Kirim undangan ke ${sekolah.name}?`)) {
@@ -260,71 +267,72 @@ export default function DapurSekolahProximityPage() {
               return (
                 <div
                   key={sekolah.id}
-                  className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow"
+                  className="py-4 border-b border-gray-100 flex flex-col md:grid md:grid-cols-12 md:items-center gap-4"
                 >
-                  {/* Header dengan status */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-2">
-                        {sekolah.name}
-                      </h3>
-                      {sekolah.alamat && (
-                        <p className="text-xs text-gray-500 line-clamp-2 mb-1">{sekolah.alamat}</p>
-                      )}
+                  {/* Nama & Alamat */}
+                  <div className="md:col-span-5 flex flex-col justify-center">
+                    <h3 className="font-bold text-gray-900 text-[15px] mb-0.5 leading-tight">
+                      {sekolah.name}
+                    </h3>
+                    {sekolah.alamat && (
+                      <p className="text-sm text-gray-500 line-clamp-1">{sekolah.alamat}</p>
+                    )}
+                    {sekolah.phone && (
+                      <p className="text-xs text-gray-400 mt-0.5">📱 {sekolah.phone}</p>
+                    )}
+                  </div>
+                  
+                  {/* Mobile Layout Jarak & Siswa */}
+                  <div className="flex justify-between items-center md:hidden border-y border-gray-50 py-2 my-1">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-700">{sekolah.distance} km</span>
                     </div>
-                    <div className="ml-2 flex-shrink-0">
-                      {sekolah.isLinked && sekolah.status !== 'REJECTED' ? (
-                        <div className="flex flex-col items-end gap-2">
-                          {sekolah.status === 'APPROVED' ? (
-                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">
-                              <Check className="w-3 h-3" />
-                              AKTIF
-                            </div>
-                          ) : (
-                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700">
-                              MENUNGGU
-                            </div>
-                          )}
-                          <button
-                            onClick={handleDisconnect}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 transition-colors"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            PUTUS
-                          </button>
-                        </div>
-                      ) : (
+                    <div className="text-sm text-gray-700">
+                      <span className="text-gray-500 text-xs mr-1">Siswa:</span>
+                      <span className="font-semibold">{sekolah.siswaCount || '-'}</span>
+                    </div>
+                  </div>
+
+                  {/* Desktop Layout Jarak & Siswa */}
+                  <div className="md:col-span-2 hidden md:flex items-center justify-center gap-1.5 text-sm font-medium text-gray-700">
+                    {sekolah.distance} km
+                  </div>
+                  <div className="md:col-span-2 hidden md:flex items-center justify-center text-sm font-semibold text-gray-700">
+                    {sekolah.siswaCount || '-'} <span className="text-xs font-normal text-gray-400 ml-1">siswa</span>
+                  </div>
+
+                  {/* Status & Aksi */}
+                  <div className="md:col-span-3 flex justify-end items-center">
+                    {sekolah.isLinked && sekolah.status !== 'REJECTED' ? (
+                      <div className="flex items-center gap-3">
+                        {sekolah.status === 'APPROVED' ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 border border-green-100 text-green-700">
+                            <Check className="w-3.5 h-3.5" />
+                            AKTIF
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-yellow-600 uppercase tracking-wider">
+                            MENUNGGU
+                          </div>
+                        )}
                         <button
-                          onClick={handleInvite}
-                          className="bg-[#D0B064] text-white px-3 py-1 rounded-md text-xs font-bold hover:bg-[#B89B58] transition-colors shadow-sm"
+                          onClick={handleDisconnect}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                          title="Putus Hubungan"
                         >
-                          {sekolah.status === 'REJECTED' ? 'UNDANG LAGI' : 'UNDANG'}
+                          <Trash2 className="w-4 h-4" />
                         </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Distance & Siswa */}
-                  <div className="grid grid-cols-2 gap-3 mb-3 pb-3 border-t border-gray-100">
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Jarak</p>
-                      <div className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-blue-600" />
-                        <p className="text-sm font-semibold text-gray-900">{sekolah.distance} km</p>
                       </div>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Siswa</p>
-                      <p className="text-sm font-semibold text-gray-900">{sekolah.siswaCount || '-'}</p>
-                    </div>
+                    ) : (
+                      <button
+                        onClick={handleInvite}
+                        className="border border-[#D0B064] text-[#D0B064] px-4 py-1.5 rounded text-xs font-bold hover:bg-[#D0B064] hover:text-white transition-colors"
+                      >
+                        {sekolah.status === 'REJECTED' ? 'Undang Ulang' : 'Kirim Undangan'}
+                      </button>
+                    )}
                   </div>
-
-                  {/* Phone */}
-                  {sekolah.phone && (
-                    <p className="text-xs text-gray-600">
-                      📱 {sekolah.phone}
-                    </p>
-                  )}
                 </div>
               );
             })}

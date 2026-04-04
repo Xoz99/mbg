@@ -5,7 +5,6 @@ import SekolahLayout from "@/components/layout/SekolahLayout"
 import { useSekolahDataCache } from "@/lib/hooks/useSekolahDataCache"
 import {
   Users,
-  TrendingUp,
   CheckCircle,
   ChevronRight,
   AlertCircle,
@@ -35,37 +34,20 @@ import {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 const SkeletonStatCard = () => (
-  <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 animate-pulse">
-    <div className="h-10 w-10 bg-slate-200 rounded-xl mb-4"></div>
-    <div className="h-4 w-24 bg-slate-200 rounded mb-3"></div>
-    <div className="h-10 w-20 bg-slate-300 rounded mb-2"></div>
-    <div className="h-3 w-32 bg-slate-100 rounded"></div>
+  <div className="animate-pulse py-4">
+    <div className="h-3 w-20 bg-gray-200 rounded mb-2" />
+    <div className="h-7 w-12 bg-gray-200 rounded mb-1" />
+    <div className="h-3 w-24 bg-gray-100 rounded" />
   </div>
 )
 
 const SkeletonChartContainer = () => (
-  <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 animate-pulse">
-    <div className="h-7 w-32 bg-slate-300 rounded-lg mb-4"></div>
-    <div className="w-full h-64 bg-slate-200 rounded-xl"></div>
+  <div className="border border-gray-100 rounded-xl p-6 animate-pulse">
+    <div className="h-5 w-32 bg-gray-200 rounded mb-4" />
+    <div className="w-full h-56 bg-gray-100 rounded-lg" />
   </div>
 )
 
-const SkeletonTableRow = () => (
-  <tr className="border-b border-slate-200">
-    <td className="py-4 px-4">
-      <div className="h-4 w-20 bg-slate-300 rounded animate-pulse"></div>
-    </td>
-    <td className="py-4 px-4">
-      <div className="h-4 w-24 bg-slate-300 rounded animate-pulse"></div>
-    </td>
-    <td className="py-4 px-4">
-      <div className="h-4 w-16 bg-slate-300 rounded animate-pulse"></div>
-    </td>
-    <td className="py-4 px-4">
-      <div className="h-4 w-12 bg-slate-300 rounded animate-pulse"></div>
-    </td>
-  </tr>
-)
 
 // ✅ Utility function untuk parse tanggal dari berbagai format
 const parseDate = (dateInput: any): Date | null => {
@@ -142,35 +124,24 @@ const AttendanceChart = memo(({ data }: { data: any[] }) => {
   if (!data || data.length === 0) {
     console.warn("[AttendanceChart] ⚠️ No data provided!")
     return (
-      <div className="flex items-center justify-center h-64 bg-slate-50 rounded-lg border-2 border-dashed border-slate-300">
-        <p className="text-slate-600">Belum ada data absensi minggu ini</p>
+      <div className="flex items-center justify-center h-56 rounded-lg border border-dashed border-gray-200">
+        <p className="text-sm text-gray-400">Belum ada data absensi minggu ini</p>
       </div>
     )
   }
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-        <defs>
-          <linearGradient id="colorHadir" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#10b981" stopOpacity={0.9} />
-            <stop offset="95%" stopColor="#059669" stopOpacity={0.7} />
-          </linearGradient>
-          <linearGradient id="colorTidak" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.9} />
-            <stop offset="95%" stopColor="#dc2626" stopOpacity={0.7} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-        <XAxis dataKey="hari" stroke="#64748b" style={{ fontSize: "12px" }} />
-        <YAxis stroke="#64748b" style={{ fontSize: "12px" }} />
+    <ResponsiveContainer width="100%" height={240}>
+      <BarChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis dataKey="hari" stroke="#94a3b8" style={{ fontSize: "11px" }} />
+        <YAxis stroke="#94a3b8" style={{ fontSize: "11px" }} />
         <Tooltip
-          contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "8px", color: "#fff" }}
-          cursor={{ fill: "rgba(15, 23, 42, 0.05)" }}
+          contentStyle={{ backgroundColor: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "12px" }}
         />
-        <Legend />
-        <Bar dataKey="hadir" fill="url(#colorHadir)" name="Hadir" radius={[8, 8, 0, 0]} />
-        <Bar dataKey="tidakHadir" fill="url(#colorTidak)" name="Tidak Hadir" radius={[8, 8, 0, 0]} />
+        <Legend wrapperStyle={{ fontSize: "12px" }} />
+        <Bar dataKey="hadir" fill="#1B263A" name="Hadir" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="tidakHadir" fill="#D0B064" name="Tidak Hadir" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -178,24 +149,14 @@ const AttendanceChart = memo(({ data }: { data: any[] }) => {
 
 AttendanceChart.displayName = "AttendanceChart"
 
-const StatCard = memo(({ title, value, subtitle, icon: Icon, color, trend }: any) => (
-  <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 hover:shadow-lg transition-all duration-300 group">
-    <div className="flex items-start justify-between mb-4">
-      <div className={`p-4 rounded-2xl ${color} shadow-lg shadow-blue-900/10 group-hover:scale-110 transition-transform duration-300`}>
-        <Icon className="w-6 h-6 text-white" />
-      </div>
-      {trend && (
-        <div
-          className={`flex items-center gap-1 text-sm font-semibold px-2.5 py-1 rounded-lg ${trend > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
-        >
-          <TrendingUp className="w-3.5 h-3.5" />
-          {Math.abs(trend)}%
-        </div>
-      )}
+const StatCard = memo(({ title, value, subtitle, icon: Icon, color }: any) => (
+  <div className="py-3">
+    <div className="flex items-center gap-2 mb-1">
+      <Icon className={`w-4 h-4 ${color === 'bg-red-500' ? 'text-red-500' : color === 'bg-[#D0B064]' ? 'text-[#D0B064]' : 'text-[#1B263A]'}`} />
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
     </div>
-    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">{title}</p>
-    <p className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">{value}</p>
-    <p className="text-sm text-slate-400 font-medium">{subtitle}</p>
+    <p className="text-3xl font-bold text-gray-900 mb-0.5">{value}</p>
+    <p className="text-xs text-gray-400">{subtitle}</p>
   </div>
 ))
 
@@ -803,35 +764,16 @@ const DashboardSekolah = () => {
     return (
       <SekolahLayout currentPage="dashboard">
         <div className="space-y-6">
-          <div>
-            <div className="h-8 w-64 bg-slate-300 rounded-lg animate-pulse mb-2"></div>
-            <div className="h-4 w-96 bg-slate-300 rounded-lg animate-pulse"></div>
+          <div className="animate-pulse">
+            <div className="h-6 w-48 bg-gray-200 rounded mb-2" />
+            <div className="h-4 w-72 bg-gray-100 rounded" />
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(3)].map((_, i) => (
-              <SkeletonStatCard key={i} />
-            ))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => <SkeletonStatCard key={i} />)}
           </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <SkeletonChartContainer />
             <SkeletonChartContainer />
-          </div>
-
-          <SkeletonChartContainer />
-
-          <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200">
-            <div className="h-6 w-32 bg-slate-300 rounded-lg mb-4 animate-pulse"></div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <tbody>
-                  {[...Array(5)].map((_, i) => (
-                    <SkeletonTableRow key={i} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
       </SekolahLayout>
@@ -841,11 +783,11 @@ const DashboardSekolah = () => {
   if (error && typeof window !== "undefined" && !localStorage.getItem("authToken")) {
     return (
       <SekolahLayout currentPage="dashboard">
-        <div className="p-6 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 m-6">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+        <div className="flex items-center gap-3 p-4 border border-red-200 rounded-xl">
+          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
           <div>
-            <p className="font-semibold text-red-900">{error}</p>
-            <p className="text-sm text-red-700">Silakan login terlebih dahulu</p>
+            <p className="text-sm font-semibold text-gray-900">{error}</p>
+            <p className="text-xs text-gray-500">Silakan login terlebih dahulu</p>
           </div>
         </div>
       </SekolahLayout>
@@ -856,90 +798,78 @@ const DashboardSekolah = () => {
     <SekolahLayout currentPage="dashboard">
       <div className="space-y-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2 tracking-tight">Dashboard PIC Sekolah</h1>
-            <p className="text-slate-600 text-base md:text-lg font-medium">Monitoring Distribusi Makanan Bergizi & Status Gizi Siswa</p>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard Sekolah</h1>
+            <p className="text-sm text-gray-500 mt-1">Monitoring distribusi makanan & status gizi siswa</p>
           </div>
           <button
             onClick={() => {
               const schoolId = localStorage.getItem("sekolahId")
               const token = localStorage.getItem("authToken")
-              if (schoolId && token) {
-                console.log("[DASHBOARD] 🔄 Manual refresh triggered")
-                refreshData(schoolId, token)
-              }
+              if (schoolId && token) refreshData(schoolId, token)
             }}
             disabled={loading}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 active:bg-slate-100 transition-all shadow-sm disabled:opacity-50 min-w-[140px]"
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
-            <RotateCw className={`w-4 h-4 text-[#D0B064] ${loading ? 'animate-spin' : ''}`} />
-            Refresh Data
+            <RotateCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
           </button>
         </div>
 
-        {/* Menu Harian Card */}
+        {/* Menu Harian - Clean card */}
         {menuHariIni && (
-          <div className="bg-gradient-to-r from-[#1B263A] to-[#243B55] rounded-2xl p-6 md:p-8 text-white shadow-lg">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-              {/* Menu Info */}
-              <div className="md:col-span-2">
-                <p className="text-xs md:text-sm font-semibold opacity-90 tracking-widest uppercase">Menu Hari Ini</p>
-                <h2 className="text-3xl md:text-4xl font-bold mb-2 mt-3">{menuHariIni.namaMenu || "-"}</h2>
-                <p className="text-sm md:text-base opacity-90">{menuHariIni.menuPlanning?.sekolah?.nama || "Sekolah"}</p>
+          <div className="border border-[#1B263A]/15 rounded-xl p-5 bg-white">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Menu Hari Ini</p>
+            <h2 className="text-xl font-bold text-gray-900 mb-1">{menuHariIni.namaMenu || "-"}</h2>
+            <p className="text-sm text-gray-500 mb-4">{menuHariIni.menuPlanning?.sekolah?.nama || "Sekolah"}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-gray-100">
+              <div>
+                <p className="text-xs text-gray-400">Kalori</p>
+                <p className="text-lg font-bold text-gray-900">{menuHariIni.kalori || 0} <span className="text-xs font-normal text-gray-400">kcal</span></p>
               </div>
-
-              {/* Menu Stats Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-lg p-4">
-                  <p className="text-xs opacity-90 mb-2">Kalori</p>
-                  <p className="text-2xl md:text-3xl font-bold">{menuHariIni.kalori || 0}</p>
-                  <p className="text-xs opacity-75">kcal</p>
-                </div>
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-lg p-4">
-                  <p className="text-xs opacity-90 mb-2">Protein</p>
-                  <p className="text-2xl md:text-3xl font-bold">{menuHariIni.protein || 0}</p>
-                  <p className="text-xs opacity-75">g</p>
-                </div>
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-lg p-4">
-                  <p className="text-xs opacity-90 mb-2">Biaya/Tray</p>
-                  <p className="text-sm md:text-base font-bold">Rp {menuHariIni.biayaPerTray?.toLocaleString("id-ID") || 0}</p>
-                </div>
-                <div className="bg-[#1B263A] bg-opacity-90 rounded-lg p-4">
-                  <p className="text-xs opacity-90 mb-2">Waktu</p>
-                  <p className="text-xs md:text-sm font-bold">{menuHariIni.jamMulaiMasak} - {menuHariIni.jamSelesaiMasak}</p>
-                </div>
+              <div>
+                <p className="text-xs text-gray-400">Protein</p>
+                <p className="text-lg font-bold text-gray-900">{menuHariIni.protein || 0} <span className="text-xs font-normal text-gray-400">g</span></p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Biaya/Tray</p>
+                <p className="text-sm font-bold text-gray-900">Rp {menuHariIni.biayaPerTray?.toLocaleString("id-ID") || 0}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Waktu Masak</p>
+                <p className="text-sm font-bold text-gray-900">{menuHariIni.jamMulaiMasak} - {menuHariIni.jamSelesaiMasak}</p>
               </div>
             </div>
           </div>
         )}
 
-        {/* ✅ Undangan Masuk Section (New Features) */}
+        {/* Undangan Masuk */}
         {invitations.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-amber-900 mb-4 flex items-center gap-2">
-              <Bell className="w-5 h-5 text-amber-600" />
+          <div className="border border-[#D0B064]/30 rounded-xl p-5 bg-white">
+            <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Bell className="w-4 h-4 text-[#D0B064]" />
               Undangan Kerjasama Dapur ({invitations.length})
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               {invitations.map((inv) => (
-                <div key={inv.dapurId} className="bg-white border border-amber-100 rounded-xl p-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-slate-900">{inv.dapur?.nama || "Dapur MBG"}</p>
-                    <p className="text-xs text-slate-500 truncate max-w-[200px]">{inv.dapur?.alamat || "Alamat tidak tersedia"}</p>
+                <div key={inv.dapurId} className="flex items-center justify-between gap-4 py-3 border-b border-gray-100 last:border-0">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">{inv.dapur?.nama || "Dapur MBG"}</p>
+                    <p className="text-xs text-gray-500 truncate">{inv.dapur?.alamat || "Alamat tidak tersedia"}</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-shrink-0">
                     <button
                       onClick={() => handleRejectInvitation(inv.dapurId)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
                     >
-                      TOLAK
+                      Tolak
                     </button>
                     <button
                       onClick={() => handleApproveInvitation(inv.dapurId)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#D0B064] text-white hover:bg-[#B89B58]"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1B263A] text-white hover:bg-[#2A3749] transition-colors"
                     >
-                      SETUJUI
+                      Setujui
                     </button>
                   </div>
                 </div>
@@ -948,79 +878,34 @@ const DashboardSekolah = () => {
           </div>
         )}
 
-        {/* STAT CARDS GRID - Responsive */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          <StatCard
-            title="Total Siswa"
-            value={stats.totalSiswa}
-            subtitle="Semua siswa aktif"
-            icon={Users}
-            color="bg-[#1B263A]"
-          />
-          <StatCard
-            title="Gizi Normal"
-            value={stats.normalGizi}
-            subtitle="Status optimal"
-            icon={Heart}
-            color="bg-[#D0B064]"
-          />
-          <StatCard
-            title="Hadir Hari Ini"
-            value={stats.hadirHariIni}
-            subtitle="Siswa hadir"
-            icon={CheckCircle}
-            color="bg-[#1B263A]"
-          />
-          <StatCard
-            title="Pengiriman Selesai"
-            value={stats.pengirimanSelesai}
-            subtitle="Porsi dikirim"
-            icon={Truck}
-            color="bg-[#1B263A]"
-          />
-          <StatCard
-            title="Gizi Kurang"
-            value={stats.giziKurang}
-            subtitle="Perlu intervensi"
-            icon={AlertCircle}
-            color="bg-[#D0B064]"
-          />
-          <StatCard
-            title="Risiko Stunting"
-            value={stats.stuntingRisiko}
-            subtitle="Monitoring ketat"
-            icon={AlertTriangle}
-            color="bg-red-500"
-          />
+        {/* Stat Cards - Clean grid with borders */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 border border-gray-100 rounded-xl p-5 bg-white">
+          <StatCard title="Total Siswa" value={stats.totalSiswa} subtitle="Semua siswa aktif" icon={Users} color="bg-[#1B263A]" />
+          <StatCard title="Gizi Normal" value={stats.normalGizi} subtitle="Status optimal" icon={Heart} color="bg-[#D0B064]" />
+          <StatCard title="Hadir Hari Ini" value={stats.hadirHariIni} subtitle="Siswa hadir" icon={CheckCircle} color="bg-[#1B263A]" />
+          <StatCard title="Pengiriman" value={stats.pengirimanSelesai} subtitle="Porsi dikirim" icon={Truck} color="bg-[#1B263A]" />
+          <StatCard title="Gizi Kurang" value={stats.giziKurang} subtitle="Perlu intervensi" icon={AlertCircle} color="bg-[#D0B064]" />
+          <StatCard title="Risiko Stunting" value={stats.stuntingRisiko} subtitle="Monitoring ketat" icon={AlertTriangle} color="bg-red-500" />
         </div>
 
         {/* Kalender + Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-          {/* Left: Kalender Reminder - Fixed width on large screens */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          {/* Left: Kalender Reminder */}
           <div className="lg:col-span-5 flex flex-col h-full">
             <KalenderReminder reminder={kalenderReminder} />
           </div>
 
-          {/* Right: Charts - Spans more area */}
-          <div className="lg:col-span-7 flex flex-col gap-8 h-full">
-            {/* Absensi Chart */}
-            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 flex flex-col h-1/2 min-h-[400px]">
-              <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <span className="p-2 bg-blue-50 rounded-lg text-blue-600">📊</span>
-                Absensi Minggu Ini
-              </h3>
-              <div className="flex-1">
+          {/* Right: Charts */}
+          <div className="lg:col-span-7 flex flex-col gap-6 h-full">
+            <div className="border border-gray-100 rounded-xl p-5 bg-white flex flex-col flex-1">
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Absensi Minggu Ini</h3>
+              <div className="flex-1 min-h-[240px]">
                 <AttendanceChart data={absensiChart} />
               </div>
             </div>
-
-            {/* Distribusi Gizi Chart */}
-            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 flex flex-col h-1/2 min-h-[400px]">
-              <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <span className="p-2 bg-emerald-50 rounded-lg text-emerald-600">🍎</span>
-                Distribusi Status Gizi
-              </h3>
-              <div className="flex-1">
+            <div className="border border-gray-100 rounded-xl p-5 bg-white flex flex-col flex-1">
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Distribusi Status Gizi</h3>
+              <div className="flex-1 min-h-[240px]">
                 <GiziDistributionChart data={siswaDiagram} />
               </div>
             </div>
@@ -1028,55 +913,49 @@ const DashboardSekolah = () => {
         </div>
 
         {/* Kelas Table */}
-        <div className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-slate-200 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-base md:text-lg font-bold text-slate-900">📚 Data Kelas</h3>
-            <button className="text-sm text-slate-600 hover:text-slate-900 font-medium flex items-center gap-1 transition-colors">
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Data Kelas</h3>
+            <button className="text-xs text-gray-500 hover:text-gray-900 font-medium flex items-center gap-1 transition-colors">
               Lihat Semua
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {kelasList.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border border-gray-100 rounded-xl">
               <table className="w-full">
-                <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                  <tr>
-                    <th className="text-left py-5 px-5 text-xs md:text-sm font-bold text-slate-700">Kelas</th>
-                    <th className="text-left py-5 px-5 text-xs md:text-sm font-bold text-slate-700">Total Siswa</th>
-                    <th className="text-left py-5 px-5 text-xs md:text-sm font-bold text-slate-700">Laki-laki</th>
-                    <th className="text-left py-5 px-5 text-xs md:text-sm font-bold text-slate-700">Perempuan</th>
-                    <th className="text-left py-5 px-5 text-xs md:text-sm font-bold text-slate-700">Alergi</th>
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Kelas</th>
+                    <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Siswa</th>
+                    <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">L</th>
+                    <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">P</th>
+                    <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Alergi</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-100">
                   {kelasList.slice(0, 10).map((kelas: any, idx: number) => (
-                    <tr
-                      key={idx}
-                      className="border-b border-slate-200 hover:bg-slate-50 transition-colors duration-150"
-                    >
-                      <td className="py-5 px-5 text-sm font-semibold text-slate-900">{kelas.nama}</td>
-                      <td className="py-5 px-5 text-sm text-slate-700 font-medium">{kelas.totalSiswa || 0}</td>
-                      <td className="py-5 px-5 text-sm text-slate-600">{kelas.lakiLaki || 0}</td>
-                      <td className="py-5 px-5 text-sm text-slate-600">{kelas.perempuan || 0}</td>
-                      <td className="py-5 px-5">
+                    <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="py-3 px-4 text-sm font-semibold text-gray-900">{kelas.nama}</td>
+                      <td className="py-3 px-4 text-sm text-gray-700 font-medium">{kelas.totalSiswa || 0}</td>
+                      <td className="py-3 px-4 text-sm text-gray-600">{kelas.lakiLaki || 0}</td>
+                      <td className="py-3 px-4 text-sm text-gray-600">{kelas.perempuan || 0}</td>
+                      <td className="py-3 px-4">
                         {kelas.alergiCount > 0 ? (
-                          <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 inline-block">
-                            {kelas.alergiCount} siswa
-                          </span>
+                          <span className="text-xs font-semibold text-red-600">{kelas.alergiCount} siswa</span>
                         ) : (
-                          <span className="text-slate-400">-</span>
+                          <span className="text-xs text-gray-400">-</span>
                         )}
                       </td>
                     </tr>
-
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-xl text-center">
-              <p className="text-yellow-800 font-medium">Data kelas tidak tersedia</p>
+            <div className="py-8 text-center">
+              <p className="text-sm text-gray-400">Data kelas tidak tersedia</p>
             </div>
           )}
         </div>

@@ -62,56 +62,56 @@ const CheckpointViewPage = () => {
   });
 
   const checkpointTypes: CheckpointType[] = [
-    { 
-      id: TipeCheckpoint.MULAI_MEMASAK, 
+    {
+      id: TipeCheckpoint.MULAI_MEMASAK,
       label: 'Mulai Memasak',
       description: 'Scan saat mulai proses memasak',
       icon: ChefHat,
       color: 'bg-orange-400',
       requiresPhoto: true
     },
-    { 
-      id: TipeCheckpoint.SELESAI_MEMASAK, 
+    {
+      id: TipeCheckpoint.SELESAI_MEMASAK,
       label: 'Selesai Memasak',
       description: 'Scan saat makanan selesai dimasak',
       icon: CheckCircle,
       color: 'bg-green-400',
       requiresPhoto: true
     },
-    { 
-      id: TipeCheckpoint.SELESAI_PACKING, 
+    {
+      id: TipeCheckpoint.SELESAI_PACKING,
       label: 'Selesai Packing',
       description: 'Scan saat packing selesai',
       icon: Boxes,
       color: 'bg-purple-400',
       requiresPhoto: true
     },
-    { 
-      id: TipeCheckpoint.SCHOOL_TO_DRIVER_RETURN, 
+    {
+      id: TipeCheckpoint.SCHOOL_TO_DRIVER_RETURN,
       label: 'Pickup Baki Kosong',
       description: 'Scan saat driver pickup baki kosong',
       icon: Package,
       color: 'bg-yellow-400',
       requiresPhoto: true
     },
-    { 
-      id: TipeCheckpoint.DRIVER_TO_KITCHEN, 
+    {
+      id: TipeCheckpoint.DRIVER_TO_KITCHEN,
       label: 'Kembali ke Dapur',
       description: 'Scan saat dalam perjalanan kembali',
       icon: Navigation,
       color: 'bg-purple-500',
       requiresPhoto: false
     },
-    { 
-      id: TipeCheckpoint.KITCHEN_RECEIVED, 
+    {
+      id: TipeCheckpoint.KITCHEN_RECEIVED,
       label: 'Baki Diterima Dapur',
       description: 'Scan saat baki kosong kembali ke dapur',
       icon: CheckCircle,
       color: 'bg-green-500',
       requiresPhoto: true
     },
-    { 
-      id: TipeCheckpoint.WASHING_COMPLETE, 
+    {
+      id: TipeCheckpoint.WASHING_COMPLETE,
       label: 'Selesai Cuci Baki',
       description: 'Scan saat baki selesai dicuci',
       icon: RefreshCw,
@@ -138,7 +138,7 @@ const CheckpointViewPage = () => {
         `${API_BASE_URL}/api/menu-harian/${id}/checkpoint`,
         {
           method: 'GET',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -195,20 +195,20 @@ const CheckpointViewPage = () => {
       try {
         setLoadingMenus(true);
         const token = getAuthToken();
-        
+
         // Fetch semua menu-planning dulu
         const planningRes = await fetch(`${API_BASE_URL}/api/menu-planning`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
-        
+
         const planningData = await planningRes.json();
-        const plannings = Array.isArray(planningData?.data?.data) ? planningData.data.data : 
-                         Array.isArray(planningData?.data) ? planningData.data : [];
-        
+        const plannings = Array.isArray(planningData?.data?.data) ? planningData.data.data :
+          Array.isArray(planningData?.data) ? planningData.data : [];
+
         const allMenusData: any[] = [];
-        
+
         // Untuk setiap planning, fetch menu-harian
         for (const planning of plannings) {
           try {
@@ -217,11 +217,11 @@ const CheckpointViewPage = () => {
                 'Authorization': `Bearer ${token}`
               }
             });
-            
+
             const menuData = await menuRes.json();
             const menus = Array.isArray(menuData?.data?.data) ? menuData.data.data :
-                         Array.isArray(menuData?.data) ? menuData.data : [];
-            
+              Array.isArray(menuData?.data) ? menuData.data : [];
+
             // Add semua menus dari planning ini
             for (const menu of menus) {
               allMenusData.push({
@@ -237,7 +237,7 @@ const CheckpointViewPage = () => {
             console.warn(`Gagal fetch menu untuk planning ${planning.id}:`, err);
           }
         }
-        
+
         console.log('Loaded menus:', allMenusData);
         setAllMenus(allMenusData);
       } catch (err) {
@@ -247,7 +247,7 @@ const CheckpointViewPage = () => {
         setLoadingMenus(false);
       }
     };
-    
+
     loadAllMenus();
   }, []);
 
@@ -309,7 +309,7 @@ const CheckpointViewPage = () => {
                   [TipeCheckpoint.KITCHEN_RECEIVED]: null,
                   [TipeCheckpoint.WASHING_COMPLETE]: null,
                 });
-                
+
                 // Auto-fetch checkpoint saat pilih menu
                 if (selectedId.trim()) {
                   fetchCheckpointsData(selectedId);
@@ -391,7 +391,7 @@ const CheckpointViewPage = () => {
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-              <div 
+              <div
                 className="bg-gradient-to-r from-[#D0B064] to-[#D0B064] h-full transition-all duration-500"
                 style={{ width: `${progressPercentage}%` }}
               ></div>
@@ -422,19 +422,17 @@ const CheckpointViewPage = () => {
                     {/* Timeline Line & Dot */}
                     <div className="flex flex-col items-center">
                       {/* Dot */}
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 border-4 transition-all ${
-                        isCompleted
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 border-4 transition-all ${isCompleted
                           ? `${checkpoint.color} border-white shadow-md`
                           : 'bg-gray-100 border-gray-300'
-                      }`}>
+                        }`}>
                         <Icon className={`w-6 h-6 ${isCompleted ? 'text-white' : 'text-gray-400'}`} />
                       </div>
 
                       {/* Vertical Line (except last item) */}
                       {!isLastItem && (
-                        <div className={`w-1 flex-grow mt-2 ${
-                          isCompleted ? 'bg-gradient-to-b from-[#D0B064] to-gray-200' : 'bg-gray-200'
-                        }`}
+                        <div className={`w-1 flex-grow mt-2 ${isCompleted ? 'bg-gradient-to-b from-[#D0B064] to-gray-200' : 'bg-gray-200'
+                          }`}
                           style={{ minHeight: '120px' }}
                         />
                       )}
@@ -442,11 +440,10 @@ const CheckpointViewPage = () => {
 
                     {/* Content */}
                     <div className="pb-8 pt-1 flex-grow">
-                      <div className={`rounded-2xl border-2 p-6 transition-all ${
-                        isCompleted
+                      <div className={`rounded-2xl border-2 p-6 transition-all ${isCompleted
                           ? 'bg-white border-[#D0B064] shadow-sm'
                           : 'bg-white border-gray-200'
-                      }`}>
+                        }`}>
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <h3 className="font-bold text-lg text-[#1B263A]">{checkpoint.label}</h3>

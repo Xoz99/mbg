@@ -13,7 +13,6 @@ import {
   X,
   AlertCircle,
   CheckCircle,
-  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
@@ -26,11 +25,11 @@ const localizer = dayjsLocalizer(dayjs);
 
 // Skeleton
 const SkeletonCard = () => (
-  <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 animate-pulse">
-    <div className="h-6 w-32 bg-gray-200 rounded mb-4"></div>
-    <div className="space-y-3">
-      <div className="h-4 w-full bg-gray-200 rounded"></div>
-      <div className="h-4 w-3/4 bg-gray-200 rounded"></div>
+  <div className="border border-gray-100 rounded-xl p-5 animate-pulse">
+    <div className="h-4 w-28 bg-gray-200 rounded mb-3" />
+    <div className="space-y-2">
+      <div className="h-3 w-full bg-gray-100 rounded" />
+      <div className="h-3 w-3/4 bg-gray-100 rounded" />
     </div>
   </div>
 );
@@ -82,9 +81,9 @@ const ModalForm = ({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {form.tanggalMulai && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs font-medium text-blue-700 mb-1">📅 Rentang tanggal dipilih</p>
-              <p className="text-sm text-blue-900">
+            <div className="p-3 border border-gray-200 rounded-lg">
+              <p className="text-xs font-medium text-gray-500 mb-1">📅 Rentang tanggal dipilih</p>
+              <p className="text-sm text-gray-900">
                 {new Date(form.tanggalMulai).toLocaleDateString('id-ID')} - {new Date(form.tanggalSelesai).toLocaleDateString('id-ID')}
               </p>
             </div>
@@ -227,34 +226,34 @@ const ModalDetail = ({
 
 // Custom Toolbar
 const CustomToolbar = ({ label, onNavigate, onView, view, views }: any) => (
-  <div className="flex items-center justify-between mb-6">
-    <div className="flex items-center gap-2">
+  <div className="flex items-center justify-between mb-4">
+    <div className="flex items-center gap-1">
       <button
         onClick={() => onNavigate('PREV')}
-        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
       >
-        <ChevronLeft className="w-5 h-5 text-gray-600" />
+        <ChevronLeft className="w-4 h-4 text-gray-600" />
       </button>
-      <h2 className="text-lg font-semibold text-gray-900 min-w-40 text-center">
+      <h2 className="text-sm font-bold text-gray-900 min-w-36 text-center">
         {label}
       </h2>
       <button
         onClick={() => onNavigate('NEXT')}
-        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
       >
-        <ChevronRight className="w-5 h-5 text-gray-600" />
+        <ChevronRight className="w-4 h-4 text-gray-600" />
       </button>
     </div>
 
-    <div className="flex gap-2">
+    <div className="flex gap-1">
       {views.map((viewName: string) => (
         <button
           key={viewName}
           onClick={() => onView(viewName)}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm capitalize ${
+          className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-xs capitalize ${
             view === viewName
-              ? 'bg-[#D0B064] text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ? 'bg-[#1B263A] text-white'
+              : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
           {viewName === 'month' ? 'Bulan' : viewName === 'week' ? 'Minggu' : 'Hari'}
@@ -520,15 +519,18 @@ const KalenderAkademik = () => {
     return (
       <SekolahLayout currentPage="kalender-akademik">
         <div className="space-y-6">
-          <div>
-            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-2"></div>
-            <div className="h-4 w-96 bg-gray-100 rounded animate-pulse"></div>
+          <div className="animate-pulse">
+            <div className="h-6 w-40 bg-gray-200 rounded mb-2" />
+            <div className="h-4 w-64 bg-gray-100 rounded" />
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <div className="lg:col-span-3">
-              <SkeletonCard />
+              <div className="border border-gray-100 rounded-xl p-5 animate-pulse">
+                <div className="h-4 w-32 bg-gray-200 rounded mb-4" />
+                <div className="w-full h-72 bg-gray-100 rounded-lg" />
+              </div>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <SkeletonCard />
               <SkeletonCard />
             </div>
@@ -543,54 +545,53 @@ const KalenderAkademik = () => {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-            <CalendarIcon className="w-8 h-8 text-[#D0B064]" />
-            Kalender Akademik
-          </h1>
-          <p className="text-gray-600">Kelola kegiatan dan libur sekolah</p>
+          <h1 className="text-2xl font-bold text-gray-900">Kalender Akademik</h1>
+          <p className="text-sm text-gray-500 mt-1">Kelola kegiatan dan libur sekolah</p>
         </div>
 
         {/* Alerts */}
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-            <p className="font-semibold text-red-900">{error}</p>
+          <div className="flex items-center gap-2 p-3 border border-red-200 rounded-xl">
+            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <p className="text-sm text-gray-700">{error}</p>
           </div>
         )}
 
         {success && (
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
-            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-            <p className="font-semibold text-green-900">{success}</p>
+          <div className="flex items-center gap-2 p-3 border border-emerald-200 rounded-xl">
+            <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+            <p className="text-sm text-gray-700">{success}</p>
           </div>
         )}
 
         {/* Calendar & Sidebar */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* Calendar */}
-          <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="lg:col-span-3 border border-gray-100 rounded-xl p-5 bg-white">
             <style>{`
               .rbc-calendar { font-family: inherit; }
-              .rbc-header { background-color: #f3f4f6; border-color: #e5e7eb; font-weight: 600; color: #374151; padding: 12px 4px; }
-              .rbc-today { background-color: #fffbf0; }
+              .rbc-header { background-color: transparent; border-color: #e5e7eb; font-weight: 600; color: #6b7280; padding: 8px 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+              .rbc-today { background-color: #fafafa; }
               .rbc-off-range-bg { background-color: #fafafa; }
-              .rbc-event { background-color: #D0B064; border: none; border-radius: 6px; }
-              .rbc-event-label { font-size: 11px; }
-              .rbc-event-content { font-size: 12px; font-weight: 500; }
-              .rbc-selected { background-color: #c09d52; }
+              .rbc-event { background-color: #1B263A; border: none; border-radius: 4px; font-size: 11px; }
+              .rbc-event-label { font-size: 10px; }
+              .rbc-event-content { font-size: 11px; font-weight: 500; }
+              .rbc-selected { background-color: #D0B064; }
               .rbc-toolbar { margin-bottom: 0; }
-              .rbc-toolbar button { color: #1B263A; border: 1px solid #d1d5db; background: white; border-radius: 6px; padding: 6px 12px; margin: 0 2px; font-size: 14px; }
-              .rbc-toolbar button:hover:not(:disabled) { background: #f3f4f6; }
-              .rbc-toolbar button.rbc-active { background: #D0B064; color: white; border-color: #D0B064; }
+              .rbc-toolbar button { color: #1B263A; border: 1px solid #e5e7eb; background: white; border-radius: 6px; padding: 4px 10px; margin: 0 1px; font-size: 12px; }
+              .rbc-toolbar button:hover:not(:disabled) { background: #f9fafb; }
+              .rbc-toolbar button.rbc-active { background: #1B263A; color: white; border-color: #1B263A; }
               .rbc-day-bg { cursor: pointer; }
-              .rbc-day-bg:hover { background-color: #f9f9f9; }
+              .rbc-day-bg:hover { background-color: #f9fafb; }
+              .rbc-month-view { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+              .rbc-date-cell { font-size: 12px; padding: 4px 8px; }
             `}</style>
             <Calendar
               localizer={localizer}
               events={events}
               startAccessor="start"
               endAccessor="end"
-              style={{ height: 600 }}
+              style={{ height: 520 }}
               view={view}
               onView={setView}
               date={date}
@@ -614,29 +615,26 @@ const KalenderAkademik = () => {
           </div>
 
           {/* Sidebar */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 h-fit">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <CalendarIcon className="w-5 h-5 text-[#D0B064]" />
-              Daftar Kegiatan
-            </h3>
+          <div className="border border-gray-100 rounded-xl p-5 bg-white h-fit">
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Daftar Kegiatan</h3>
 
             <button
               onClick={() => {
                 setSelected(null);
                 setShowForm(true);
               }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#c09d52] transition-colors font-medium mb-4"
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-[#1B263A] text-white text-sm rounded-lg hover:bg-[#2A3749] transition-colors font-medium mb-4"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
               Tambah Kegiatan
             </button>
 
             {list.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-8">
+              <p className="text-xs text-gray-400 text-center py-6">
                 Belum ada kegiatan
               </p>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-2 max-h-96 overflow-y-auto">
                 {list.map((item) => (
                   <div
                     key={item.id}
@@ -644,12 +642,12 @@ const KalenderAkademik = () => {
                       setSelected(item);
                       setShowDetail(true);
                     }}
-                    className="p-3 rounded-lg border border-gray-200 hover:border-[#D0B064] hover:bg-[#fffbf0] cursor-pointer transition-all"
+                    className="p-3 rounded-lg border border-gray-100 hover:border-gray-200 cursor-pointer transition-colors"
                   >
-                    <p className="font-semibold text-gray-900 text-sm">
+                    <p className="font-medium text-gray-900 text-sm">
                       {item.deskripsi}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                       {new Date(item.tanggalMulai).toLocaleDateString('id-ID')} - {new Date(item.tanggalSelesai).toLocaleDateString('id-ID')}
                     </p>
                   </div>

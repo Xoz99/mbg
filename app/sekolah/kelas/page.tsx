@@ -13,7 +13,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  BarChart3,
   Loader2,
   AlertCircle,
   Plus,
@@ -27,45 +26,38 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 // Skeleton Components
 const SkeletonStatCard = () => (
-  <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 animate-pulse">
-    <div className="h-10 w-10 bg-gray-200 rounded-lg mb-3"></div>
-    <div className="h-3 w-24 bg-gray-200 rounded mb-2"></div>
-    <div className="h-8 w-16 bg-gray-300 rounded mb-2"></div>
-    <div className="h-3 w-20 bg-gray-200 rounded"></div>
+  <div className="animate-pulse py-3">
+    <div className="h-3 w-16 bg-gray-200 rounded mb-2" />
+    <div className="h-7 w-10 bg-gray-200 rounded mb-1" />
+    <div className="h-3 w-20 bg-gray-100 rounded" />
   </div>
 );
 
 const SkeletonChartContainer = () => (
-  <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 animate-pulse">
-    <div className="h-6 w-32 bg-gray-200 rounded mb-4"></div>
-    <div className="w-full h-80 bg-gray-100 rounded-lg"></div>
+  <div className="border border-gray-100 rounded-xl p-5 animate-pulse">
+    <div className="h-4 w-32 bg-gray-200 rounded mb-4" />
+    <div className="w-full h-56 bg-gray-100 rounded-lg" />
   </div>
 );
 
 const SkeletonCard = () => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
-    <div className="bg-gray-200 h-24"></div>
-    <div className="p-5 space-y-4">
-      <div className="h-6 w-3/4 bg-gray-200 rounded"></div>
-      <div className="h-4 w-1/2 bg-gray-100 rounded"></div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="h-16 bg-gray-100 rounded"></div>
-        <div className="h-16 bg-gray-100 rounded"></div>
-      </div>
-      <div className="h-10 bg-gray-100 rounded"></div>
+  <div className="border border-gray-100 rounded-xl overflow-hidden animate-pulse">
+    <div className="p-4 space-y-3">
+      <div className="h-5 w-2/3 bg-gray-200 rounded" />
+      <div className="h-4 w-1/3 bg-gray-100 rounded" />
+      <div className="h-8 bg-gray-100 rounded" />
     </div>
   </div>
 );
 
 const KelasChart = memo(({ data }: { data: any[] }) => (
-  <ResponsiveContainer width="100%" height={300}>
+  <ResponsiveContainer width="100%" height={240}>
     <BarChart data={data}>
-      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-      <XAxis dataKey="nama" stroke="#94a3b8" style={{ fontSize: '12px' }} />
-      <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} />
-      <Tooltip />
-      <Legend />
-      <Bar dataKey="totalSiswa" fill="#3b82f6" name="Total Siswa" radius={[8, 8, 0, 0]} />
+      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+      <XAxis dataKey="nama" stroke="#94a3b8" style={{ fontSize: '11px' }} />
+      <YAxis stroke="#94a3b8" style={{ fontSize: '11px' }} />
+      <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px' }} />
+      <Bar dataKey="totalSiswa" fill="#1B263A" name="Total Siswa" radius={[4, 4, 0, 0]} />
     </BarChart>
   </ResponsiveContainer>
 ));
@@ -646,15 +638,13 @@ const DataKelas = () => {
   }, [kelasData]);
 
   const StatCard = ({ title, value, subtitle, icon: Icon, color }: any) => (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`p-3 rounded-lg ${color}`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
+    <div className="py-3">
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className={`w-4 h-4 ${color === 'bg-blue-500' ? 'text-[#1B263A]' : color === 'bg-green-500' ? 'text-emerald-600' : color === 'bg-red-500' ? 'text-red-500' : 'text-[#D0B064]'}`} />
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
       </div>
-      <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
-      <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
-      <p className="text-sm text-gray-500">{subtitle}</p>
+      <p className="text-2xl font-bold text-gray-900 mb-0.5">{value}</p>
+      <p className="text-xs text-gray-400">{subtitle}</p>
     </div>
   );
 
@@ -663,27 +653,16 @@ const DataKelas = () => {
     return (
       <SekolahLayout currentPage="kelas">
         <div className="space-y-6">
-          <div>
-            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-2"></div>
-            <div className="h-4 w-96 bg-gray-100 rounded animate-pulse"></div>
+          <div className="animate-pulse">
+            <div className="h-6 w-36 bg-gray-200 rounded mb-2" />
+            <div className="h-4 w-64 bg-gray-100 rounded" />
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <SkeletonStatCard key={i} />
-            ))}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 border border-gray-100 rounded-xl p-5">
+            {[...Array(4)].map((_, i) => <SkeletonStatCard key={i} />)}
           </div>
-
           <SkeletonChartContainer />
-
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 animate-pulse">
-            <div className="h-10 w-full bg-gray-200 rounded"></div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
           </div>
         </div>
       </SekolahLayout>
@@ -694,9 +673,9 @@ const DataKelas = () => {
     return (
       <SekolahLayout currentPage="kelas">
         <div className="flex items-center justify-center h-96">
-          <div className="text-center max-w-md">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <p className="text-red-600 mb-4">{error}</p>
+          <div className="text-center">
+            <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+            <p className="text-sm text-gray-700 font-medium mb-4">{error}</p>
             <button
               onClick={() => {
                 const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
@@ -707,7 +686,7 @@ const DataKelas = () => {
                   setCredentialsReady(true)
                 }
               }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 bg-[#1B263A] text-white text-sm rounded-lg hover:bg-[#2A3749] transition-colors font-medium"
             >
               Coba Lagi
             </button>
@@ -719,21 +698,21 @@ const DataKelas = () => {
 
   return (
     <SekolahLayout currentPage="kelas">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="flex items-end justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Data Kelas</h1>
-          <p className="text-gray-600">Informasi lengkap kelas dan siswa</p>
+          <h1 className="text-2xl font-bold text-gray-900">Data Kelas</h1>
+          <p className="text-sm text-gray-500 mt-1">Informasi lengkap kelas dan siswa</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#1B263A] text-white rounded-lg hover:bg-[#24314d] transition-colors font-semibold shadow-md"
-          >
-          <Plus className="w-5 h-5" />
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#1B263A] text-white text-sm rounded-lg hover:bg-[#2A3749] transition-colors font-medium"
+        >
+          <Plus className="w-4 h-4" />
           Tambah Kelas
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 border border-gray-100 rounded-xl p-5 bg-white mb-6">
         <StatCard title="Total Kelas" value={stats.totalKelas} subtitle="Kelas aktif" icon={GraduationCap} color="bg-blue-500" />
         <StatCard title="Total Siswa" value={stats.totalSiswa} subtitle="Seluruh tingkat" icon={Users} color="bg-green-500" />
         <StatCard title="Siswa Alergi" value={stats.totalAlergi} subtitle={`${stats.persenAlergi}% dari total`} icon={AlertCircle} color="bg-red-500" />
@@ -741,96 +720,81 @@ const DataKelas = () => {
       </div>
 
       {kelasData.length > 0 && (
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Grafik Siswa per Kelas</h3>
-              <p className="text-sm text-gray-600 mt-1">Distribusi siswa di setiap kelas</p>
-            </div>
-            <BarChart3 className="w-5 h-5 text-gray-400" />
-          </div>
+        <div className="border border-gray-100 rounded-xl p-5 bg-white mb-6">
+          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Grafik Siswa per Kelas</h3>
           <KelasChart data={chartData} />
         </div>
       )}
 
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+      <div className="mb-6">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             placeholder="Cari kelas atau wali kelas..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
           />
         </div>
       </div>
 
       {kelasData.length === 0 ? (
-        <div className="bg-white rounded-xl p-12 text-center border border-gray-100">
-          <GraduationCap className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-600 text-lg font-medium mb-2">Belum ada data kelas</p>
-          <p className="text-gray-500 mb-6">Mulai tambahkan kelas untuk sekolah ini</p>
+        <div className="py-12 text-center">
+          <GraduationCap className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-600 font-medium mb-1">Belum ada data kelas</p>
+          <p className="text-xs text-gray-400 mb-4">Mulai tambahkan kelas untuk sekolah ini</p>
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1B263A] text-white text-sm rounded-lg hover:bg-[#2A3749] transition-colors font-medium"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
             Tambah Kelas
           </button>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             {paginatedData.map((kelas) => {
               const kelasKey = kelas.id || kelas._id;
-              console.log(`[MAP] Rendering Kelas: ${kelas.nama}, ID: ${kelasKey}`);
               return (
-                <div key={kelasKey} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="bg-gradient-to-br from-[#1B263A] to-[#2A3749] p-5 text-white">
-                    <h3 className="text-2xl font-bold">Kelas: {kelas.nama || 'Kelas'}</h3>
-                  </div>
+                <div key={kelasKey} className="border border-gray-100 rounded-xl overflow-hidden bg-white hover:border-gray-200 transition-colors">
+                  <div className="px-5 pt-5 pb-3">
+                    <h3 className="text-lg font-bold text-gray-900 mb-3">Kelas {kelas.nama || 'Kelas'}</h3>
 
-                  <div className="p-5">
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div className="text-center p-3 bg-green-50 rounded-lg">
-                        <Users className="w-5 h-5 text-green-600 mx-auto mb-1" />
-                        <p className="text-2xl font-bold text-green-600">{kelas.lakiLaki || 0}</p>
-                        <p className="text-xs text-gray-600">Laki-laki</p>
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <p className="text-xs text-gray-400">Laki-laki</p>
+                        <p className="text-xl font-bold text-gray-900">{kelas.lakiLaki || 0}</p>
                       </div>
-                      <div className="text-center p-3 bg-pink-50 rounded-lg">
-                        <Users className="w-5 h-5 text-pink-600 mx-auto mb-1" />
-                        <p className="text-2xl font-bold text-pink-600">{kelas.perempuan || 0}</p>
-                        <p className="text-xs text-gray-600">Perempuan</p>
+                      <div>
+                        <p className="text-xs text-gray-400">Perempuan</p>
+                        <p className="text-xl font-bold text-gray-900">{kelas.perempuan || 0}</p>
                       </div>
                     </div>
 
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Total Siswa</span>
-                        <span className="font-semibold text-gray-900">{kelas.totalSiswa || 0} siswa</span>
+                    <div className="space-y-1.5 text-sm mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500">Total Siswa</span>
+                        <span className="font-medium text-gray-900">{kelas.totalSiswa || 0}</span>
                       </div>
                       {kelas.alergiCount > 0 && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-red-600">Alergi</span>
-                          <span className="font-semibold text-red-900">{kelas.alergiCount} siswa</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-red-500 text-xs">Alergi</span>
+                          <span className="text-xs font-medium text-red-600">{kelas.alergiCount} siswa</span>
                         </div>
                       )}
                     </div>
+                  </div>
 
+                  <div className="px-5 pb-4">
                     <button
                       onClick={async () => {
                         const kelasId = kelas.id || kelas._id;
-                        console.log("[CLICK] Kelas dipilih:", kelas.nama);
-                        console.log("[CLICK] Kelas ID:", kelasId);
-                        console.log("[CLICK] Full Kelas Object:", kelas);
                         setSelectedKelas(kelas);
-
-                        // Auto-fetch hadir hari ini saat detail dibuka
                         try {
                           const authToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
                           if (!authToken) return;
-
                           const url = `${API_BASE_URL}/api/kelas/${kelasId}/absensi`;
                           const response = await fetch(url, {
                             method: "GET",
@@ -839,48 +803,34 @@ const DataKelas = () => {
                               "Content-Type": "application/json",
                             },
                           });
-
                           if (response.ok) {
                             const data = await response.json();
                             let hadirCount = 0;
                             const today = new Date().toISOString().split('T')[0];
-
                             if (Array.isArray(data.data?.data)) {
                               const todayRecords = data.data.data.filter((record: any) => {
                                 const recordDate = record.tanggal?.split('T')[0];
                                 return recordDate === today;
                               });
-                              if (todayRecords.length > 0) {
-                                hadirCount = todayRecords[0].jumlahHadir || 0;
-                              }
+                              if (todayRecords.length > 0) hadirCount = todayRecords[0].jumlahHadir || 0;
                             } else if (Array.isArray(data.data)) {
-                              const todayRecord = data.data.find((record: any) => {
-                                const recordDate = record.tanggal?.split('T')[0];
-                                return recordDate === today;
-                              });
+                              const todayRecord = data.data.find((record: any) => record.tanggal?.split('T')[0] === today);
                               hadirCount = todayRecord?.jumlahHadir || 0;
                             } else if (typeof data.data === 'object' && data.data?.jumlahHadir !== undefined) {
                               hadirCount = data.data.jumlahHadir || 0;
                             } else if (data.jumlahHadir !== undefined) {
                               hadirCount = data.jumlahHadir || 0;
                             }
-
-                            // Update selectedKelas dengan hadirHariIni
-                            setSelectedKelas((prev: any) => ({
-                              ...prev,
-                              hadirHariIni: hadirCount,
-                            }));
-
-                            console.log("[CLICK AUTO-FETCH] Hadir hari ini:", hadirCount);
+                            setSelectedKelas((prev: any) => ({ ...prev, hadirHariIni: hadirCount }));
                           }
                         } catch (err) {
                           console.error("[CLICK AUTO-FETCH] Error:", err);
                         }
                       }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                     >
                       <Eye className="w-4 h-4" />
-                      Lihat Detail
+                      Detail
                     </button>
                   </div>
                 </div>
@@ -888,25 +838,25 @@ const DataKelas = () => {
             })}
           </div>
 
-          <div className="flex items-center justify-between bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-600">
-              Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredData.length)} dari {filteredData.length} kelas
+          <div className="flex items-center justify-between py-3">
+            <p className="text-xs text-gray-500">
+              {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredData.length)} dari {filteredData.length}
             </p>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-sm text-gray-600">Hal {currentPage} / {totalPages}</span>
+              <span className="text-xs text-gray-600 font-medium">{currentPage} / {totalPages}</span>
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>

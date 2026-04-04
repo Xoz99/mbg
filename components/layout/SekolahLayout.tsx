@@ -18,7 +18,10 @@ import {
   Send,
   CheckCircle,
   ChevronDown,
-  Package
+  Package,
+  Eye,
+  EyeOff,
+  School
 } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
@@ -41,6 +44,7 @@ const BubbleReport = ({
   authToken = ""
 }: BubbleReportProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showBubble, setShowBubble] = useState(true);
   const [judul, setJudul] = useState('');
   const [deskripsi, setDeskripsi] = useState('');
   const [status, setStatus] = useState<SubmitStatus>('idle');
@@ -106,14 +110,32 @@ const BubbleReport = ({
 
   return (
     <>
-      {/* Bubble Button */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-8 right-8 w-16 h-16 bg-gradient-to-br from-[#D0B064] to-[#C9A355] text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40"
-        aria-label="Open report form"
-      >
-        <MessageCircle className="w-8 h-8" />
-      </button>
+      {/* Tombol Toggle & Bubble Group */}
+      <div className="fixed bottom-8 right-8 z-50">
+        {/* Tombol Toggle View (Eye/EyeOff) - Posisinya di atas icon utama seperti notif */}
+        <button
+          onClick={() => setShowBubble(!showBubble)}
+          className={`absolute -top-2 -right-2 w-8 h-8 rounded-full shadow-lg transition-all flex items-center justify-center z-[51] border-2 border-white ${
+            showBubble 
+              ? 'bg-gray-100 text-gray-500 hover:bg-red-500 hover:text-white' 
+              : 'bg-[#1B263A] text-[#D0B064] scale-125'
+          }`}
+          title={showBubble ? "Sembunyikan Menu" : "Tampilkan Menu"}
+        >
+          {showBubble ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+
+        {/* Tombol Utama (Hanya muncul jika showBubble = true) */}
+        {showBubble && (
+          <button
+            onClick={() => setIsOpen(true)}
+            className="w-16 h-16 bg-gradient-to-br from-[#D0B064] to-[#C9A355] text-white rounded-full shadow-xl hover:shadow-2xl transition-all hover:scale-105 flex items-center justify-center relative"
+            aria-label="Open report form"
+          >
+            <MessageCircle className="w-8 h-8" />
+          </button>
+        )}
+      </div>
 
       {/* Modal Overlay */}
       {isOpen && (
@@ -342,78 +364,61 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-[#1B263A] text-white transition-all duration-300 flex flex-col flex-shrink-0`}>
         {/* Logo Section */}
-        <div className="h-[88px] px-6 flex items-center justify-between border-b border-white/10">
+        <div className="h-[88px] px-6 flex items-center justify-between border-b border-white/5">
           {sidebarOpen ? (
             <>
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-6 h-6 text-white" />
+                <div className="w-10 h-10 bg-[#D0B064] rounded-full flex items-center justify-center overflow-hidden shadow-sm border border-white/10">
+                  <School className="w-5 h-5 text-white" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  {loading ? (
-                    <div className="space-y-2">
-                      <div className="h-4 bg-white/10 rounded w-3/4 animate-pulse"></div>
-                      <div className="h-3 bg-white/10 rounded w-1/2 animate-pulse"></div>
-                    </div>
-                  ) : (
-                    <>
-                      <h2 className="font-bold text-sm line-clamp-1 text-white">{String(sekolahInfo.pic)}</h2>
-                      <p className="text-xs text-gray-400">PIC Sekolah</p>
-                    </>
-                  )}
+                <div className="min-w-0">
+                  <h2 className="font-bold text-sm text-white tracking-tight uppercase">UNIT SEKOLAH</h2>
+                  <p className="text-[10px] text-[#D0B064] font-bold uppercase tracking-widest leading-none truncate max-w-[120px]">
+                    {loading ? "..." : String(sekolahInfo.nama)}
+                  </p>
                 </div>
               </div>
               <button 
                 onClick={() => setSidebarOpen(false)} 
-                className="hover:bg-white/10 p-1 rounded transition-colors"
+                className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-white/50 hover:text-white"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </>
           ) : (
             <button 
               onClick={() => setSidebarOpen(true)} 
-              className="hover:bg-white/10 p-2 rounded mx-auto transition-colors"
+              className="hover:bg-white/10 p-2.5 rounded-lg mx-auto transition-colors text-white/70 hover:text-white border border-white/5"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5" />
             </button>
           )}
         </div>
 
         {/* Sekolah Info Card */}
         {sidebarOpen && (
-          <div className="mx-3 mt-4 mb-2 bg-white/5 rounded-lg p-3 border border-white/10">
+          <div className="mx-4 mt-6 mb-4 bg-white/5 rounded-xl p-4 border border-white/5">
             {loading ? (
               <div className="space-y-3 animate-pulse">
-                <div className="h-4 bg-white/10 rounded w-3/4"></div>
-                <div className="h-3 bg-white/10 rounded w-2/3"></div>
-                <div className="h-3 bg-white/10 rounded w-1/2"></div>
+                <div className="h-3 bg-white/10 rounded w-3/4"></div>
+                <div className="h-2 bg-white/10 rounded w-1/2"></div>
               </div>
             ) : error ? (
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-red-400">{String(error)}</p>
-              </div>
+              <p className="text-[10px] text-red-400">{String(error)}</p>
             ) : (
-              <>
-                <div className="flex items-start gap-2 mb-2">
-                  <MapPin className="w-4 h-4 text-white/70 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-400">Nama Sekolah</p>
-                    <p className="font-semibold text-sm text-white truncate">{String(sekolahInfo.nama)}</p>
-                    {sekolahInfo.alamat && (
-                      <p className="text-xs text-gray-400 truncate mt-0.5">{String(sekolahInfo.alamat)}</p>
-                    )}
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <MapPin className="w-4 h-4 text-[#D0B064] flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-1">Lokasi</p>
+                    <p className="font-semibold text-xs text-white leading-tight">{String(sekolahInfo.nama)}</p>
                   </div>
                 </div>
-                <div className="pt-2 border-t border-white/10">
-                  <p className="text-xs text-gray-400">PIC Sekolah</p>
-                  <p className="text-sm font-medium text-white">{String(sekolahInfo.pic)}</p>
-                  {sekolahInfo.picPhone && (
-                    <p className="text-xs text-gray-400 mt-1">{String(sekolahInfo.picPhone)}</p>
-                  )}
+                <div className="pt-3 border-t border-white/5">
+                  <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-1">Koordinator</p>
+                  <p className="text-xs font-semibold text-white/90">{String(sekolahInfo.pic)}</p>
                 </div>
-              </>
+              </div>
             )}
           </div>
         )}
@@ -435,10 +440,10 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
                       handleNavigation(item.path);
                     }
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all border-l-4 ${
                     isActive 
-                      ? 'bg-[#D0B064] text-white shadow-lg' 
-                      : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                      ? 'bg-white/5 text-[#D0B064] border-[#D0B064] font-bold' 
+                      : 'text-white/50 border-transparent hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
@@ -514,35 +519,22 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
         {/* Top Navbar */}
         <header className="h-[88px] bg-[#1B263A] text-white px-8 flex items-center flex-shrink-0 border-b border-white/10">
           <div className="flex items-center justify-between w-full">
-            {/* Welcome Message - Left Side */}
+            {/* Page Title - Left Side */}
             <div>
-              <p className="text-gray-400 text-sm">Selamat datang di</p>
-              <p className="text-2xl font-bold text-white">
-                {loading ? 'Loading...' : `${String(sekolahInfo.nama)}`}
-              </p>
+              <p className="text-[10px] uppercase tracking-widest text-[#D0B064] font-bold mb-0.5">Sekolah</p>
+              <h1 className="text-xl font-bold text-white capitalize">
+                {currentPage === 'dashboard' ? 'Dashboard' : currentPage?.replace(/-/g, ' ')}
+              </h1>
             </div>
 
-            {/* School Badge */}
-            <div className="flex items-center gap-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-2.5 rounded-full shadow-lg ml-auto">
-              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <GraduationCap className="w-4 h-4" />
-                )}
+            {/* School Badge - Flat & Minimalist */}
+            <div className="flex items-center gap-3 px-6 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white ml-auto">
+              <div className="w-8 h-8 bg-[#D0B064] rounded-full flex items-center justify-center shadow-lg">
+                <School className="w-4 h-4 text-white" />
               </div>
               <div className="text-left">
-                {loading ? (
-                  <div className="space-y-1">
-                    <div className="h-2 bg-white/20 rounded w-12"></div>
-                    <div className="h-3 bg-white/20 rounded w-24"></div>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-xs text-white/80 font-medium">{String(sekolahInfo.kode)}</p>
-                    <p className="font-bold text-white tracking-wide leading-tight line-clamp-1">{String(sekolahInfo.kota)}</p>
-                  </>
-                )}
+                <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">{loading ? '...' : sekolahInfo.kode}</p>
+                <p className="font-bold text-white tracking-wide leading-tight text-sm line-clamp-1">{loading ? '...' : sekolahInfo.kota}</p>
               </div>
             </div>
           </div>

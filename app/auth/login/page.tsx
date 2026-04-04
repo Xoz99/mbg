@@ -86,7 +86,7 @@ const LoginPage = () => {
             ...userData,
             role: apiRole
           }
-          
+
           localStorage.setItem("mbg_user", JSON.stringify(userDataWithRole))
           localStorage.setItem("authToken", token)
           localStorage.setItem("mbg_token", token)
@@ -145,7 +145,7 @@ const LoginPage = () => {
         aria-hidden="true"
         className="pointer-events-none absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-[#dfe4ea] to-transparent"
       />
-      
+
       <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-white mb-1">SELAMAT DATANG</h1>

@@ -23,6 +23,9 @@ import {
   Send,
   CheckCircle,
   Loader2,
+  Eye,
+  EyeOff,
+  Scale
 } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
@@ -45,6 +48,7 @@ const BubbleReport = ({
   authToken = ""
 }: BubbleReportProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showBubble, setShowBubble] = useState(true);
   const [judul, setJudul] = useState('');
   const [deskripsi, setDeskripsi] = useState('');
   const [status, setStatus] = useState<SubmitStatus>('idle');
@@ -110,14 +114,32 @@ const BubbleReport = ({
 
   return (
     <>
-      {/* Bubble Button */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-8 right-8 w-16 h-16 bg-gradient-to-br from-[#D0B064] to-[#C9A355] text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40"
-        aria-label="Open report form"
-      >
-        <MessageCircle className="w-8 h-8" />
-      </button>
+      {/* Tombol Toggle & Bubble Group */}
+      <div className="fixed bottom-8 right-8 z-50">
+        {/* Tombol Toggle View (Eye/EyeOff) - Posisinya di atas icon utama seperti notif */}
+        <button
+          onClick={() => setShowBubble(!showBubble)}
+          className={`absolute -top-2 -right-2 w-8 h-8 rounded-full shadow-lg transition-all flex items-center justify-center z-[51] border-2 border-white ${
+            showBubble 
+              ? 'bg-gray-100 text-gray-500 hover:bg-red-500 hover:text-white' 
+              : 'bg-[#1B263A] text-[#D0B064] scale-125'
+          }`}
+          title={showBubble ? "Sembunyikan Menu" : "Tampilkan Menu"}
+        >
+          {showBubble ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+
+        {/* Tombol Utama (Hanya muncul jika showBubble = true) */}
+        {showBubble && (
+          <button
+            onClick={() => setIsOpen(true)}
+            className="w-16 h-16 bg-gradient-to-br from-[#D0B064] to-[#C9A355] text-white rounded-full shadow-xl hover:shadow-2xl transition-all hover:scale-105 flex items-center justify-center relative"
+            aria-label="Open report form"
+          >
+            <MessageCircle className="w-8 h-8" />
+          </button>
+        )}
+      </div>
 
       {/* Modal Overlay */}
       {isOpen && (
@@ -337,31 +359,31 @@ const MinistryLayout = ({ children, currentPage = 'dashboard' }: MinistryLayoutP
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-[#1B263A] text-white transition-all duration-300 flex flex-col flex-shrink-0`}>
         {/* Logo Section */}
-        <div className="h-[88px] px-6 flex items-center justify-between border-b border-white/10">
+        <div className="h-[88px] px-6 flex items-center justify-between border-b border-white/5">
           {sidebarOpen ? (
             <>
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-[#D0B064] rounded-full flex items-center justify-center overflow-hidden">
-                  <Building2 className="w-6 h-6 text-white" />
+                <div className="w-10 h-10 bg-[#D0B064] rounded-full flex items-center justify-center overflow-hidden shadow-sm border border-white/10">
+                  <Scale className="w-5 h-5 text-white" />
                 </div>
-                <div>
-                  <h2 className="font-bold text-sm">KEMENTERIAN</h2>
-                  <p className="text-xs text-[#D0B064] font-semibold">Pendidikan</p>
+                <div className="min-w-0">
+                  <h2 className="font-bold text-sm text-white tracking-tight uppercase">KEMENTERIAN</h2>
+                  <p className="text-[10px] text-[#D0B064] font-bold uppercase tracking-widest leading-none self-start">PUSAT</p>
                 </div>
               </div>
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="hover:bg-white/10 p-1 rounded transition-colors"
+                className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-white/50 hover:text-white"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </>
           ) : (
             <button
               onClick={() => setSidebarOpen(true)}
-              className="hover:bg-white/10 p-2 rounded mx-auto transition-colors"
+              className="hover:bg-white/10 p-2.5 rounded-lg mx-auto transition-colors text-white/70 hover:text-white border border-white/5"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5" />
             </button>
           )}
         </div>
@@ -393,11 +415,10 @@ const MinistryLayout = ({ children, currentPage = 'dashboard' }: MinistryLayoutP
               <button
                 key={item.id}
                 onClick={() => handleNavigation(item.path)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                  isActive
-                    ? 'bg-[#D0B064] text-white shadow-lg'
-                    : 'text-gray-300 hover:bg-white/5 hover:text-white'
-                }`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all border-l-4 ${isActive
+                  ? 'bg-white/5 text-[#D0B064] border-[#D0B064] font-bold'
+                  : 'text-white/50 border-transparent hover:bg-white/5 hover:text-white'
+                  }`}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 {sidebarOpen && <span className="font-medium text-sm">{item.name}</span>}
@@ -440,34 +461,16 @@ const MinistryLayout = ({ children, currentPage = 'dashboard' }: MinistryLayoutP
               ))}
             </div>
 
-            {/* Right Side Actions */}
-            <div className="flex items-center gap-4">
-              {/* Notifications */}
-              <button className="relative p-2 hover:bg-white/10 rounded-lg transition-colors">
-                <Bell className="w-5 h-5" />
-                {notificationCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold">
-                    {notificationCount > 9 ? '9+' : notificationCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Settings */}
-              <button
-                onClick={() => router.push('/kementrian/settings')}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-
-              {/* User Badge */}
-              <div className="flex items-center gap-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-2.5 rounded-full shadow-lg ml-2">
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  <Users className="w-5 h-5 text-white" />
+            {/* Right Side Actions - Identity Badge */}
+            <div className="flex items-center gap-4 ml-auto">
+              {/* Ministry Badge - Flat & Minimalist */}
+              <div className="flex items-center gap-3 px-6 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white">
+                <div className="w-8 h-8 bg-[#D0B064] rounded-full flex items-center justify-center shadow-lg">
+                  <Scale className="w-4 h-4 text-white" />
                 </div>
                 <div className="text-left">
-                  <p className="text-xs text-white/80 font-medium">{ministryInfo.role}</p>
-                  <p className="font-bold text-white tracking-wide leading-tight">{ministryInfo.pic}</p>
+                  <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Pusat</p>
+                  <p className="font-bold text-white tracking-wide leading-tight text-sm line-clamp-1">Kementerian</p>
                 </div>
               </div>
             </div>

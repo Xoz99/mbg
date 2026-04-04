@@ -392,49 +392,24 @@ const DataKaryawan = () => {
     return jenis
   }
 
-  const StatCard = ({ title, value, subtitle, icon: Icon, color }: any) => (
-    <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all">
-      <div className={`p-2.5 rounded-lg ${color} mb-3 w-fit`}>
-        <Icon className="w-5 h-5 text-white" />
-      </div>
-      <p className="text-xs font-medium text-gray-600 mb-1">{title}</p>
-      <p className="text-2xl font-bold text-gray-900 mb-0.5">{value}</p>
-      <p className="text-xs text-gray-500">{subtitle}</p>
-    </div>
-  )
-
   if (loading && employees.length === 0) {
     return (
       <DapurLayout currentPage="karyawan">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Data Karyawan</h1>
-          <p className="text-gray-600">Kelola data dan performa staff dapur</p>
+          <p className="text-sm text-gray-500">Kelola data staf dapur</p>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Karyawan</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Posisi</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {[...Array(5)].map((_, i) => (
-                  <SkeletonRow key={i} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="space-y-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-100 animate-pulse">
+              <div className="w-10 h-10 bg-gray-200 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-32 bg-gray-200 rounded" />
+                <div className="h-3 w-20 bg-gray-100 rounded" />
+              </div>
+              <div className="h-4 w-16 bg-gray-200 rounded" />
+            </div>
+          ))}
         </div>
       </DapurLayout>
     )
@@ -445,15 +420,14 @@ const DataKaryawan = () => {
       <DapurLayout currentPage="karyawan">
         <div className="flex items-center justify-center h-96">
           <div className="text-center max-w-md">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <p className="text-red-600 mb-4">{error}</p>
-
+            <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+            <p className="text-sm text-red-600 mb-4">{error}</p>
             <button
               onClick={() => {
                 setError(null)
                 if (dapurId && authToken) fetchEmployees()
               }}
-              className="px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] transition-colors"
+              className="px-4 py-2 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] text-sm font-semibold transition-colors"
             >
               Coba Lagi
             </button>
@@ -465,169 +439,133 @@ const DataKaryawan = () => {
 
   return (
     <DapurLayout currentPage="karyawan">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Data Karyawan</h1>
-            <p className="text-gray-600">Kelola data dan performa staff dapur</p>
+      {/* Header + Stats in one compact row */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-0.5">Data Karyawan</h1>
+          <p className="text-sm text-gray-500">Kelola data staf dapur</p>
+          {/* Inline stats */}
+          <div className="flex items-center gap-5 mt-3">
+            <span className="text-sm text-gray-600">
+              Total <span className="font-bold text-gray-900">{stats.total}</span>
+            </span>
+            <span className="text-sm text-gray-600 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+              Aktif <span className="font-bold text-gray-900">{stats.active}</span>
+            </span>
+            <span className="text-sm text-gray-600 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
+              Non-aktif <span className="font-bold text-gray-900">{stats.inactive}</span>
+            </span>
           </div>
-          <div className="flex items-center gap-3">
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition-colors text-sm font-semibold"
+        >
+          <Plus className="w-4 h-4" />
+          Tambah
+        </button>
+      </div>
+
+      {/* Search + Filter */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
+        <div className="flex-1 relative max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Cari karyawan..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 transition-all placeholder:text-gray-400"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          {["semua", "AKTIF", "TIDAK_AKTIF"].map((status) => (
             <button
-              onClick={fetchEmployees}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold shadow-sm disabled:opacity-50"
+              key={status}
+              onClick={() => setFilterStatus(status)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                filterStatus === status
+                  ? "bg-[#1B263A] text-white"
+                  : "text-gray-500 hover:bg-gray-100"
+              }`}
             >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-              Refresh
+              {status === "semua" ? "Semua" : status === "AKTIF" ? "Aktif" : "Tidak Aktif"}
             </button>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#D0B064] text-white rounded-xl hover:bg-[#C9A355] transition-colors font-semibold shadow-sm"
-            >
-              <Plus className="w-5 h-5" />
-              Tambah Karyawan
-            </button>
-          </div>
+          ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="TOTAL KARYAWAN" value={stats.total} subtitle="staff dapur" icon={Users} color="bg-blue-600" />
-        <StatCard title="KARYAWAN SIAP" value={stats.active} subtitle="siap bekerja hari ini" icon={UserCheck} color="bg-green-600" />
-        <StatCard title="AKTIF" value={stats.active} subtitle="sedang bertugas" icon={CheckCircle} color="bg-emerald-600" />
-        <StatCard
-          title="TIDAK AKTIF"
-          value={stats.inactive}
-          subtitle="resign/suspend"
-          icon={UserX}
-          color="bg-red-600"
-        />
-      </div>
-
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col md:flex-row items-center gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Cari nama, email, atau posisi..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-            />
+      {/* Employee List – Card style rows instead of plain table */}
+      <div className="space-y-2">
+        {filteredEmployees.length === 0 ? (
+          <div className="py-16 text-center">
+            <Users className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+            <p className="text-sm text-gray-500 font-medium">
+              {employees.length > 0
+                ? "Tidak ada hasil sesuai filter"
+                : "Belum ada data karyawan"}
+            </p>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-gray-700">Status:</span>
-            {["semua", "AKTIF", "TIDAK_AKTIF"].map((status) => (
-              <button
-                key={status}
-                onClick={() => setFilterStatus(status)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  filterStatus === status
-                    ? "bg-[#D0B064] text-white shadow-md"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+        ) : (
+          filteredEmployees.map((emp) => {
+            const statusConfig = getStatusConfig((emp.status || "").toUpperCase())
+            return (
+              <div
+                key={emp.id || emp._id}
+                className="flex items-center gap-4 px-4 py-3 rounded-xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50/50 transition-all cursor-pointer group"
+                onClick={() => setSelectedEmployee(emp)}
               >
-                {status === "semua" ? "Semua" : status === "AKTIF" ? "Aktif" : "Tidak Aktif"}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+                {/* Avatar */}
+                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {emp.fotoUrl || emp.foto ? (
+                    <img src={emp.fotoUrl || emp.foto} alt={emp.nama} className="w-10 h-10 object-cover rounded-full" />
+                  ) : (
+                    <User className="w-5 h-5 text-gray-400" />
+                  )}
+                </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Karyawan
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Posisi</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredEmployees.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
-                    <Users className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                    <p>
-                      {employees.length > 0
-                        ? "Tidak ada hasil sesuai filter/pencarian"
-                        : "Tidak ada data karyawan"}
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                filteredEmployees.map((emp) => {
-                  const statusConfig = getStatusConfig((emp.status || "").toUpperCase())
-                  return (
-                    <tr key={emp.id || emp._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
-                            {emp.fotoUrl || emp.foto ? (
-                              <img src={emp.fotoUrl || emp.foto} alt={emp.nama} className="w-12 h-12 object-cover" />
-                            ) : (
-                              <User className="w-6 h-6 text-gray-400" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-semibold text-gray-900">{emp.nama || emp.name}</p>
-                            <p className="text-xs text-gray-500">{getJenisKelaminDisplay(emp.jenisKelamin)}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-semibold text-gray-900">{emp.posisi || emp.position}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${statusConfig.color}`}
-                        >
-                          <div className={`w-2 h-2 rounded-full ${statusConfig.dotColor}`}></div>
-                          {statusConfig.text}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setSelectedEmployee(emp)}
-                            className="p-2 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition-colors"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => openEditModal(emp)}
-                            className="p-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteEmployee(emp.id || emp._id)}
-                            className="p-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm truncate">{emp.nama || emp.name}</p>
+                  <p className="text-xs text-gray-500">{emp.posisi || emp.position} · {getJenisKelaminDisplay(emp.jenisKelamin)}</p>
+                </div>
+
+                {/* Status */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className={`w-2 h-2 rounded-full ${statusConfig.dotColor}`} />
+                  <span className="text-xs font-semibold text-gray-600">{statusConfig.text}</span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openEditModal(emp) }}
+                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Edit"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteEmployee(emp.id || emp._id) }}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Hapus"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )
+          })
+        )}
       </div>
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white px-6 py-5 flex items-center justify-between rounded-t-2xl">
-              <h3 className="text-xl font-bold">Tambah Karyawan</h3>
+            <div className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-lg font-bold text-gray-900">Tambah Karyawan</h3>
               <button
                 onClick={() => {
                   setShowAddModal(false)
@@ -635,13 +573,13 @@ const DataKaryawan = () => {
                   setFotoPreview("")
                   setFormData({ nama: "", posisi: "", jenisKelamin: "LAKI_LAKI", status: "AKTIF" })
                 }}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded transition-colors"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateEmployee} className="p-6 space-y-4">
+            <form onSubmit={handleCreateEmployee} className="p-6 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Nama</label>
                 <input
@@ -760,8 +698,8 @@ const DataKaryawan = () => {
       {showEditModal && editingEmployee && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white px-6 py-5 flex items-center justify-between rounded-t-2xl">
-              <h3 className="text-xl font-bold">Edit Karyawan</h3>
+            <div className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-lg font-bold text-gray-900">Edit Karyawan</h3>
               <button
                 onClick={() => {
                   setShowEditModal(false)
@@ -769,13 +707,13 @@ const DataKaryawan = () => {
                   setFotoFile(null)
                   setFotoPreview("")
                 }}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded transition-colors"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateEmployee} className="p-6 space-y-4">
+            <form onSubmit={handleUpdateEmployee} className="p-6 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Nama</label>
                 <input
@@ -900,148 +838,95 @@ const DataKaryawan = () => {
       {selectedEmployee && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white px-6 py-5 flex items-center justify-between z-10 rounded-t-2xl">
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between z-10 rounded-t-2xl">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center overflow-hidden">
+                <div className="w-12 h-12 bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0 rounded">
                   {selectedEmployee.fotoUrl || selectedEmployee.foto ? (
-                    <img src={selectedEmployee.fotoUrl || selectedEmployee.foto} alt={selectedEmployee.nama} className="w-16 h-16 object-cover" />
+                    <img src={selectedEmployee.fotoUrl || selectedEmployee.foto} alt={selectedEmployee.nama} className="w-12 h-12 object-cover" />
                   ) : (
-                    <User className="w-8 h-8" />
+                    <User className="w-6 h-6 text-gray-400" />
                   )}
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold">{selectedEmployee.nama || selectedEmployee.name}</h3>
-                  <p className="text-sm text-white/80">{selectedEmployee.posisi || selectedEmployee.position}</p>
-                  {(() => {
-                    const statusConfig = getStatusConfig((selectedEmployee.status || "").toUpperCase())
-                    const StatusIcon = statusConfig.icon
-                    return (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/20 border border-white/30 mt-2">
-                        <StatusIcon className="w-4 h-4" />
-                        {statusConfig.text}
-                      </span>
-                    )
-                  })()}
+                  <h3 className="text-lg font-bold text-gray-900 leading-tight">{selectedEmployee.nama || selectedEmployee.name}</h3>
+                  <p className="text-sm text-gray-500">{selectedEmployee.posisi || selectedEmployee.position}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedEmployee(null)}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 text-gray-500 hover:bg-gray-50 hover:text-gray-900 rounded transition-colors"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              {(selectedEmployee.phone || selectedEmployee.email) && (
-                <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-y-4 border-b border-gray-100 pb-6">
                   {selectedEmployee.phone && (
-                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                      <div className="flex items-center gap-3">
-                        <Phone className="w-5 h-5 text-blue-600" />
-                        <div>
-                          <p className="text-xs text-blue-600">Telepon</p>
-                          <p className="font-semibold text-gray-900">{selectedEmployee.phone}</p>
-                        </div>
-                      </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Telepon</p>
+                      <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-gray-400" />
+                        {selectedEmployee.phone}
+                      </p>
                     </div>
                   )}
                   {selectedEmployee.email && (
-                    <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
-                      <div className="flex items-center gap-3">
-                        <Mail className="w-5 h-5 text-purple-600" />
-                        <div>
-                          <p className="text-xs text-purple-600">Email</p>
-                          <p className="font-semibold text-gray-900 text-sm">{selectedEmployee.email}</p>
-                        </div>
-                      </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Email</p>
+                      <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-gray-400" />
+                        {selectedEmployee.email}
+                      </p>
                     </div>
                   )}
-                </div>
-              )}
-
-              <div>
-                <h4 className="font-bold text-gray-900 mb-3 text-sm uppercase tracking-wide">Informasi Kepegawaian</h4>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center gap-3">
-                      <Briefcase className="w-5 h-5 text-gray-600" />
-                      <div>
-                        <p className="text-xs text-gray-500">Posisi</p>
-                        <p className="font-semibold text-gray-900">
-                          {selectedEmployee.posisi || selectedEmployee.position}
-                        </p>
-                      </div>
-                    </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Status</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedEmployee.status}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="w-5 h-5 text-gray-600" />
-                      <div>
-                        <p className="text-xs text-gray-500">Status</p>
-                        <p className="font-semibold text-gray-900">{selectedEmployee.status}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center gap-3">
-                      <User className="w-5 h-5 text-gray-600" />
-                      <div>
-                        <p className="text-xs text-gray-500">Jenis Kelamin</p>
-                        <p className="font-semibold text-gray-900">{getJenisKelaminDisplay(selectedEmployee.jenisKelamin)}</p>
-                      </div>
-                    </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Jenis Kelamin</p>
+                    <p className="text-sm font-semibold text-gray-900">{getJenisKelaminDisplay(selectedEmployee.jenisKelamin)}</p>
                   </div>
                   {selectedEmployee.createdAt && (
-                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                      <div className="flex items-center gap-3">
-                        <Calendar className="w-5 h-5 text-gray-600" />
-                        <div>
-                          <p className="text-xs text-gray-500">Tanggal Dibuat</p>
-                          <p className="font-semibold text-gray-900">
-                            {new Date(selectedEmployee.createdAt).toLocaleDateString("id-ID")}
-                          </p>
-                        </div>
-                      </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Tanggal Bergabung</p>
+                      <p className="text-sm text-gray-900">
+                        {new Date(selectedEmployee.createdAt).toLocaleDateString("id-ID")}
+                      </p>
                     </div>
                   )}
                   {selectedEmployee.updatedAt && (
-                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                      <div className="flex items-center gap-3">
-                        <Clock className="w-5 h-5 text-gray-600" />
-                        <div>
-                          <p className="text-xs text-gray-500">Terakhir Update</p>
-                          <p className="font-semibold text-gray-900">
-                            {new Date(selectedEmployee.updatedAt).toLocaleDateString("id-ID")}
-                          </p>
-                        </div>
-                      </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Terakhir Update</p>
+                      <p className="text-sm text-gray-900">
+                        {new Date(selectedEmployee.updatedAt).toLocaleDateString("id-ID")}
+                      </p>
                     </div>
                   )}
                 </div>
+
+                {selectedEmployee.address && (
+                  <div className="pt-2 pb-6 border-b border-gray-100">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Alamat</p>
+                    <p className="text-sm text-gray-900 flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                      {selectedEmployee.address}
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {selectedEmployee.address && (
-                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <p className="text-xs text-blue-600 font-semibold mb-1">Alamat</p>
-                      <p className="text-sm text-gray-900">{selectedEmployee.address}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex gap-3 pt-6">
                 <button
                   onClick={() => {
                     setSelectedEmployee(null)
                     openEditModal(selectedEmployee)
                   }}
-                  className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-[#D0B064] text-white rounded-xl hover:bg-[#C9A355] transition-all font-bold shadow-md hover:shadow-lg"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-[#1B263A] text-[#1B263A] rounded hover:bg-gray-50 transition-colors text-sm font-semibold"
                 >
-                  <Edit className="w-5 h-5" />
+                  <Edit className="w-4 h-4" />
                   Edit Data
                 </button>
                 <button

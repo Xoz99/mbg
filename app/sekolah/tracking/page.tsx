@@ -40,7 +40,7 @@ const SkeletonCard = () => (
 
 const SkeletonMap = () => (
   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden h-full">
-    <div className="bg-gradient-to-br from-gray-800 to-gray-700 p-4 md:p-5">
+    <div className="bg-[#1B263A] p-4 md:p-5">
       <div className="animate-pulse">
         <div className="h-6 bg-gray-600 rounded w-48 mb-2"></div>
         <div className="h-4 bg-gray-600 rounded w-64"></div>
@@ -81,22 +81,22 @@ const SkeletonSidebar = () => (
     </div>
 
     {/* Time Card Skeleton */}
-    <div className="bg-gradient-to-br from-gray-800 to-gray-700 rounded-xl p-4 md:p-5 shadow-lg animate-pulse">
+    <div className="bg-white border border-gray-100 rounded-xl p-4 md:p-5 shadow-sm animate-pulse">
       <div className="flex items-center gap-2.5 mb-4">
-        <div className="w-5 h-5 bg-gray-600 rounded flex-shrink-0"></div>
-        <div className="h-5 bg-gray-600 rounded w-40"></div>
+        <div className="w-5 h-5 bg-gray-200 rounded flex-shrink-0"></div>
+        <div className="h-5 bg-gray-200 rounded w-40"></div>
       </div>
-      <div className="bg-gray-600 rounded-lg p-3 md:p-4 mb-4">
-        <div className="h-10 bg-gray-500 rounded w-32 mx-auto"></div>
+      <div className="bg-gray-50 rounded-lg p-3 md:p-4 mb-4">
+        <div className="h-10 bg-gray-200 rounded w-32 mx-auto"></div>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-gray-600/50 rounded-lg p-3">
-          <div className="h-3 bg-gray-500 rounded w-20 mb-2"></div>
-          <div className="h-6 bg-gray-500 rounded w-16"></div>
+        <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+          <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+          <div className="h-6 bg-gray-200 rounded w-16"></div>
         </div>
-        <div className="bg-gray-600/50 rounded-lg p-3">
-          <div className="h-3 bg-gray-500 rounded w-20 mb-2"></div>
-          <div className="h-6 bg-gray-500 rounded w-16"></div>
+        <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+          <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+          <div className="h-6 bg-gray-200 rounded w-16"></div>
         </div>
       </div>
     </div>
@@ -492,13 +492,13 @@ const TrackingPage = () => {
 
   const getStatusInfo = (status: string) => {
     const statusMap: any = {
-      dalam_perjalanan: { text: 'Dalam Perjalanan', icon: Truck, bgClass: 'bg-blue-500' },
-      sampai: { text: 'Sudah Sampai', icon: CheckCircle, bgClass: 'bg-green-500' },
-      belum_berangkat: { text: 'Belum Berangkat', icon: Clock, bgClass: 'bg-orange-500' },
-      active: { text: 'Dalam Perjalanan', icon: Truck, bgClass: 'bg-blue-500' },
-      arrived: { text: 'Sudah Sampai', icon: CheckCircle, bgClass: 'bg-green-500' },
-      idle: { text: 'Belum Berangkat', icon: Clock, bgClass: 'bg-orange-500' },
-      pending: { text: 'Menunggu', icon: Clock, bgClass: 'bg-yellow-500' }
+      dalam_perjalanan: { text: 'Dalam Perjalanan', icon: Truck, bgClass: 'bg-blue-50 text-blue-600 border border-blue-200' },
+      sampai: { text: 'Sudah Sampai', icon: CheckCircle, bgClass: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
+      belum_berangkat: { text: 'Belum Berangkat', icon: Clock, bgClass: 'bg-amber-50 text-amber-600 border border-amber-200' },
+      active: { text: 'Dalam Perjalanan', icon: Truck, bgClass: 'bg-blue-50 text-blue-600 border border-blue-200' },
+      arrived: { text: 'Sudah Sampai', icon: CheckCircle, bgClass: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
+      idle: { text: 'Belum Berangkat', icon: Clock, bgClass: 'bg-amber-50 text-amber-600 border border-amber-200' },
+      pending: { text: 'Menunggu', icon: Clock, bgClass: 'bg-gray-50 text-gray-600 border border-gray-200' }
     };
     return statusMap[status] || statusMap.active;
   };
@@ -545,7 +545,7 @@ const TrackingPage = () => {
     <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
       <div className="flex items-center gap-3 mb-3">
         <div className={`p-2.5 rounded-lg ${color} flex-shrink-0`}>
-          <Icon className="w-5 h-5 text-white" />
+          <Icon className="w-5 h-5 flex-shrink-0" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-gray-500 mb-0.5">{title}</p>
@@ -638,15 +638,15 @@ const TrackingPage = () => {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-            <StatCard title="Kendaraan" value={vehicle.id} subtitle="ID Kendaraan MBG" icon={Truck} color="bg-blue-500" />
+            <StatCard title="Kendaraan" value={vehicle.id} subtitle="ID Kendaraan MBG" icon={Truck} color="bg-gray-50 text-gray-700 border border-gray-200" />
             <StatCard title="Status" value={statusInfo.text} subtitle={`ETA: ${vehicle.estimasi}`} icon={StatusIcon} color={statusInfo.bgClass} />
-            <StatCard title="Jarak" value={vehicle.jarak} subtitle={`Kecepatan: ${vehicle.kecepatan}`} icon={Navigation} color="bg-green-500" />
+            <StatCard title="Jarak" value={vehicle.jarak} subtitle={`Kecepatan: ${vehicle.kecepatan}`} icon={Navigation} color="bg-emerald-50 text-emerald-600 border border-emerald-200" />
             <StatCard 
               title="Muatan" 
               value={vehicle.kapasitas > 0 ? `${vehicle.terisi}/${vehicle.kapasitas}` : 'N/A'} 
               subtitle={vehicle.kapasitas > 0 ? `${Math.round((vehicle.terisi / vehicle.kapasitas) * 100)}% terisi` : 'Data tidak tersedia'} 
               icon={Package} 
-              color="bg-purple-500" 
+              color="bg-purple-50 text-purple-600 border border-purple-200" 
             />
           </div>
 
@@ -655,7 +655,7 @@ const TrackingPage = () => {
             {/* Map Section */}
             <div className="lg:col-span-2">
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden h-full">
-                <div className="bg-gradient-to-br from-[#1B263A] to-[#2A3749] p-4 md:p-5 text-white">
+                <div className="bg-[#1B263A] p-4 md:p-5 text-white">
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-3">
                       <MapPin className="w-5 h-5 md:w-6 md:h-6 flex-shrink-0" />
@@ -740,7 +740,7 @@ const TrackingPage = () => {
               <div className="bg-white rounded-xl p-4 md:p-5 shadow-sm border border-gray-100">
                 <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-200">
                   <div className={`p-2.5 ${statusInfo.bgClass} rounded-lg flex-shrink-0`}>
-                    <Truck className="w-5 h-5 text-white" />
+                    <Truck className="w-5 h-5 flex-shrink-0" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-gray-600">Kendaraan</p>
@@ -803,22 +803,22 @@ const TrackingPage = () => {
               </div>
 
               {/* Time Card */}
-              <div className="bg-gradient-to-br from-[#1B263A] to-[#2A3749] rounded-xl p-4 md:p-5 text-white shadow-lg">
+              <div className="bg-white border border-gray-100 rounded-xl p-4 md:p-5 shadow-sm">
                 <div className="flex items-center gap-2.5 mb-4">
-                  <Clock className="w-5 h-5 flex-shrink-0" />
-                  <h3 className="text-base md:text-lg font-semibold">Waktu Real-time</h3>
+                  <Clock className="w-5 h-5 flex-shrink-0 text-[#1B263A]" />
+                  <h3 className="text-base md:text-lg font-semibold text-[#1B263A]">Waktu Real-time</h3>
                 </div>
-                <div className="bg-[#D0B064] rounded-lg p-3 md:p-4 mb-4">
-                  <p className="text-2xl md:text-3xl font-mono font-bold text-center">{formattedTime}</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 md:p-4 mb-4">
+                  <p className="text-2xl md:text-3xl font-mono font-bold text-center text-[#1B263A]">{formattedTime}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white/10 rounded-lg p-3">
-                    <p className="text-xs text-white/70 mb-1">Update Terakhir</p>
-                    <p className="text-base md:text-lg font-bold">{vehicle.waktuBerangkat}</p>
+                  <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+                    <p className="text-xs text-gray-500 mb-1">Update Terakhir</p>
+                    <p className="text-base md:text-lg font-bold text-gray-900">{vehicle.waktuBerangkat}</p>
                   </div>
-                  <div className="bg-white/10 rounded-lg p-3">
-                    <p className="text-xs text-white/70 mb-1">Est. Tiba</p>
-                    <p className="text-base md:text-lg font-bold">{vehicle.estimasiTiba}</p>
+                  <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+                    <p className="text-xs text-gray-500 mb-1">Est. Tiba</p>
+                    <p className="text-base md:text-lg font-bold text-gray-900">{vehicle.estimasiTiba}</p>
                   </div>
                 </div>
               </div>
@@ -829,8 +829,8 @@ const TrackingPage = () => {
           <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-gray-100">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 md:gap-6">
               <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0">
-                <div className="p-3 md:p-4 bg-red-500 rounded-xl flex-shrink-0">
-                  <MapPin className="w-6 h-6 md:w-8 md:h-8 text-white" />
+                <div className="p-3 md:p-4 bg-gray-50 border border-gray-200 rounded-xl flex-shrink-0">
+                  <MapPin className="w-6 h-6 md:w-8 md:h-8 text-[#1B263A]" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs md:text-sm text-gray-600 mb-1">Tujuan Pengiriman</p>
@@ -859,7 +859,7 @@ const TrackingPage = () => {
       {isFullscreen && (
         <div className="fixed inset-0 bg-black z-[9999] flex flex-col overflow-hidden">
           {/* Fullscreen Header */}
-          <div className="bg-gradient-to-br from-[#1B263A] to-[#2A3749] p-4 md:p-5 text-white flex items-center justify-between flex-shrink-0">
+          <div className="bg-[#1B263A] p-4 md:p-5 text-white flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <MapPin className="w-6 h-6 flex-shrink-0" />
               <div className="min-w-0">

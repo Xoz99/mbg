@@ -10,8 +10,6 @@ import {
   X,
   CheckCircle2,
   XCircle,
-  Sparkles,
-  Zap,
   User,
   Users2,
   AlertTriangle,
@@ -22,27 +20,19 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 // Skeleton Components
 const SkeletonStatCard = () => (
-  <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 shadow-sm border border-slate-200 animate-pulse">
-    <div className="h-10 w-10 bg-slate-300 rounded-xl mb-3"></div>
-    <div className="h-3 w-24 bg-slate-300 rounded mb-2"></div>
-    <div className="h-8 w-16 bg-slate-400 rounded mb-2"></div>
-    <div className="h-3 w-20 bg-slate-300 rounded"></div>
+  <div className="animate-pulse py-3">
+    <div className="h-4 w-16 bg-slate-200 rounded mb-2" />
+    <div className="h-7 w-12 bg-slate-200 rounded mb-1" />
+    <div className="h-3 w-20 bg-slate-100 rounded" />
   </div>
 )
 
 const SkeletonKelasCard = () => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
-    <div className="bg-slate-300 h-20"></div>
-    <div className="p-5 space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="h-20 bg-slate-200 rounded-lg"></div>
-        <div className="h-20 bg-slate-200 rounded-lg"></div>
-      </div>
-      <div className="space-y-2">
-        <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-        <div className="h-4 bg-slate-200 rounded w-1/2"></div>
-      </div>
-      <div className="h-10 bg-slate-200 rounded-lg"></div>
+  <div className="border border-gray-100 rounded-xl overflow-hidden animate-pulse">
+    <div className="p-4 space-y-3">
+      <div className="h-5 w-2/3 bg-slate-200 rounded" />
+      <div className="h-4 w-1/3 bg-slate-100 rounded" />
+      <div className="h-10 bg-slate-100 rounded mt-4" />
     </div>
   </div>
 )
@@ -468,19 +458,13 @@ const Presensi = () => {
   }
 
   const StatCard = ({ title, value, subtitle, icon: Icon, color }: any) => (
-    <div className="group relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-300">
-      <div className="absolute inset-0 bg-gradient-to-br from-white via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="relative">
-        <div className="flex items-start justify-between mb-3">
-          <div className={`p-3.5 rounded-xl ${color}`}>
-            <Icon className="w-5 h-5 text-white" />
-          </div>
-          <Zap className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" />
-        </div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{title}</p>
-        <p className="text-3xl font-bold text-gray-900 mb-0.5">{value}</p>
-        <p className="text-xs text-gray-500 font-medium">{subtitle}</p>
+    <div className="py-3">
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className={`w-4 h-4 ${color}`} />
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
       </div>
+      <p className="text-2xl font-bold text-gray-900 mb-0.5">{value}</p>
+      <p className="text-xs text-gray-400">{subtitle}</p>
     </div>
   )
 
@@ -528,53 +512,43 @@ const Presensi = () => {
               <p className="text-gray-600">Tidak ada data kelas</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {cachedData.kelasData.map((kelas: any) => (
                 <div
                   key={kelas.id}
-                  className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
+                  className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:border-gray-200 transition-colors"
                 >
-                  {/* Header */}
-                  <div className="bg-gradient-to-br from-[#1B263A] to-[#2A3749] px-5 py-4 text-white h-20 flex items-center">
-                    <h3 className="text-2xl font-bold truncate">Kelas: {kelas.nama || 'Kelas'}</h3>
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-5">
-                    {/* Laki-laki dan Perempuan */}
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div className="text-center p-3 bg-blue-50 rounded-lg">
-                        <Users className="w-5 h-5 text-blue-600 mx-auto mb-1" />
-                        <p className="text-2xl font-bold text-blue-600">{kelas.lakiLaki || 0}</p>
-                        <p className="text-xs text-gray-600">Laki-laki</p>
+                  <div className="px-5 pt-5 pb-3">
+                    <h3 className="text-lg font-bold text-gray-900 mb-3">Kelas: {kelas.nama || 'Kelas'}</h3>
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <p className="text-xs text-gray-400">Laki-laki</p>
+                        <p className="text-xl font-bold text-gray-900">{kelas.lakiLaki || 0}</p>
                       </div>
-                      <div className="text-center p-3 bg-pink-50 rounded-lg">
-                        <Users className="w-5 h-5 text-pink-600 mx-auto mb-1" />
-                        <p className="text-2xl font-bold text-pink-600">{kelas.perempuan || 0}</p>
-                        <p className="text-xs text-gray-600">Perempuan</p>
+                      <div>
+                        <p className="text-xs text-gray-400">Perempuan</p>
+                        <p className="text-xl font-bold text-gray-900">{kelas.perempuan || 0}</p>
                       </div>
                     </div>
-
-                    {/* Info */}
-                    <div className="space-y-2 mb-4 min-h-[56px]">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Total Siswa</span>
-                        <span className="font-semibold text-gray-900">{kelas.totalSiswa || 0} siswa</span>
+                    <div className="space-y-1.5 text-sm mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500">Total Siswa</span>
+                        <span className="font-medium text-gray-900">{kelas.totalSiswa || 0}</span>
                       </div>
                       {kelas.alergiCount > 0 && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-red-600">Alergi</span>
-                          <span className="font-semibold text-red-900">{kelas.alergiCount} siswa</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-red-500 text-xs">Alergi</span>
+                          <span className="text-red-600 text-xs font-medium">{kelas.alergiCount} siswa</span>
                         </div>
                       )}
                     </div>
-
-                    {/* Button */}
+                  </div>
+                  <div className="px-5 pb-4">
                     <button
                       onClick={() => handleKelasSelect(kelas)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border border-[#1B263A] text-[#1B263A] rounded-lg hover:bg-[#1B263A] hover:text-white transition-colors text-sm font-medium"
                     >
-                      <CheckCircle className="w-4 h-4" />
+                      <Camera className="w-4 h-4" />
                       Mulai Presensi
                     </button>
                   </div>
@@ -607,10 +581,10 @@ const Presensi = () => {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-10">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-6 gap-y-1 mb-8 border border-gray-100 rounded-xl p-5 bg-white">
             {loadingSelectedKelas ? (
               <>
-                {[...Array(5)].map((_, i) => (
+                {[...Array(3)].map((_, i) => (
                   <SkeletonStatCard key={i} />
                 ))}
               </>
@@ -619,23 +593,23 @@ const Presensi = () => {
                 <StatCard
                   title="Total Siswa"
                   value={stats.total}
-                  subtitle="Siswa di kelas"
+                  subtitle="di kelas ini"
                   icon={Users}
-                  color="bg-gradient-to-br from-blue-500 to-blue-600"
+                  color="text-[#1B263A]"
                 />
                 <StatCard
                   title="Laki-laki"
                   value={stats.lakiLaki}
-                  subtitle="Siswa"
-                  icon={Users}
-                  color="bg-gradient-to-br from-cyan-500 to-cyan-600"
+                  subtitle="total siswa"
+                  icon={User}
+                  color="text-emerald-600"
                 />
                 <StatCard
                   title="Perempuan"
                   value={stats.perempuan}
-                  subtitle="Siswa"
-                  icon={Users}
-                  color="bg-gradient-to-br from-rose-500 to-rose-600"
+                  subtitle="total siswa"
+                  icon={User}
+                  color="text-pink-600"
                 />
               </>
             )}
@@ -643,50 +617,49 @@ const Presensi = () => {
 
           {/* STEP: CAMERA FACE */}
           {step === "camera-face" && (
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
               {!cameraReady ? (
-                // Button untuk mulai presensi
                 <div className="p-12 text-center">
                   <div className="mb-8">
-                    <div className="w-32 h-32 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full mx-auto mb-6 flex items-center justify-center shadow-2xl">
-                      <Camera className="w-16 h-16 text-white" />
+                    <div className="w-24 h-24 bg-gray-100 rounded-full mx-auto mb-6 flex items-center justify-center">
+                      <Camera className="w-10 h-10 text-gray-500" />
                     </div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-3">Siap untuk Presensi?</h2>
-                    <p className="text-gray-600 text-lg mb-2">Sistem akan mendeteksi wajah siswa secara otomatis</p>
-                    <p className="text-gray-500 text-sm">Pastikan wajah terlihat jelas dan pencahayaan cukup</p>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Mulai Presensi Kamera</h2>
+                    <p className="text-gray-600 text-sm mb-1">Sistem akan mendeteksi wajah siswa secara otomatis</p>
+                    <p className="text-gray-500 text-xs">Pastikan wajah terlihat jelas dan pencahayaan cukup</p>
                   </div>
 
                   <button
                     onClick={() => setCameraReady(true)}
-                    className="px-10 py-4 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-2xl text-white rounded-2xl transition-all font-bold text-lg flex items-center justify-center gap-3 mx-auto transform hover:scale-105"
+                    className="px-6 py-3 bg-[#1B263A] text-white rounded-xl hover:bg-[#2A3749] transition-colors font-medium text-sm flex items-center justify-center gap-2 mx-auto"
                   >
-                    <Camera className="w-6 h-6" />
-                    Mulai Presensi
+                    <Camera className="w-5 h-5" />
+                    Mulai Kamera
                   </button>
                 </div>
               ) : (
                 <>
                   {/* Status Bar */}
-                  <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 flex items-center justify-between">
+                  <div className="bg-[#1B263A] px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
                       <span className="text-sm font-semibold text-white">Kamera Aktif</span>
                     </div>
-                    <span className="text-xs text-gray-400 font-mono">DETEKSI WAJAH</span>
+                    <span className="text-xs text-gray-400 font-mono">FACE DETECT</span>
                   </div>
 
                   {/* Camera Container */}
-                  <div className="relative bg-black overflow-hidden aspect-video">
+                  <div className="relative bg-black overflow-hidden w-full h-[500px] md:h-[600px]">
                     <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                     <canvas ref={canvasRef} className="hidden" />
 
                     {/* Overlay Guide */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div
-                        className={`w-64 h-64 border-4 rounded-full transition-all duration-300 ${
+                        className={`w-64 h-64 border-2 rounded-full transition-all duration-300 ${
                           faceDetected
-                            ? "border-[#D0B064] shadow-2xl shadow-[#D0B064]/40 scale-100"
-                            : "border-gray-500 animate-pulse scale-95"
+                            ? "border-emerald-400 scale-100"
+                            : "border-gray-400 opacity-50 scale-95"
                         }`}
                       >
                         {faceDetected && countdown > 0 && (
@@ -698,16 +671,16 @@ const Presensi = () => {
                     </div>
 
                     {/* Info Badges */}
-                    <div className="absolute top-6 right-6 space-y-3">
+                    <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
                       {faceDetected && (
-                        <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg animate-pulse">
-                          <CheckCircle className="w-4 h-4" />
-                          Wajah Terdeteksi
+                        <div className="bg-emerald-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          Terdeteksi
                         </div>
                       )}
 
                       {!faceDetected && facePosition && (
-                        <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg">
+                        <div className="bg-amber-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium">
                           {facePosition === "too-dark" && "Terlalu gelap"}
                           {facePosition === "too-bright" && "Terlalu terang"}
                         </div>
@@ -728,110 +701,96 @@ const Presensi = () => {
 
           {/* STEP: PROCESSING FACE */}
           {step === "processing-face" && (
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
+            <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
               <div className="mb-6">
                 {facePhoto && (
                   <img
                     src={facePhoto || "/placeholder.svg"}
                     alt="Face"
-                    className="w-32 h-32 rounded-full object-cover border-4 border-gray-200 mx-auto shadow-lg"
+                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 mx-auto"
                   />
                 )}
               </div>
               <div className="flex justify-center mb-6">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-[#D0B064] rounded-full animate-pulse opacity-20"></div>
-                  <div className="relative w-16 h-16 bg-gradient-to-br from-[#D0B064] to-[#C9A355] rounded-full flex items-center justify-center">
-                    <Sparkles className="w-8 h-8 text-white animate-pulse" />
-                  </div>
-                </div>
+                <Loader className="w-8 h-8 text-[#1B263A] animate-spin" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Mengenali Wajah...</h2>
-              <p className="text-gray-600 text-sm mb-6">Menganalisis dengan AI Detection Face</p>
-              <div className="flex justify-center gap-1.5">
-                <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
-                <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Memproses Wajah...</h2>
+              <p className="text-sm text-gray-500">Mohon tunggu sebentar</p>
             </div>
           )}
 
           {/* STEP: CONFIRM */}
           {step === "confirm" && selectedSiswa && (
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-              <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-white" />
-                  <span className="text-sm font-semibold text-white">Wajah Berhasil Dikenali</span>
+            <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm animate-in fade-in zoom-in duration-300">
+              <div className="p-8 md:p-12">
+                <div className="flex items-center justify-center gap-3 mb-10">
+                  <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100">
+                    <CheckCircle className="w-6 h-6 text-emerald-500" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Wajah Dikenali</h2>
                 </div>
-              </div>
 
-              <div className="p-8">
-                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 mb-8 border-2 border-[#D0B064]/30">
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedSiswa.nama}</h3>
-                  <p className="text-sm text-gray-600 mb-1">{selectedSiswa.kelas}</p>
-                  <p className="text-xs text-gray-500 mb-4">NIS: {selectedSiswa.nis}</p>
-
-                  <div className="flex items-center justify-center gap-4 mb-4">
-                    <div className="text-center">
-                      <p className="text-xs font-bold text-gray-600 mb-2">👤 Foto DB</p>
-                      {selectedSiswa.fotoUrl ? (
-                        <img
-                          src={selectedSiswa.fotoUrl || "/placeholder.svg"}
-                          alt="Foto"
-                          className="w-24 h-24 rounded-full object-cover border-4 border-[#D0B064] shadow-lg"
-                        />
-                      ) : (
-                        <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-[#D0B064] flex items-center justify-center">
-                          {selectedSiswa.jenisKelamin === "LAKI_LAKI" ? (
-                            <Users2 className="w-12 h-12 text-gray-500" />
-                          ) : (
-                            <User className="w-12 h-12 text-gray-500" />
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <CheckCircle className="w-8 h-8 text-[#D0B064]" />
-                    </div>
-
-                    <div className="text-center">
-                      <p className="text-xs font-bold text-gray-600 mb-2">📷 Deteksi</p>
-                      {facePhoto && (
-                        <img
-                          src={facePhoto || "/placeholder.svg"}
-                          alt="Foto Deteksi"
-                          className="w-24 h-24 rounded-full object-cover border-4 border-[#D0B064] shadow-lg"
-                        />
-                      )}
-                    </div>
+                <div className="text-center mb-12">
+                  <h3 className="text-3xl font-bold text-gray-900 mb-1 tracking-tight">{selectedSiswa.nama}</h3>
+                  <div className="flex items-center justify-center gap-2 text-base text-gray-500 mb-10">
+                    <span className="font-medium">{selectedSiswa.kelas}</span>
+                    <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                    <span className="font-medium text-gray-400">NIS: {selectedSiswa.nis}</span>
                   </div>
 
-                  {selectedSiswa.alergi && selectedSiswa.alergi.length > 0 && (
-                    <div className="bg-red-50 rounded-lg p-3 border-l-4 border-red-500">
-                      <p className="text-xs text-red-700 font-bold">ALERGI TERDAFTAR</p>
-                      <p className="text-sm text-red-800 font-semibold mt-1">{selectedSiswa.alergi.join(", ")}</p>
+                  <div className="flex justify-center items-center gap-8 md:gap-16">
+                    <div className="relative group">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-bold mb-3">Data Master</p>
+                      <div className="relative">
+                        {selectedSiswa.fotoUrl ? (
+                          <img
+                            src={selectedSiswa.fotoUrl || "/placeholder.svg"}
+                            alt="Foto"
+                            className="w-32 h-32 md:w-40 md:h-40 rounded-3xl object-cover bg-gray-50 border-2 border-white shadow-lg"
+                          />
+                        ) : (
+                          <div className="w-32 h-32 md:w-40 md:h-40 rounded-3xl bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center">
+                            <User className="w-12 h-12 text-gray-300" />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
+
+                    <div className="hidden sm:flex flex-col items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center border border-emerald-100 shadow-sm">
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      </div>
+                      <div className="h-16 w-px bg-gradient-to-b from-transparent via-emerald-200 to-transparent"></div>
+                    </div>
+
+                    <div className="relative group">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-bold mb-3">Scan Kamera</p>
+                      <div className="relative">
+                        {facePhoto && (
+                          <img
+                            src={facePhoto || "/placeholder.svg"}
+                            alt="Foto Deteksi"
+                            className="w-32 h-32 md:w-40 md:h-40 rounded-3xl object-cover bg-gray-50 border-2 border-white shadow-lg"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <p className="text-lg font-bold text-gray-900 text-center mb-8">Konfirmasi presensi?</p>
-
-                <div className="grid grid-cols-2 gap-3">
+                <div className="max-w-xl mx-auto flex flex-col sm:flex-row gap-4">
                   <button
                     onClick={() => handleReset()}
-                    className="px-6 py-3 bg-gray-200 text-gray-900 rounded-xl hover:bg-gray-300 transition-colors font-bold flex items-center justify-center gap-2"
+                    className="flex-1 px-6 py-4 bg-gray-50 text-gray-600 rounded-2xl hover:bg-gray-100 transition-all text-sm font-bold border border-gray-200"
                   >
-                    <X className="w-5 h-5" />
                     Batal
                   </button>
                   <button
                     onClick={() => submitPresensi()}
-                    className="px-6 py-3 bg-gradient-to-r from-[#D0B064] to-[#C9A355] hover:shadow-lg text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2"
+                    className="flex-[1.5] px-6 py-4 bg-[#1B263A] text-white rounded-2xl hover:bg-[#2A3749] transition-all text-sm font-bold flex items-center justify-center gap-2 shadow-xl shadow-[#1B263A]/20"
                   >
                     <CheckCircle className="w-5 h-5" />
-                    Konfirmasi
+                    Konfirmasi Kehadiran
                   </button>
                 </div>
               </div>
@@ -852,76 +811,61 @@ const Presensi = () => {
 
           {/* STEP: RESULT */}
           {step === "result" && (
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-              <div
-                className={`bg-gradient-to-r ${
-                  validationResult?.success ? "from-[#D0B064] to-[#C9A355]" : "from-red-500 to-red-600"
-                } px-6 py-4`}
-              >
-                <div className="flex items-center gap-2">
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden max-w-xl mx-auto shadow-sm">
+              <div className="p-10 text-center">
+                <div className="mb-8">
                   {validationResult?.success ? (
-                    <>
-                      <CheckCircle2 className="w-5 h-5 text-white" />
-                      <span className="text-sm font-semibold text-white">Presensi Tersimpan</span>
-                    </>
+                    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto border border-emerald-100">
+                      <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                    </div>
                   ) : (
-                    <>
-                      <XCircle className="w-5 h-5 text-white" />
-                      <span className="text-sm font-semibold text-white">Gagal Tersimpan</span>
-                    </>
+                    <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto border border-red-100">
+                      <XCircle className="w-10 h-10 text-red-500" />
+                    </div>
                   )}
                 </div>
-              </div>
 
-              <div className="p-8 text-center">
-                <div
-                  className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                    validationResult?.success ? "bg-amber-100" : "bg-red-100"
-                  }`}
-                >
-                  {validationResult?.success ? (
-                    <CheckCircle2 className="w-12 h-12 text-[#D0B064]" />
-                  ) : (
-                    <XCircle className="w-12 h-12 text-red-600" />
-                  )}
-                </div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  {validationResult?.success ? "Berhasil!" : "Gagal!"}
+                  {validationResult?.success ? "Presensi Berhasil!" : "Gagal Mencatat"}
                 </h2>
-                <p className="text-gray-600">{validationResult?.message}</p>
+                <p className="text-gray-500 mb-8">{validationResult?.message}</p>
 
                 {validationResult?.success && validationResult?.siswa && (
-                  <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 my-6 border-2 border-[#D0B064]/30">
-                    <p className="text-xs font-bold text-[#C9A355] mb-3">✓ PRESENSI TERSIMPAN</p>
-                    <p className="text-xl font-bold text-gray-900 mb-1">{validationResult.siswa.nama}</p>
-                    <p className="text-sm text-gray-600 mb-3">
-                      {validationResult.siswa.kelas} • NIS {validationResult.siswa.nis}
+                  <div className="p-6 border border-gray-200 rounded-2xl bg-gray-50 text-left">
+                    <p className="text-lg font-bold text-gray-900 mb-1">{validationResult.siswa.nama}</p>
+                    <p className="text-sm text-gray-500">
+                      {validationResult.siswa.kelas} <span className="mx-1.5">•</span> NIS {validationResult.siswa.nis}
                     </p>
 
-                    {/* Tanggal Presensi */}
                     {validationResult?.data?.absensiKelas?.tanggal && (
-                      <div className="mt-4 pt-4 border-t border-emerald-300 text-center">
-                        <p className="text-xs text-gray-600 mb-1">Tanggal Presensi</p>
-                        <p className="text-lg font-bold text-emerald-700">
-                          {new Date(validationResult.data.absensiKelas.tanggal + 'T00:00:00').toLocaleDateString('id-ID', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </p>
-                      </div>
-                    )}
-
-                    {validationResult.siswa.alergi && validationResult.siswa.alergi.length > 0 && (
-                      <div className="pt-3 border-t border-emerald-300">
-                        <p className="text-xs text-gray-700">Alergi: {validationResult.siswa.alergi.join(", ")}</p>
+                      <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">Waktu Presensi</p>
+                          <p className="font-semibold text-gray-800 text-sm">
+                            {new Date(validationResult.data.absensiKelas.tanggal + 'T00:00:00').toLocaleDateString('id-ID', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                        <div className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold uppercase">
+                          Selesai
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
 
-                <p className="text-center text-gray-500 text-xs">Kembali otomatis dalam 5 detik...</p>
+                <div className="mt-10 flex flex-col items-center gap-4">
+                  <div className="flex gap-1.5">
+                    <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+                    <div className="w-2 h-2 bg-[#D0B064] rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                  </div>
+                  <p className="text-gray-400 text-xs font-medium">Melanjutkan otomatis dalam beberapa detik...</p>
+                </div>
               </div>
             </div>
           )}
