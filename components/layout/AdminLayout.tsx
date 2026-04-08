@@ -1,38 +1,250 @@
-// components/layout/AdminLayout.tsx
 'use client';
-
 import { useState, ReactNode, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { 
-  Home, Building2, Plus, GraduationCap, Users, BarChart3, 
-  Menu, X, LogOut, Settings, MapPin, ShieldAlert, Utensils,
+import { useRouter, usePathname } from 'next/navigation';
+import {
+  Home,
+  Menu,
+  X,
+  LogOut,
+  AlertCircle,
+  MessageCircle,
+  Send,
+  CheckCircle,
   Loader2,
-  TicketIcon,
-  ChevronDown
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Building2,
+  Plus,
+  Utensils,
+  ShieldCheck,
+  Calendar,
+  Users
 } from 'lucide-react';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 interface AdminLayoutProps {
   children: ReactNode;
   currentPage?: string;
 }
 
-const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) => {
+// BubbleReport Component
+type SubmitStatus = 'idle' | 'loading' | 'success' | 'error';
+
+interface BubbleReportProps {
+  apiBaseUrl?: string;
+  authToken?: string;
+}
+
+const BubbleReport = ({
+  apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL!,
+  authToken = ""
+}: BubbleReportProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [showBubble, setShowBubble] = useState(true);
+  const [judul, setJudul] = useState('');
+  const [deskripsi, setDeskripsi] = useState('');
+  const [status, setStatus] = useState<SubmitStatus>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!judul.trim() || !deskripsi.trim()) {
+      setErrorMessage('Judul dan deskripsi tidak boleh kosong');
+      return;
+    }
+
+    try {
+      setStatus('loading');
+      setErrorMessage('');
+
+      const token = authToken || localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
+
+      const response = await fetch(`${apiBaseUrl}/api/tickets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify({
+          judul: judul.trim(),
+          deskripsi: deskripsi.trim()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      setStatus('success');
+      setJudul('');
+      setDeskripsi('');
+
+      setTimeout(() => {
+        setIsOpen(false);
+        setStatus('idle');
+      }, 3000);
+    } catch (err) {
+      console.error('Error submitting report:', err);
+      setStatus('error');
+      setErrorMessage(err instanceof Error ? err.message : 'Gagal mengirim laporan');
+    }
+  };
+
+  const resetForm = () => {
+    setJudul('');
+    setDeskripsi('');
+    setStatus('idle');
+    setErrorMessage('');
+  };
+
+  const handleClose = () => {
+    setIsOpen(false);
+    resetForm();
+  };
+
+  return (
+    <>
+      {/* Tombol Toggle & Bubble Group */}
+      <div className="fixed bottom-8 right-8 z-50">
+        {/* Tombol Toggle View (Eye/EyeOff) */}
+        <button
+          onClick={() => setShowBubble(!showBubble)}
+          className={`absolute -top-2 -right-2 w-8 h-8 rounded-full shadow-lg transition-all flex items-center justify-center z-[51] border-2 border-white ${showBubble
+            ? 'bg-gray-100 text-gray-500 hover:bg-red-500 hover:text-white'
+            : 'bg-[#1B263A] text-[#D0B064] scale-125'
+            }`}
+          title={showBubble ? "Sembunyikan Menu" : "Tampilkan Menu"}
+        >
+          {showBubble ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+
+        {/* Tombol Utama (Hanya muncul jika showBubble = true) */}
+        {showBubble && (
+          <button
+            onClick={() => setIsOpen(true)}
+            className="w-16 h-16 bg-gradient-to-br from-[#D0B064] to-[#C9A355] text-white rounded-full shadow-xl hover:shadow-2xl transition-all hover:scale-105 flex items-center justify-center relative"
+            aria-label="Open report form"
+          >
+            <MessageCircle className="w-8 h-8" />
+          </button>
+        )}
+      </div>
+
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 transition-opacity"
+          onClick={handleClose}
+        />
+      )}
+
+      <div
+        className={`fixed bottom-24 right-8 w-96 bg-white rounded-2xl shadow-2xl z-50 transition-all transform ${isOpen
+          ? 'opacity-100 scale-100'
+          : 'opacity-0 scale-75 pointer-events-none'
+          }`}
+      >
+        <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4 rounded-t-2xl flex items-center justify-between">
+          <h3 className="text-white font-bold text-lg">Laporkan Masalah</h3>
+          <button
+            onClick={handleClose}
+            className="text-white hover:bg-white/20 p-1 rounded transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          {status === 'success' ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <h4 className="text-lg font-bold text-gray-800 mb-2 text-center">Laporan Terkirim!</h4>
+              <p className="text-gray-600 text-center text-sm">
+                Terima kasih telah melaporkan masalah. Tim kami akan segera menanganinya.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Judul Laporan
+                </label>
+                <input
+                  type="text"
+                  value={judul}
+                  onChange={(e) => setJudul(e.target.value)}
+                  placeholder="Contoh: Issue dengan dashboard admin"
+                  disabled={status === 'loading'}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D0B064] focus:border-transparent transition-all disabled:bg-gray-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Deskripsi Detail
+                </label>
+                <textarea
+                  value={deskripsi}
+                  onChange={(e) => setDeskripsi(e.target.value)}
+                  placeholder="Jelaskan masalah yang Anda alami..."
+                  disabled={status === 'loading'}
+                  rows={4}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D0B064] focus:border-transparent transition-all resize-none disabled:bg-gray-100"
+                />
+              </div>
+
+              {errorMessage && (
+                <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-700">{errorMessage}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={status === 'loading' || !judul.trim() || !deskripsi.trim()}
+                className="w-full bg-gradient-to-r from-[#D0B064] to-[#C9A355] text-white font-semibold py-3 rounded-lg hover:shadow-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {status === 'loading' ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Mengirim...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Kirim Laporan
+                  </>
+                )}
+              </button>
+
+              <p className="text-xs text-gray-500 text-center">
+                Laporan Anda akan ditinjau oleh tim support kami
+              </p>
+            </form>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
+// AdminLayout Component
+const AdminLayout = ({ children, currentPage }: AdminLayoutProps) => {
   const router = useRouter();
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [expandedMenu, setExpandedMenu] = useState<string | null>('manajemen');
-  const [userInfo, setUserInfo] = useState({
-    name: 'Loading...',
-    email: '',
-    role: '',
-    dapurId: '',
-  });
+  const [userInfo, setUserInfo] = useState({ name: 'Admin', role: 'SUPERADMIN' });
 
   useEffect(() => {
     const userData = localStorage.getItem('mbg_user');
-    const token = localStorage.getItem('mbg_token');
-    const dapurId = localStorage.getItem('dapurId') || localStorage.getItem('userDapurId');
-    
+    const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
+
     if (!userData || !token) {
       router.push('/auth/login');
       return;
@@ -40,84 +252,49 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
 
     try {
       const user = JSON.parse(userData);
-      const role = user.role || user.routeRole;
-
-      // Check if user is SUPERADMIN
-      if (role !== 'SUPERADMIN') {
-        router.push('/auth/login');
-        return;
-      }
-
       setUserInfo({
-        name: user.name || 'User',
-        email: user.email || '',
-        role: role,
-        dapurId: dapurId || '',
+        name: user.name || 'Admin',
+        role: (user.role || user.routeRole || 'SUPERADMIN').toUpperCase()
       });
-      setLoading(false);
     } catch (error) {
       router.push('/auth/login');
     }
   }, [router]);
 
-  const getNavigation = () => {
-    return [
-      { id: 'dashboard', name: 'Dashboard', icon: Home, path: '/admin/dashboard' },
-      
-      // KATEGORI: MANAJEMEN
-      {
-        id: 'manajemen',
-        name: 'Manajemen',
-        icon: Building2,
-        hasSubmenu: true,
-        submenu: [
-          { id: 'dapur', name: 'Manajemen Dapur', path: '/admin/dapur' },
-          { id: 'sekolah', name: 'Manajemen Sekolah', path: '/admin/sekolah' },
-          { id: 'user', name: 'User Management', path: '/admin/user' },
-        ]
-      },
-
-      // KATEGORI: REGISTRASI
-      {
-        id: 'registrasi',
-        name: 'Registrasi',
-        icon: Plus,
-        hasSubmenu: true,
-        submenu: [
-          { id: 'register-pic', name: 'Register PIC Dapur', path: '/admin/register-pic' },
-          { id: 'register-pic-sekolah', name: 'Register PIC Sekolah', path: '/admin/register-pic-sekolah' },
-        ]
-      },
-
-      // KATEGORI: OPERASIONAL
-      {
-        id: 'operasional',
-        name: 'Operasional',
-        icon: Utensils,
-        hasSubmenu: true,
-        submenu: [
-          { id: 'LinkDapurSekolah', name: 'Dapur Ke Sekolah', path: '/admin/LinkDapurSekolah' },
-          { id: 'tickets', name: 'Laporan Tiketing', path: '/admin/tickets' },
-        ]
-      },
-
-      // KATEGORI: LAPORAN
-      {
-        id: 'laporan',
-        name: 'Laporan',
-        icon: BarChart3,
-        hasSubmenu: true,
-        submenu: [
-          { id: 'laporan-analytics', name: 'Laporan & Analytics', path: '/admin/laporan' },
-        ]
-      },
-
-      // PENGATURAN (direct link)
-      { id: 'settings', name: 'Pengaturan Sistem', icon: Settings, path: '/admin/settings' },
-    ];
-  };
-
-  const navigation = getNavigation();
+  // ===== NAVIGATION STRUCTURE =====
+  const navigation = [
+    { id: 'dashboard', name: 'Dashboard', icon: Home, path: '/admin/dashboard' },
+    {
+      id: 'manajemen',
+      name: 'Manajemen',
+      icon: Building2,
+      hasSubmenu: true,
+      submenu: [
+        { id: 'dapur', name: 'Manajemen Dapur', path: '/admin/dapur' },
+        { id: 'sekolah', name: 'Manajemen Sekolah', path: '/admin/sekolah' },
+        { id: 'user', name: 'Manajemen Personel', path: '/admin/user' },
+      ]
+    },
+    {
+      id: 'registrasi',
+      name: 'Registrasi',
+      icon: Plus,
+      hasSubmenu: true,
+      submenu: [
+        { id: 'register-pic', name: 'Registrasi PIC Dapur', path: '/admin/register-pic' },
+        { id: 'register-pic-sekolah', name: 'Registrasi PIC Sekolah', path: '/admin/register-pic-sekolah' },
+      ]
+    },
+    {
+      id: 'operasional',
+      name: 'Operasional',
+      icon: Utensils,
+      hasSubmenu: true,
+      submenu: [
+        { id: 'tickets', name: 'Laporan Tiketing', path: '/admin/tickets' },
+      ]
+    }
+  ];
 
   const handleNavigation = (path: string) => {
     router.push(path);
@@ -127,8 +304,7 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
     if (typeof window !== 'undefined') {
       localStorage.removeItem('mbg_user');
       localStorage.removeItem('mbg_token');
-      localStorage.removeItem('dapurId');
-      localStorage.removeItem('userDapurId');
+      localStorage.removeItem('authToken');
       document.cookie = 'mbg_user=; path=/; max-age=0';
       document.cookie = 'mbg_token=; path=/; max-age=0';
     }
@@ -139,6 +315,16 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
     setExpandedMenu(expandedMenu === menuId ? null : menuId);
   };
 
+  // Auto-expand and detect current page
+  useEffect(() => {
+    for (const item of navigation) {
+      if (item.hasSubmenu && item.submenu?.some(sub => sub.path === pathname || sub.id === currentPage)) {
+        setExpandedMenu(item.id);
+        break;
+      }
+    }
+  }, [pathname, currentPage]);
+
   return (
     <div className="flex h-screen bg-[#1B263A] overflow-hidden">
       {/* Sidebar */}
@@ -148,24 +334,24 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
           {sidebarOpen ? (
             <>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center overflow-hidden shadow-sm border border-white/10">
-                  <ShieldAlert className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 bg-[#D0B064] rounded-full flex items-center justify-center overflow-hidden shadow-sm border border-white/10">
+                  <ShieldCheck className="w-5 h-5 text-white" />
                 </div>
                 <div className="min-w-0">
                   <h2 className="font-bold text-sm text-white tracking-tight uppercase">SUPER ADMIN</h2>
-                  <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest leading-none">ADMINISTRATOR</p>
+                  <p className="text-[10px] text-[#D0B064] font-bold uppercase tracking-widest leading-none">PUSAT SISTEM</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setSidebarOpen(false)} 
+              <button
+                onClick={() => setSidebarOpen(false)}
                 className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-white/50 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
             </>
           ) : (
-            <button 
-              onClick={() => setSidebarOpen(true)} 
+            <button
+              onClick={() => setSidebarOpen(true)}
               className="hover:bg-white/10 p-2.5 rounded-lg mx-auto transition-colors text-white/70 hover:text-white border border-white/5"
             >
               <Menu className="w-5 h-5" />
@@ -173,31 +359,25 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
           )}
         </div>
 
-        {/* Info Card */}
+        {/* Admin Info Card */}
         {sidebarOpen && (
           <div className="mx-4 mt-6 mb-4 bg-white/5 rounded-xl p-4 border border-white/5">
-            {loading ? (
-              <div className="space-y-3 animate-pulse">
-                <div className="h-3 bg-white/10 rounded w-3/4"></div>
-                <div className="h-2 bg-white/10 rounded w-1/2"></div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <ShieldAlert className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                  <div className="min-w-0">
-                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-1">Administrator</p>
-                    <p className="font-semibold text-xs text-white leading-tight">{userInfo.name}</p>
-                  </div>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <Users className="w-4 h-4 text-[#D0B064] flex-shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-1">Otoritas</p>
+                  <p className="font-semibold text-xs text-white leading-tight">Pengendali Pusat</p>
                 </div>
-                {userInfo.email && (
-                  <div className="pt-3 border-t border-white/5">
-                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-1">Email</p>
-                    <p className="text-xs font-semibold text-white/90 truncate">{userInfo.email}</p>
-                  </div>
-                )}
               </div>
-            )}
+              <div className="pt-3 border-t border-white/5">
+                <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-1">Status Sesi</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                  <p className="text-xs font-semibold text-white/90">{userInfo.name}</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -205,69 +385,68 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navigation.map((item: any) => {
             const Icon = item.icon;
-            const isActive = currentPage === item.id;
+            const isSubMenu = item.hasSubmenu;
+            const isItemActive = item.hasSubmenu
+              ? item.submenu?.some((sub: any) => sub.path === pathname || sub.id === currentPage)
+              : (item.path === pathname || item.id === currentPage);
             const isSubmenuOpen = expandedMenu === item.id;
 
             return (
               <div key={item.id}>
                 <button
                   onClick={() => {
-                    if (item.hasSubmenu) {
+                    if (isSubMenu) {
                       toggleMenu(item.id);
                     } else {
                       handleNavigation(item.path);
                     }
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all border-l-4 ${
-                    isActive 
-                      ? 'bg-white/5 text-red-500 border-red-500 font-bold' 
-                      : 'text-white/50 border-transparent hover:bg-white/5 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all border-l-4 ${isItemActive
+                    ? 'bg-white/5 text-[#D0B064] border-[#D0B064] font-bold'
+                    : 'text-white/50 border-transparent hover:bg-white/5 hover:text-white'
+                    }`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   {sidebarOpen && (
                     <>
                       <span className="font-medium text-sm flex-1 text-left">{item.name}</span>
-                      {item.hasSubmenu && (
-                        <ChevronDown 
-                          className={`w-4 h-4 transition-transform ${
-                            isSubmenuOpen ? 'rotate-180' : ''
-                          }`}
+                      {isSubMenu && (
+                        <ChevronDown
+                          className={`w-4 h-4 transition-transform ${isSubmenuOpen ? 'rotate-180' : ''}`}
                         />
                       )}
                     </>
                   )}
                 </button>
 
-                {/* Submenu dengan Animasi */}
-                {item.hasSubmenu && sidebarOpen && (
+                {/* Submenu */}
+                {isSubMenu && sidebarOpen && (
                   <div
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      isSubmenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                    }`}
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${isSubmenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}
                   >
                     <div className="ml-4 mt-1 space-y-1 border-l border-white/10 pl-0">
-                      {item.submenu.map((subitem: any, index: number) => (
-                        <button
-                          key={subitem.id}
-                          onClick={() => handleNavigation(subitem.path)}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm transform ${
-                            isSubmenuOpen
+                      {item.submenu.map((subitem: any, index: number) => {
+                        const isSubActive = subitem.path === pathname || subitem.id === currentPage;
+                        return (
+                          <button
+                            key={subitem.id}
+                            onClick={() => handleNavigation(subitem.path)}
+                            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm transform ${isSubmenuOpen
                               ? 'translate-x-0 opacity-100'
                               : '-translate-x-2 opacity-0'
-                          } ${
-                            currentPage === subitem.id
-                              ? 'bg-red-500/30 text-red-300 font-medium'
-                              : 'text-gray-400 hover:text-white hover:bg-white/5'
-                          }`}
-                          style={{
-                            transitionDelay: isSubmenuOpen ? `${index * 50}ms` : '0ms',
-                          }}
-                        >
-                          <div className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
-                          <span className="text-left">{subitem.name}</span>
-                        </button>
-                      ))}
+                              } ${isSubActive
+                                ? 'bg-[#D0B064]/30 text-[#D0B064] font-medium'
+                                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                              }`}
+                            style={{
+                              transitionDelay: isSubmenuOpen ? `${index * 50}ms` : '0ms',
+                            }}
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                            <span className="text-left">{subitem.name}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -278,12 +457,12 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
 
         {/* Logout */}
         <div className="p-4 border-t border-white/10">
-          <button 
+          <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-all font-medium"
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
-            {sidebarOpen && <span className="font-medium">Logout</span>}
+            {sidebarOpen && <span>Logout</span>}
           </button>
         </div>
       </aside>
@@ -294,43 +473,35 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }: AdminLayoutProps) 
         <header className="h-[88px] bg-[#1B263A] text-white px-8 flex items-center flex-shrink-0 border-b border-white/10">
           <div className="flex items-center justify-between w-full">
             <div>
-              {loading ? (
-                <div className="space-y-2">
-                  <div className="h-5 bg-white/10 rounded w-32 animate-pulse"></div>
-                  <div className="h-3 bg-white/10 rounded w-40 animate-pulse"></div>
-                </div>
-              ) : (
-                <>
-                  <h1 className="text-xl font-bold text-white">Welcome, {userInfo.name}</h1>
-                  <p className="text-sm text-gray-400">Manage MBG System</p>
-                </>
-              )}
+              <p className="text-[10px] uppercase tracking-widest text-[#D0B064] font-bold mb-0.5">ADMINISTRATOR</p>
+              <h1 className="text-xl font-bold text-white capitalize">
+                {pathname.split('/').pop()?.replace(/-/g, ' ') || 'Overview'}
+              </h1>
             </div>
 
-            {/* Right side - Badge */}
-            <div className="flex items-center gap-4 ml-auto">
-              <div className="flex items-center gap-3 px-6 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white">
-                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    userInfo.name.charAt(0)
-                  )}
-                </div>
-                <div className="text-left hidden md:block">
-                  <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">SUPERADMIN</p>
-                  <p className="font-bold text-white tracking-wide leading-tight text-sm line-clamp-1">{userInfo.name}</p>
-                </div>
+            <div className="flex items-center gap-3 px-6 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white ml-auto">
+              <div className="w-8 h-8 bg-[#D0B064] rounded-full flex items-center justify-center shadow-lg">
+                <ShieldCheck className="w-4 h-4 text-white" />
+              </div>
+              <div className="text-left">
+                <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider leading-none mb-1">Status</p>
+                <p className="font-bold text-white tracking-wide leading-tight text-sm">Super Admin</p>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Content Area with rounded corner */}
-        <div className="flex-1 bg-gray-50 rounded-tl-[32px] overflow-y-auto p-8">
+        {/* Content Area */}
+        <div className="flex-1 bg-gray-50 rounded-tl-[32px] overflow-y-auto p-8 shadow-inner">
           {children}
         </div>
       </main>
+
+      {/* BubbleReport */}
+      <BubbleReport
+        apiBaseUrl={API_BASE_URL}
+        authToken={localStorage.getItem('mbg_token') || ""}
+      />
     </div>
   );
 };

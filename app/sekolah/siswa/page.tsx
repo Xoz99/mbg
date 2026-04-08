@@ -1125,20 +1125,20 @@ const DataSiswa = () => {
 
       {/* Add Siswa Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-[#1B263A] text-white px-6 py-5 flex items-center justify-between rounded-t-2xl z-10">
-          <h3 className="text-xl font-bold">Tambah Siswa Baru</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white border-4 border-black max-w-2xl w-full shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] max-h-[90vh] overflow-y-auto">
+          <div className="sticky top-0 bg-black text-white px-8 py-6 flex items-center justify-between border-b-4 border-black z-10">
+          <h3 className="text-xl font-black uppercase italic tracking-tighter">TAMBAH SISWA BARU</h3>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 border-2 border-white hover:bg-white hover:text-black transition-all shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:shadow-none"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateSiswa} className="p-6 space-y-4">
-              <div className="flex flex-col items-center mb-4">
+            <form onSubmit={handleCreateSiswa} className="p-8 space-y-6">
+              <div className="flex flex-col items-center mb-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Foto Siswa (Opsional)</label>
 
                 <div className="relative">
@@ -1193,20 +1193,20 @@ const DataSiswa = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Nama Siswa <span className="text-red-500">*</span>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">
+                    NAMA SISWA <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={formData.nama}
                     onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="Nama lengkap"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                    placeholder="NAMA LENGKAP"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">
                     NIS <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -1214,26 +1214,26 @@ const DataSiswa = () => {
                     required
                     value={formData.nis}
                     onChange={(e) => setFormData({ ...formData, nis: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                     placeholder="2024001"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Kelas <span className="text-red-500">*</span>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">
+                  KELAS <span className="text-red-500">*</span>
                 </label>
                 <select
                   required
                   value={formData.kelasId}
                   onChange={(e) => setFormData({ ...formData, kelasId: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] bg-white"
                 >
-                  <option value="">Pilih Kelas</option>
+                  <option value="">PILIH KELAS</option>
                   {kelasData.map((kelas) => (
                     <option key={kelas.id} value={String(kelas.id || "")}>
-                      {String(kelas.nama || "")}
+                      {String(kelas.nama || "").toUpperCase()}
                     </option>
                   ))}
                 </select>
@@ -1241,26 +1241,26 @@ const DataSiswa = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Jenis Kelamin</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">JENIS KELAMIN</label>
                   <select
                     value={formData.jenisKelamin}
                     onChange={(e) => setFormData({ ...formData, jenisKelamin: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] bg-white"
                   >
-                    <option value="LAKI_LAKI">Laki-laki</option>
-                    <option value="PEREMPUAN">Perempuan</option>
+                    <option value="LAKI_LAKI">LAKI-LAKI</option>
+                    <option value="PEREMPUAN">PEREMPUAN</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Umur (tahun) <span className="text-red-500">*</span>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">
+                    UMUR (TAHUN) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     required
                     value={formData.umur}
                     onChange={(e) => setFormData({ ...formData, umur: Number.parseInt(e.target.value) || 7 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                     min="5"
                     max="18"
                   />
@@ -1269,8 +1269,8 @@ const DataSiswa = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Tinggi Badan (cm) <span className="text-red-500">*</span>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">
+                    TINGGI BADAN (CM) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -1278,13 +1278,13 @@ const DataSiswa = () => {
                     step="0.1"
                     value={formData.tinggiBadan}
                     onChange={(e) => setFormData({ ...formData, tinggiBadan: Number.parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                     placeholder="120.5"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Berat Badan (kg) <span className="text-red-500">*</span>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">
+                    BERAT BADAN (KG) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -1292,58 +1292,57 @@ const DataSiswa = () => {
                     step="0.1"
                     value={formData.beratBadan}
                     onChange={(e) => setFormData({ ...formData, beratBadan: Number.parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                     placeholder="22.5"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Alergi (Opsional)</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">ALERGI (OPSIONAL)</label>
                 <div className="flex gap-2 mb-2">
                   <input
                     type="text"
                     value={alergiInput}
                     onChange={(e) => setAlergiInput(e.target.value)}
                     onKeyPress={handleKeyPressAlergi}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="Ketik alergi dan tekan Enter"
+                    className="flex-1 px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                    placeholder="KETIK ALERGI..."
                   />
                   <button
                     type="button"
                     onClick={handleAddAlergi}
-                    className="px-4 py-2 bg-[#1B263A] text-white rounded-xl hover:shadow-lg transition-all font-medium"
-                    >
-                    Tambah
+                    className="px-6 py-3 bg-black text-white border-2 border-black hover:bg-gray-800 transition-all font-black uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1"
+                  >
+                    TAMBAH
                   </button>
                 </div>
 
-                <div className="flex flex-wrap gap-2 min-h-[32px]">
+                <div className="flex flex-wrap gap-2 min-h-[32px] mt-4">
                   {formData.alergi.length === 0 ? (
-                    <p className="text-sm text-gray-500 italic">Belum ada alergi</p>
+                    <p className="text-[10px] uppercase font-black text-gray-500 italic">BELUM ADA ALERGI</p>
                   ) : (
                     formData.alergi.map((alergi, idx) => (
-                      <Chip key={idx} label={alergi} variant="success" onDelete={() => handleRemoveAlergi(alergi)} />
+                      <Chip key={idx} label={alergi.toUpperCase()} variant="warning" onDelete={() => handleRemoveAlergi(alergi)} />
                     ))
                   )}
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row gap-4 pt-6 mt-6 border-t-4 border-black">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+                  className="w-full sm:flex-1 px-4 py-4 bg-white text-black border-2 border-black hover:bg-gray-100 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1"
                 >
-                  Batal
+                  BATAL
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 bg-[#1B263A] text-white rounded-xl hover:bg-[#24314d] hover:shadow-lg transition-all font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                  Tambah
+                  className="w-full sm:flex-1 px-4 py-4 bg-black text-white border-2 border-black hover:bg-gray-900 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {submitting ? "MEMPROSES..." : "TAMBAHKAN SISWA [+]"}
                 </button>
               </div>
             </form>
@@ -1353,23 +1352,23 @@ const DataSiswa = () => {
 
       {/* Edit Siswa Modal */}
       {showEditModal && selectedSiswa && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-[#1B263A] text-white px-6 py-5 flex items-center justify-between rounded-t-2xl z-10">
-          <h3 className="text-xl font-bold">Edit Data Siswa</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white border-4 border-black max-w-2xl w-full shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] max-h-[90vh] overflow-y-auto">
+          <div className="sticky top-0 bg-black text-white px-8 py-6 flex items-center justify-between border-b-4 border-black z-10">
+          <h3 className="text-xl font-black uppercase italic tracking-tighter">EDIT DATA SISWA</h3>
               <button
                 onClick={() => {
                   setShowEditModal(false)
                   setSelectedSiswa(null)
                 }}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 border-2 border-white hover:bg-white hover:text-black transition-all shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:shadow-none"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateSiswa} className="p-6 space-y-4">
-              <div className="flex flex-col items-center mb-4">
+            <form onSubmit={handleUpdateSiswa} className="p-8 space-y-6">
+              <div className="flex flex-col items-center mb-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Foto Siswa (Opsional)</label>
 
                 <div className="relative">
@@ -1424,45 +1423,45 @@ const DataSiswa = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Siswa</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">NAMA SISWA</label>
                   <input
                     type="text"
                     value={formData.nama}
                     onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="Nama lengkap"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                    placeholder="NAMA LENGKAP"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">NIS (Read Only)</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">NIS (Otomatis)</label>
                   <input
                     type="text"
                     value={formData.nis}
                     disabled
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl bg-gray-100 text-gray-600"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase bg-gray-200 text-gray-500 cursor-not-allowed shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Jenis Kelamin</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">JENIS KELAMIN</label>
                   <select
                     value={formData.jenisKelamin}
                     onChange={(e) => setFormData({ ...formData, jenisKelamin: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] bg-white"
                   >
-                    <option value="LAKI_LAKI">Laki-laki</option>
-                    <option value="PEREMPUAN">Perempuan</option>
+                    <option value="LAKI_LAKI">LAKI-LAKI</option>
+                    <option value="PEREMPUAN">PEREMPUAN</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Umur (tahun)</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">UMUR (TAHUN)</label>
                   <input
                     type="number"
                     value={formData.umur}
                     onChange={(e) => setFormData({ ...formData, umur: Number.parseInt(e.target.value) || 7 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                     min="5"
                     max="18"
                   />
@@ -1471,77 +1470,77 @@ const DataSiswa = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Tinggi Badan (cm)</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">TINGGI BADAN (CM)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={formData.tinggiBadan}
                     onChange={(e) => setFormData({ ...formData, tinggiBadan: Number.parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                     placeholder="120.5"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Berat Badan (kg)</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">BERAT BADAN (KG)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={formData.beratBadan}
                     onChange={(e) => setFormData({ ...formData, beratBadan: Number.parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                     placeholder="22.5"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Alergi</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">ALERGI (OPSIONAL)</label>
                 <div className="flex gap-2 mb-2">
                   <input
                     type="text"
                     value={alergiInput}
                     onChange={(e) => setAlergiInput(e.target.value)}
                     onKeyPress={handleKeyPressAlergi}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="Ketik alergi dan tekan Enter"
+                    className="flex-1 px-4 py-3 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                    placeholder="KETIK ALERGI..."
                   />
                   <button
                     type="button"
                     onClick={handleAddAlergi}
-                    className="px-4 py-2 bg-[#1B263A] text-white rounded-xl hover:bg-[#243B55] hover:shadow-lg transition-all font-medium"
-                    >
-                    Tambah
+                    className="px-6 py-3 bg-black text-white border-2 border-black hover:bg-gray-800 transition-all font-black uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1"
+                  >
+                    TAMBAH
                   </button>
                 </div>
 
-                <div className="flex flex-wrap gap-2 min-h-[32px]">
+                <div className="flex flex-wrap gap-2 min-h-[32px] mt-4">
                   {formData.alergi.length === 0 ? (
-                    <p className="text-sm text-gray-500 italic">Belum ada alergi</p>
+                    <p className="text-[10px] uppercase font-black text-gray-500 italic">BELUM ADA ALERGI</p>
                   ) : (
                     formData.alergi.map((alergi, idx) => (
-                      <Chip key={idx} label={alergi} variant="success" onDelete={() => handleRemoveAlergi(alergi)} />
+                      <Chip key={idx} label={alergi.toUpperCase()} variant="warning" onDelete={() => handleRemoveAlergi(alergi)} />
                     ))
                   )}
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row gap-4 pt-6 mt-6 border-t-4 border-black">
                 <button
                   type="button"
                   onClick={() => {
                     setShowEditModal(false)
                     setSelectedSiswa(null)
                   }}
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+                  className="w-full sm:flex-1 px-4 py-4 bg-white text-black border-2 border-black hover:bg-gray-100 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1"
                 >
-                  Batal
+                  BATAL
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 bg-[#1B263A] text-white rounded-xl hover:shadow-lg transition-all font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Simpan</>}
+                  className="w-full sm:flex-1 px-4 py-4 bg-[#D0B064] text-black border-2 border-black hover:bg-[#C9A355] transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {submitting ? "MEMPROSES..." : "SIMPAN PERUBAHAN"}
                 </button>
               </div>
             </form>
@@ -1551,21 +1550,21 @@ const DataSiswa = () => {
 
       {/* Detail Modal */}
       {showDetailModal && selectedSiswa && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-              <h3 className="text-xl font-bold text-gray-900">Detail Siswa</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white border-4 border-black max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
+            <div className="sticky top-0 bg-black border-b-4 border-black px-8 py-6 flex items-center justify-between z-10">
+              <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">DETAIL SISWA</h3>
               <button
                 onClick={() => setShowDetailModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 border-2 border-white text-white hover:bg-white hover:text-black transition-all shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:shadow-none"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-            <div className="flex items-start gap-6 bg-gradient-to-br from-[#1B263A] to-[#243B55] rounded-2xl p-6 text-white shadow-lg">
-            <div className="flex-shrink-0">
+            <div className="p-8 space-y-8">
+              <div className="flex flex-col md:flex-row items-center md:items-start gap-8 bg-[#D0B064] border-4 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                <div className="flex-shrink-0">
                   {(() => {
                     let fotoSrc = selectedSiswa.fotoUrl || ""
                     if (fotoSrc && !fotoSrc.startsWith("data:") && !fotoSrc.startsWith("http")) {
@@ -1576,88 +1575,88 @@ const DataSiswa = () => {
                       <img
                         src={fotoSrc || "/placeholder.svg"}
                         alt={selectedSiswa.nama}
-                        className="w-28 h-28 rounded-full object-cover border-4 border-white/30 shadow-lg"
+                        className="w-32 h-32 md:w-40 md:h-40 object-cover border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                       />
                     ) : (
-                      <div className="w-28 h-28 bg-white/20 rounded-full flex items-center justify-center text-6xl border-4 border-white/30">
+                      <div className="w-32 h-32 md:w-40 md:h-40 bg-white flex items-center justify-center text-7xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                         {selectedSiswa.jenisKelamin === "LAKI_LAKI" ? "👨" : "👩"}
                       </div>
                     )
                   })()}
                 </div>
-                <div className="flex-1">
-                  <h4 className="text-3xl font-bold mb-3">{selectedSiswa.nama}</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 flex-shrink-0" />
-                      <span>NIS: {selectedSiswa.nis}</span>
+                <div className="flex-1 w-full text-center md:text-left">
+                  <h4 className="text-4xl font-black uppercase tracking-tighter mb-6">{selectedSiswa.nama}</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 text-xs font-black uppercase tracking-widest">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-black/60">NOMOR INDUK SISWA</span>
+                      <span className="text-base flex items-center justify-center md:justify-start gap-2 border-b-2 border-black pb-1"><User className="w-4 h-4" /> {selectedSiswa.nis}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 flex-shrink-0" />
-                      <span>{selectedSiswa.umur} tahun</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-black/60">UMUR</span>
+                      <span className="text-base flex items-center justify-center md:justify-start gap-2 border-b-2 border-black pb-1"><Calendar className="w-4 h-4" /> {selectedSiswa.umur} TAHUN</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">Kelas:</span>
-                      <span>{selectedSiswa.kelas}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-black/60">KELAS</span>
+                      <span className="text-base border-b-2 border-black pb-1">{selectedSiswa.kelas}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">L/P:</span>
-                      <span>{selectedSiswa.jenisKelamin === "LAKI_LAKI" ? "Laki-laki" : "Perempuan"}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-black/60">JENIS KELAMIN</span>
+                      <span className="text-base border-b-2 border-black pb-1">{selectedSiswa.jenisKelamin === "LAKI_LAKI" ? "LAKI-LAKI" : "PEREMPUAN"}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl p-4 border-2 border-cyan-200 shadow-sm">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Ruler className="w-5 h-5 text-cyan-600" />
-                    <p className="text-sm font-bold text-cyan-900">Tinggi Badan</p>
+                <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                  <div className="flex items-center gap-2 mb-3 border-b-2 border-black pb-2">
+                    <Ruler className="w-5 h-5 text-black" />
+                    <p className="text-[10px] uppercase font-black tracking-widest text-black">TINGGI BADAN</p>
                   </div>
-                  <p className="text-3xl font-bold text-cyan-900">{selectedSiswa.tinggiBadan} cm</p>
+                  <p className="text-3xl font-black uppercase">{selectedSiswa.tinggiBadan} <span className="text-sm">CM</span></p>
                 </div>
 
-                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-4 border-2 border-emerald-200 shadow-sm">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Weight className="w-5 h-5 text-emerald-600" />
-                    <p className="text-sm font-bold text-emerald-900">Berat Badan</p>
+                <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                  <div className="flex items-center gap-2 mb-3 border-b-2 border-black pb-2">
+                    <Weight className="w-5 h-5 text-black" />
+                    <p className="text-[10px] uppercase font-black tracking-widest text-black">BERAT BADAN</p>
                   </div>
-                  <p className="text-3xl font-bold text-emerald-900">{selectedSiswa.beratBadan} kg</p>
+                  <p className="text-3xl font-black uppercase">{selectedSiswa.beratBadan} <span className="text-sm">KG</span></p>
                 </div>
 
-                <div className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl p-4 border-2 border-pink-200 shadow-sm">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp className="w-5 h-5 text-pink-600" />
-                    <p className="text-sm font-bold text-pink-900">IMT</p>
+                <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                  <div className="flex items-center gap-2 mb-3 border-b-2 border-black pb-2">
+                    <TrendingUp className="w-5 h-5 text-black" />
+                    <p className="text-[10px] uppercase font-black tracking-widest text-black">IMT</p>
                   </div>
-                  <p className="text-3xl font-bold text-pink-900">
+                  <p className="text-3xl font-black uppercase">
                     {typeof selectedSiswa.imt === "number" ? selectedSiswa.imt.toFixed(1) : Number(selectedSiswa.imt || 0).toFixed(1)}
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-4 border-2 border-amber-200 shadow-sm">
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertCircle className="w-5 h-5 text-amber-600" />
-                    <p className="text-sm font-bold text-amber-900">Status Gizi</p>
+                <div className="bg-[#D0B064] border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                  <div className="flex items-center gap-2 mb-3 border-b-2 border-black pb-2">
+                    <AlertCircle className="w-5 h-5 text-black" />
+                    <p className="text-[10px] uppercase font-black tracking-widest text-black">STATUS GIZI</p>
                   </div>
-                  <p className="text-sm font-bold text-amber-900">{displayStatusText(selectedSiswa.statusGizi)}</p>
+                  <p className="text-base font-black uppercase">{displayStatusText(selectedSiswa.statusGizi)}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-4 border-2 border-emerald-200">
-                  <p className="text-sm font-bold text-emerald-900 mb-2">Status Gizi</p>
+                <div className="bg-white border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                  <p className="text-xs font-black uppercase tracking-widest text-black mb-4">STATUS GIZI (DETAIL)</p>
                   <span
-                    className={`inline-block px-4 py-2 rounded-full text-sm font-bold border-2 ${getStatusColor(selectedSiswa.statusGizi)}`}
+                    className={`inline-block px-4 py-2 border-2 border-black text-xs font-black uppercase tracking-widest ${getStatusColor(selectedSiswa.statusGizi).replace('bg-emerald-', 'bg-green-').replace('text-emerald-', 'text-black')}`}
                   >
                     {displayStatusText(selectedSiswa.statusGizi)}
                   </span>
                 </div>
 
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-4 border-2 border-amber-200">
-                  <p className="text-sm font-bold text-amber-900 mb-2">Status Stunting</p>
+                <div className="bg-white border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                  <p className="text-xs font-black uppercase tracking-widest text-black mb-4">STATUS STUNTING</p>
                   <span
-                    className={`inline-block px-4 py-2 rounded-full text-sm font-bold ${getStuntingColor(selectedSiswa.statusStunting)}`}
+                    className={`inline-block px-4 py-2 border-2 border-black text-xs font-black uppercase tracking-widest ${getStuntingColor(selectedSiswa.statusStunting)} text-black`}
                   >
                     {displayStatusText(selectedSiswa.statusStunting)}
                   </span>
@@ -1665,28 +1664,27 @@ const DataSiswa = () => {
               </div>
 
               {selectedSiswa.riwayatPengukuran && selectedSiswa.riwayatPengukuran.length > 0 && (
-                <div className="bg-white rounded-2xl p-6 border-2 border-gray-200 shadow-sm">
-                  <h4 className="text-lg font-bold text-gray-900 mb-4">Grafik Pertumbuhan</h4>
+                <div className="bg-white border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                  <h4 className="text-xl font-black uppercase italic tracking-tighter text-black border-b-4 border-black pb-4 mb-6">GRAFIK PERTUMBUHAN</h4>
                   <GrowthChart data={selectedSiswa.riwayatPengukuran} />
                 </div>
               )}
 
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border-2 border-gray-200 shadow-sm">
-                <h4 className="text-lg font-bold text-gray-900 mb-4">Informasi Kesehatan</h4>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-700">Alergi</p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {selectedSiswa.alergi.length === 0 ? (
-                          <p className="font-medium text-gray-900">Tidak ada alergi</p>
-                        ) : (
-                          selectedSiswa.alergi.map((alergi: string, idx: number) => (
-                            <Chip key={idx} label={alergi} variant="warning" />
-                          ))
-                        )}
-                      </div>
+              <div className="bg-white border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                <h4 className="text-xl font-black uppercase italic tracking-tighter text-black border-b-4 border-black pb-4 mb-6">INFORMASI KESEHATAN TAMBAHAN</h4>
+                <div className="space-y-6">
+                  <div className="flex flex-col gap-4">
+                    <p className="text-xs font-black uppercase tracking-widest text-black">DAFTAR ALERGI</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSiswa.alergi.length === 0 ? (
+                        <p className="text-xs font-black uppercase tracking-widest text-gray-400 italic bg-gray-100 px-4 py-2 border-2 border-gray-300">TIDAK ADA ALERGI TERCATAT</p>
+                      ) : (
+                        selectedSiswa.alergi.map((alergi: string, idx: number) => (
+                          <span key={idx} className="bg-red-600 text-white font-black uppercase px-4 py-2 border-2 border-black inline-block shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                            {alergi}
+                          </span>
+                        ))
+                      )}
                     </div>
                   </div>
 
@@ -1695,15 +1693,15 @@ const DataSiswa = () => {
                       handleOpenEditModal(selectedSiswa)
                       setShowDetailModal(false)
                     }}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-[#1B263A] to-[#243B55] text-white rounded-xl hover:shadow-lg transition-all font-semibold text-sm mt-4"
-                    >
-                    Edit Data Siswa
+                    className="w-full px-4 py-4 bg-black text-white border-2 border-black hover:bg-gray-800 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 mt-4"
+                  >
+                    EDIT DATA SISWA INI
                   </button>
 
                   {selectedSiswa.statusGizi !== "NORMAL" && (
-                    <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 mt-3">
-                      <p className="text-sm font-bold text-amber-900 mb-1">⚠️ Catatan Penting</p>
-                      <p className="text-sm text-amber-800">
+                    <div className="bg-red-600 text-white border-4 border-black p-6 mt-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                      <p className="text-sm font-black uppercase tracking-widest mb-2 flex items-center gap-2"><AlertCircle className="w-5 h-5" /> PERHATIAN KHUSUS</p>
+                      <p className="text-xs font-bold leading-relaxed uppercase">
                         Siswa memerlukan perhatian khusus dalam program gizi. Pastikan mendapatkan porsi yang sesuai dan
                         monitor perkembangan secara rutin.
                       </p>

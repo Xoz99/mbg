@@ -295,6 +295,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
                 sekolahNama: sekolah.nama || "Unknown",
                 sekolahAlamat: sekolah.alamat || "",
                 status: "NO_PLANNING",
+                linkStatus: sekolah.status || "PENDING",
                 completedDays: 0,
                 totalDays: 0,
                 daysLeft: 0,
@@ -435,6 +436,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
               completedDays,
               totalDays,
               status: completedDays === totalDays ? "COMPLETE" : "INCOMPLETE",
+              linkStatus: sekolah.status || "PENDING",
               daysLeft: totalDays - completedDays,
               totalMenuCount: menus.length,
               allPlanningMenus: menus // ✅ Store all menus for this planning to avoid shared race condition

@@ -4,32 +4,12 @@ import type React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/layout/AdminLayout';
-import {
-  Users,
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
-  X,
-  Search,
-  Mail,
-  Phone,
-  Shield,
-  AlertCircle,
-  Loader2,
-  Download,
-  EyeOff,
-  Check,
-  ChevronDown,
-  Building2,
-  User as UserIcon,
-} from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 interface User {
   id: string;
-  email?: string; // Hidden (generated karyawan-{UUID}@local format)
+  email?: string;
   name: string;
   phone?: string;
   role: string;
@@ -37,24 +17,29 @@ interface User {
   createdAt?: string;
   updatedAt?: string;
   source?: string; // dapur, sekolah, karyawan
+  sourceName?: string;
+  fotoUrl?: string; // Primary field from backend
 }
 
 // ===== SKELETON LOADING =====
 const SkeletonUserRow = () => (
-  <tr className="border-b border-gray-100 animate-pulse">
-    <td className="px-6 py-4"><div className="h-4 w-4 bg-gray-300 rounded"></div></td>
-    <td className="px-6 py-4">
-      <div className="space-y-2">
-        <div className="h-4 w-32 bg-gray-300 rounded"></div>
-        <div className="h-3 w-40 bg-gray-200 rounded"></div>
+  <tr className="border-b-2 border-black animate-pulse">
+    <td className="px-4 py-3"><div className="h-3 w-4 bg-gray-200"></div></td>
+    <td className="px-4 py-3">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-gray-200 border-2 border-black"></div>
+        <div className="space-y-1">
+          <div className="h-3 w-24 bg-gray-200"></div>
+          <div className="h-2 w-32 bg-gray-100"></div>
+        </div>
       </div>
     </td>
-    <td className="px-6 py-4"><div className="h-4 w-24 bg-gray-300 rounded"></div></td>
-    <td className="px-6 py-4"><div className="h-6 w-20 bg-gray-300 rounded-full"></div></td>
-    <td className="px-6 py-4">
-      <div className="flex gap-2">
-        <div className="h-8 w-8 bg-gray-300 rounded"></div>
-        <div className="h-8 w-8 bg-gray-300 rounded"></div>
+    <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-200 border-2 border-black"></div></td>
+    <td className="px-4 py-3 text-center"><div className="h-3 w-16 bg-gray-200 mx-auto"></div></td>
+    <td className="px-4 py-3 text-right">
+      <div className="flex justify-end gap-2">
+        <div className="h-8 w-16 bg-gray-200"></div>
+        <div className="h-8 w-10 bg-gray-100 border-2 border-black"></div>
       </div>
     </td>
   </tr>
@@ -63,7 +48,6 @@ const SkeletonUserRow = () => (
 const UserManagement = () => {
   const router = useRouter();
   const [authToken, setAuthToken] = useState('');
-  const [users, setUsers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,21 +67,20 @@ const UserManagement = () => {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
-    posisi: 'KOKI', // Karyawan posisi
+    posisi: 'KOKI',
     foto: null as File | null,
   });
   const [formLoading, setFormLoading] = useState(false);
 
-  // Role list - from backend
   const roles = [
-    { value: 'PIC_DAPUR', label: 'PIC Dapur', color: 'bg-blue-100 text-blue-900' },
-    { value: 'PIC_SEKOLAH', label: 'PIC Sekolah', color: 'bg-green-100 text-green-900' },
-    { value: 'KOKI', label: 'Koki', color: 'bg-orange-100 text-orange-900' },
-    { value: 'AHLI_GIZI', label: 'Ahli Gizi', color: 'bg-purple-100 text-purple-900' },
-    { value: 'TUKANG_CUCI_PIRING', label: 'Tukang Cuci Piring', color: 'bg-yellow-100 text-yellow-900' },
-    { value: 'ADMIN', label: 'Admin', color: 'bg-red-100 text-red-900' },
-    { value: 'SUPERADMIN', label: 'Super Admin', color: 'bg-red-200 text-red-900' },
-    { value: 'KARYAWAN', label: 'Karyawan', color: 'bg-gray-100 text-gray-900' },
+    { value: 'PIC_DAPUR', label: 'PIC Dapur', color: 'border-blue-600 text-blue-600' },
+    { value: 'PIC_SEKOLAH', label: 'PIC Sekolah', color: 'border-green-600 text-green-600' },
+    { value: 'KOKI', label: 'Koki', color: 'border-orange-600 text-orange-600' },
+    { value: 'AHLI_GIZI', label: 'Ahli Gizi', color: 'border-purple-600 text-purple-600' },
+    { value: 'TUKANG_CUCI_PIRING', label: 'Tukang Cuci Piring', color: 'border-yellow-600 text-yellow-600' },
+    { value: 'ADMIN', label: 'Admin', color: 'border-red-600 text-red-600' },
+    { value: 'SUPERADMIN', label: 'Super Admin', color: 'border-black text-black' },
+    { value: 'KARYAWAN', label: 'Karyawan', color: 'border-gray-600 text-gray-600' },
   ];
 
   // Auth check
@@ -113,255 +96,145 @@ const UserManagement = () => {
     try {
       const user = JSON.parse(userData);
       const role = user.role || user.routeRole;
-
       if (role !== 'SUPERADMIN') {
         router.push('/auth/login');
         return;
       }
-
       setAuthToken(token);
-    } catch (error) {
-      console.error('Error parsing user data:', error);
+    } catch (err) {
       router.push('/auth/login');
     }
   }, [router]);
 
-  // ===== FETCH FROM MULTIPLE SOURCES =====
   const fetchAllUsers = useCallback(async () => {
     if (!authToken) return;
-
     try {
       setLoading(true);
       setError(null);
-
       const allUsersList: User[] = [];
-      let hasError = false;
-
-      console.log('[FETCH] Starting multi-source user fetch...');
-
-      // 1. GET PIC DAPUR from /api/dapur
-      try {
-        console.log('[FETCH] Getting PIC DAPUR from /api/dapur...');
-        const dapurResponse = await fetch(`${API_BASE_URL}/api/dapur?page=1&limit=1000`, {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (dapurResponse.ok) {
-          const dapurData = await dapurResponse.json();
-          let dapurList = [];
-
-          if (Array.isArray(dapurData.data?.data)) {
-            dapurList = dapurData.data.data;
-          } else if (Array.isArray(dapurData.data)) {
-            dapurList = dapurData.data;
-          } else if (Array.isArray(dapurData)) {
-            dapurList = dapurData;
-          }
-
-          console.log(`[FETCH] Found ${dapurList.length} dapur`);
-
-          // Extract PIC DAPUR info with role from BE
-          dapurList.forEach((dapur: any) => {
-            if (dapur.picEmail || dapur.picName) {
-              allUsersList.push({
-                id: `dapur-${dapur.id}`,
-                email: dapur.picEmail || `pic-${dapur.id}@dapur.local`,
-                name: dapur.picName || `PIC ${dapur.nama}`,
-                phone: dapur.picPhone,
-                role: dapur.picRole || 'PIC_DAPUR', // Get from BE, fallback to PIC_DAPUR
-                source: 'dapur',
-                createdAt: dapur.createdAt,
-              });
-            }
-          });
-        }
-      } catch (err) {
-        console.error('[FETCH] Error getting dapur:', err);
-        hasError = true;
-      }
-
-      // 2. GET PIC SEKOLAH from /api/sekolah
-      try {
-        console.log('[FETCH] Getting PIC SEKOLAH from /api/sekolah...');
-        const sekolahResponse = await fetch(`${API_BASE_URL}/api/sekolah?page=1&limit=1000`, {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (sekolahResponse.ok) {
-          const sekolahData = await sekolahResponse.json();
-          let sekolahList = [];
-
-          if (Array.isArray(sekolahData.data?.data)) {
-            sekolahList = sekolahData.data.data;
-          } else if (Array.isArray(sekolahData.data)) {
-            sekolahList = sekolahData.data;
-          } else if (Array.isArray(sekolahData)) {
-            sekolahList = sekolahData;
-          }
-
-          console.log(`[FETCH] Found ${sekolahList.length} sekolah`);
-
-          // Extract PIC SEKOLAH info with role from BE
-          sekolahList.forEach((sekolah: any) => {
-            if (sekolah.picEmail || sekolah.picName) {
-              allUsersList.push({
-                id: `sekolah-${sekolah.id}`,
-                email: sekolah.picEmail || `pic-${sekolah.id}@sekolah.local`,
-                name: sekolah.picName || `PIC ${sekolah.nama}`,
-                phone: sekolah.picPhone,
-                role: sekolah.picRole || 'PIC_SEKOLAH', // Get from BE, fallback to PIC_SEKOLAH
-                source: 'sekolah',
-                createdAt: sekolah.createdAt,
-              });
-            }
-          });
-        }
-      } catch (err) {
-        console.error('[FETCH] Error getting sekolah:', err);
-        hasError = true;
-      }
-
-      // 3. GET KARYAWAN from /api/karyawan
-      try {
-        console.log('[FETCH] Getting KARYAWAN from /api/karyawan...');
-        const karyawanResponse = await fetch(`${API_BASE_URL}/api/karyawan?page=1&limit=1000`, {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (karyawanResponse.ok) {
-          const karyawanData = await karyawanResponse.json();
-          let karyawanList = [];
-
-          if (Array.isArray(karyawanData.data?.data)) {
-            karyawanList = karyawanData.data.data;
-          } else if (Array.isArray(karyawanData.data)) {
-            karyawanList = karyawanData.data;
-          } else if (Array.isArray(karyawanData)) {
-            karyawanList = karyawanData;
-          }
-
-          console.log(`[FETCH] Found ${karyawanList.length} karyawan`);
-
-          // Extract KARYAWAN info with posisi as role (KOKI, AHLI_GIZI, TUKANG_CUCI_PIRING, dll)
-          karyawanList.forEach((karyawan: any) => {
+      
+      const dRes = await fetch(`${API_BASE_URL}/api/dapur?limit=1000`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      if (dRes.ok) {
+        const dData = await dRes.json();
+        const dList = dData.data?.data || dData.data || dData || [];
+        dList.forEach((d: any) => {
+          const pic = d.pic || (d.picDapur && d.picDapur[0]) || null;
+          if (pic || d.picName || d.picEmail) {
             allUsersList.push({
-              id: karyawan.id,
-              name: karyawan.nama,
-              phone: undefined, // Karyawan doesn't have phone
-              role: karyawan.posisi || 'KARYAWAN', // posisi is the role (KOKI, AHLI_GIZI, etc)
-              source: 'karyawan',
-              createdAt: karyawan.createdAt,
+              id: pic?.id ? `pic-d-${pic.id}` : `dapur-${d.id}`,
+              name: pic?.name || d.picName || `PIC ${d.nama || d.name}`,
+              role: pic?.role || d.picRole || 'PIC_DAPUR',
+              source: 'dapur',
+              sourceName: d.nama || d.name,
+              phone: pic?.phone || d.picPhone,
+              email: pic?.email || d.picEmail,
+              fotoUrl: pic?.fotoUrl || pic?.picFoto || d.picFoto || d.fotoUrl,
+              createdAt: pic?.createdAt || d.createdAt
             });
+          }
+        });
+      }
+
+      const sRes = await fetch(`${API_BASE_URL}/api/sekolah?limit=1000`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      if (sRes.ok) {
+        const sData = await sRes.json();
+        const sList = sData.data?.data || sData.data || sData || [];
+        sList.forEach((s: any) => {
+          const pic = s.pic || (s.picSekolah && s.picSekolah[0]) || null;
+          if (pic || s.picName || s.picEmail) {
+            allUsersList.push({
+              id: pic?.id ? `pic-s-${pic.id}` : `sekolah-${s.id}`,
+              name: pic?.name || s.picName || `PIC ${s.nama || s.name}`,
+              role: pic?.role || s.picRole || 'PIC_SEKOLAH',
+              source: 'sekolah',
+              sourceName: s.nama || s.name,
+              phone: pic?.phone || s.picPhone,
+              email: pic?.email || s.picEmail,
+              fotoUrl: pic?.fotoUrl || pic?.picFoto || s.picFoto || s.fotoUrl,
+              createdAt: pic?.createdAt || s.createdAt
+            });
+          }
+        });
+      }
+
+      const kRes = await fetch(`${API_BASE_URL}/api/karyawan?limit=1000`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      if (kRes.ok) {
+        const kData = await kRes.json();
+        const kList = kData.data?.data || kData.data || kData || [];
+        kList.forEach((k: any) => {
+          allUsersList.push({
+            id: k.id,
+            name: k.nama,
+            role: k.posisi || 'KARYAWAN',
+            source: 'karyawan',
+            sourceName: 'PUSAT_MBG',
+            fotoUrl: k.fotoUrl || k.foto,
+            createdAt: k.createdAt
           });
-        }
-      } catch (err) {
-        console.error('[FETCH] Error getting karyawan:', err);
-        hasError = true;
+        });
       }
 
-      // 4. Deduplicate by ID (not email, since email is generated format)
-      const uniqueUsers = Array.from(
-        new Map(allUsersList.map((user) => [user.id, user])).values()
-      );
-
-      console.log(`[FETCH] Total unique users: ${uniqueUsers.length}`);
-
-      if (uniqueUsers.length === 0 && hasError) {
-        setError('Gagal mengambil data user dari beberapa sumber. Cek koneksi dan token.');
-      }
-
-      setAllUsers(uniqueUsers);
-      setUsers(uniqueUsers);
+      const unique = Array.from(new Map(allUsersList.map(u => [u.id, u])).values());
+      const sorted = unique.sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+      });
+      setAllUsers(sorted);
     } catch (err: any) {
-      console.error('Fetch error:', err);
-      setError(err.message || 'Gagal memload data user');
-      setAllUsers([]);
-      setUsers([]);
+      setError(err.message || 'Gagal memuat data personel');
     } finally {
       setLoading(false);
     }
   }, [authToken]);
 
-  // Fetch saat authToken tersedia
   useEffect(() => {
-    if (authToken) {
-      fetchAllUsers();
-    }
+    if (authToken) fetchAllUsers();
   }, [authToken, fetchAllUsers]);
 
-  // ===== FILTER & SEARCH =====
-  useEffect(() => {
+  const filteredUsers = useMemo(() => {
     let filtered = [...allUsers];
-
-    // Filter by role
-    if (filterRole !== 'semua') {
-      filtered = filtered.filter((user) => user.role === filterRole);
-    }
-
-    // Filter by source
-    if (filterSource !== 'semua') {
-      filtered = filtered.filter((user) => user.source === filterSource);
-    }
-
-    // Search
+    if (filterRole !== 'semua') filtered = filtered.filter(u => u.role === filterRole);
+    if (filterSource !== 'semua') filtered = filtered.filter(u => u.source === filterSource);
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (user) =>
-          user.name.toLowerCase().includes(query) ||
-          (user.phone && user.phone.includes(query))
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(u => 
+        u.name.toLowerCase().includes(q) || 
+        (u.phone && u.phone.includes(q)) || 
+        (u.email && u.email.toLowerCase().includes(q))
       );
     }
-
-    setUsers(filtered);
+    return filtered;
   }, [searchQuery, filterRole, filterSource, allUsers]);
 
-  // ===== CRUD OPERATIONS =====
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-
     try {
       setFormLoading(true);
+      const fd = new FormData();
+      fd.append('nama', formData.name);
+      fd.append('posisi', formData.posisi);
+      if (formData.foto) fd.append('foto', formData.foto);
 
-      const formDataPayload = new FormData();
-      formDataPayload.append('nama', formData.name);
-      formDataPayload.append('posisi', formData.posisi);
-      if (formData.foto) {
-        formDataPayload.append('foto', formData.foto);
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/karyawan`, {
+      const res = await fetch(`${API_BASE_URL}/api/karyawan`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: formDataPayload,
+        headers: { Authorization: `Bearer ${authToken}` },
+        body: fd
       });
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(`API Error: ${response.status} - ${errorData}`);
-      }
-
-      const result = await response.json();
-      console.log('Create success:', result);
-
-      setFormData({ name: '', posisi: 'KOKI', foto: null });
+      if (!res.ok) throw new Error('Gagal memproses pendaftaran');
+      
       setShowAddModal(false);
-      await fetchAllUsers();
-      alert('Karyawan berhasil ditambahkan!');
+      setFormData({ name: '', posisi: 'KOKI', foto: null });
+      fetchAllUsers();
     } catch (err: any) {
-      console.error('Create error:', err);
-      alert(err.message || 'Gagal menambah karyawan');
+      alert(`ERR: ${err.message}`);
     } finally {
       setFormLoading(false);
     }
@@ -369,528 +242,408 @@ const UserManagement = () => {
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!selectedUser) return;
-
     try {
       setFormLoading(true);
+      const fd = new FormData();
+      fd.append('nama', formData.name);
+      fd.append('posisi', formData.posisi);
+      if (formData.foto) fd.append('foto', formData.foto);
 
-      const formDataPayload = new FormData();
-      formDataPayload.append('nama', formData.name);
-      formDataPayload.append('posisi', formData.posisi);
-      if (formData.foto) {
-        formDataPayload.append('foto', formData.foto);
+      const endpoint = selectedUser.source === 'karyawan' 
+        ? `/api/karyawan/${selectedUser.id}`
+        : null;
+
+      if (!endpoint) {
+        alert("Peringatan: User unit harus dikelola dide menu registrasi terkait.");
+        return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/karyawan/${selectedUser.id}`, {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: formDataPayload,
+        headers: { Authorization: `Bearer ${authToken}` },
+        body: fd
       });
 
-      if (!response.ok) {
-        throw new Error(`Update failed: ${response.status}`);
-      }
-
+      if (!res.ok) throw new Error('Gagal update data');
+      
       setShowEditModal(false);
       setSelectedUser(null);
-      await fetchAllUsers();
-      alert('Karyawan berhasil diupdate!');
+      fetchAllUsers();
     } catch (err: any) {
-      console.error('Update error:', err);
-      alert(err.message || 'Gagal update karyawan');
+      alert(err.message);
     } finally {
       setFormLoading(false);
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = async (id: string) => {
     try {
       setFormLoading(true);
-
-      const response = await fetch(`${API_BASE_URL}/api/karyawan/${userId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/karyawan/${id}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${authToken}` }
       });
-
-      if (!response.ok) {
-        throw new Error(`Delete failed: ${response.status}`);
-      }
-
+      if (!res.ok) throw new Error('Gagal hapus data');
       setShowDeleteConfirm(false);
       setDeleteTargetId(null);
-      await fetchAllUsers();
-      alert('Karyawan berhasil dihapus!');
+      fetchAllUsers();
     } catch (err: any) {
-      console.error('Delete error:', err);
-      alert(err.message || 'Gagal hapus karyawan');
+      alert(err.message);
     } finally {
       setFormLoading(false);
     }
   };
 
-  // ===== HELPER FUNCTIONS =====
   const getRoleConfig = (role: string) => {
-    return roles.find((r) => r.value === role) || { value: role, label: role, color: 'bg-gray-100 text-gray-700' };
+    return roles.find(r => r.value === role) || { value: role, label: role, color: 'border-black text-black' };
   };
 
-  const getSourceLabel = (source?: string) => {
-    switch (source) {
-      case 'dapur':
-        return 'Dapur';
-      case 'sekolah':
-        return 'Sekolah';
-      case 'karyawan':
-        return 'Karyawan';
-      default:
-        return 'Other';
-    }
+  const getSourceLabel = (src?: string) => {
+    if (src === 'dapur') return 'UNIT_DAPUR';
+    if (src === 'sekolah') return 'UNIT_SEKOLAH';
+    return 'INTERNAL_PUSAT';
   };
 
-  const openEditModal = (user: User) => {
-    setSelectedUser(user);
-    setFormData({
-      name: user.name,
-      posisi: user.role,
-      foto: null,
-    });
-    setShowEditModal(true);
+  const getImageUrl = (path?: string) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    const cleanPath = path.replace(/^\/+/, '');
+    return `${API_BASE_URL}/${cleanPath.startsWith('uploads') ? cleanPath : 'uploads/' + cleanPath}`;
   };
 
-  // ===== RENDER =====
   return (
-    <AdminLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Manajemen User</h1>
-          <p className="text-gray-600 mt-1">Kelola semua user dari PIC Dapur, PIC Sekolah, Karyawan, dan lainnya</p>
+    <AdminLayout currentPage="user">
+       <div className="space-y-6">
+        {/* HEADER */}
+        <div className="flex justify-between items-center border-b-4 border-black pb-4">
+          <div>
+            <h1 className="text-3xl font-black uppercase italic tracking-tighter">DAFTAR_PERSONEL</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">SISTEM INTEGRASI TENAGA KERJA PUSAT</p>
+          </div>
+          <button
+            onClick={() => {
+              setFormData({ name: '', posisi: 'KOKI', foto: null });
+              setShowAddModal(true);
+            }}
+            className="px-6 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
+          >
+            TAMBAH_PERSONEL [+]
+          </button>
         </div>
 
-        {/* Error */}
+        {/* ERROR MESSAGE */}
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-semibold text-red-900">Error</h3>
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
+          <div className="bg-red-600 text-white p-4 border-2 border-black font-black text-xs uppercase tracking-widest">
+            KESALAHAN // {error}
           </div>
         )}
 
-        {/* Toolbar */}
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 p-5 space-y-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex-1 min-w-[200px]">
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                <Search className="w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Cari user..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 bg-transparent border-0 focus:ring-0 focus:outline-none text-sm"
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                setFormData({ name: '', posisi: 'KOKI', foto: null });
-                setShowAddModal(true);
-              }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-colors font-semibold text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Tambah User
-            </button>
+        {/* FILTERS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="border-2 border-black bg-white p-3">
+            <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">CARI PERSONEL</label>
+            <input
+              type="text"
+              placeholder="CARI NAMA / EMAIL / TELP..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent text-sm font-black uppercase outline-none"
+            />
           </div>
-
-          <div className="flex gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-700">Role:</span>
-              <select
-                value={filterRole}
-                onChange={(e) => setFilterRole(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900"
-              >
-                <option value="semua">Semua</option>
-                {roles.map((role) => (
-                  <option key={role.value} value={role.value}>
-                    {role.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-700">Sumber:</span>
-              <select
-                value={filterSource}
-                onChange={(e) => setFilterSource(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900"
-              >
-                <option value="semua">Semua</option>
-                <option value="dapur">Dapur</option>
-                <option value="sekolah">Sekolah</option>
-                <option value="karyawan">Karyawan</option>
-              </select>
-            </div>
+          <div className="border-2 border-black bg-white p-3">
+            <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">JABATAN_OTORITAS</label>
+            <select
+              value={filterRole}
+              onChange={e => setFilterRole(e.target.value)}
+              className="w-full bg-transparent text-sm font-black uppercase outline-none"
+            >
+              <option value="semua">SEMUA JABATAN</option>
+              {roles.map(r => <option key={r.value} value={r.value}>{r.label.toUpperCase()}</option>)}
+            </select>
+          </div>
+          <div className="border-2 border-black bg-white p-3">
+            <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">SUMBER_DATA_UNIT</label>
+            <select
+              value={filterSource}
+              onChange={e => setFilterSource(e.target.value)}
+              className="w-full bg-transparent text-sm font-black uppercase outline-none"
+            >
+              <option value="semua">SEMUA UNIT</option>
+              <option value="dapur">DAPUR</option>
+              <option value="sekolah">SEKOLAH</option>
+              <option value="karyawan">MBG PUSAT</option>
+            </select>
           </div>
         </div>
 
-        {/* Users Table */}
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-red-500 to-red-600 text-white">
+        {/* TABLE */}
+        <div className="border-2 border-black bg-white overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+          <table className="w-full text-left">
+            <thead className="bg-black text-white border-b-2 border-black">
+              <tr className="divide-x divide-white/20">
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest w-12 text-center">NO</th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">IDENTITAS_PERSONEL</th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">OTORITAS</th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-center">UNIT_ASAL</th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-right">AKSI</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black">
+              {loading ? (
+                Array(5).fill(0).map((_, i) => <SkeletonUserRow key={i} />)
+              ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">#</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Nama</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Posisi</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Sumber</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Aksi</th>
+                  <td colSpan={5} className="py-12 text-center text-xs font-black uppercase text-gray-400 italic tracking-[0.2em]">DATA_TIDAK_DITEMUKAN</td>
                 </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  [...Array(5)].map((_, i) => <SkeletonUserRow key={i} />)
-                ) : users.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                      Tidak ada user
+              ) : (
+                filteredUsers.map((u, idx) => (
+                  <tr key={u.id} className="hover:bg-gray-50 group divide-x divide-black transition-colors text-black">
+                    <td className="px-4 py-3 text-[9px] font-black text-gray-300 italic text-center">{String(idx + 1).padStart(2, '0')}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-black border-2 border-black overflow-hidden flex-shrink-0 grayscale group-hover:grayscale-0 transition-all duration-300">
+                          {getImageUrl(u.fotoUrl) ? (
+                            <img src={getImageUrl(u.fotoUrl)!} alt={u.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-900 text-white font-black text-xs">
+                              {u.name[0]}
+                            </div>
+                          )}
+                        </div>
+                        <div className="leading-tight">
+                          <p className="font-black text-xs uppercase tracking-tight">{u.name}</p>
+                          <p className="text-[8px] font-bold text-gray-400 mt-0.5">{u.email || u.phone || u.id.slice(-8).toUpperCase()}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 border font-black text-[8px] uppercase tracking-widest shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${getRoleConfig(u.role).color}`}>
+                        {getRoleConfig(u.role).label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex flex-col">
+                        <p className="text-[9px] font-black italic underline decoration-gray-200">{getSourceLabel(u.source)}</p>
+                        <p className="text-[7px] font-black text-gray-400">{u.sourceName}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end gap-2 text-black">
+                        <button
+                          onClick={() => { setSelectedUser(u); setShowDetailModal(true); }}
+                          className="px-3 py-1.5 bg-black text-white text-[8px] font-black uppercase hover:bg-gray-800 transition-colors"
+                        >
+                          DETAIL
+                        </button>
+                        {u.source === 'karyawan' && (
+                          <button
+                            onClick={() => {
+                                setSelectedUser(u);
+                                setFormData({ name: u.name, posisi: u.role, foto: null });
+                                setShowEditModal(true);
+                            }}
+                            className="px-3 py-1.5 border-2 border-black text-[8px] font-black uppercase hover:bg-gray-50 transition-colors"
+                          >
+                            UBAH
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
-                ) : (
-                  users.map((user, index) => (
-                    <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-700">{index + 1}</td>
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="font-semibold text-gray-900">{user.name}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getRoleConfig(user.role).color}`}>
-                          {getRoleConfig(user.role).label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-block px-2 py-1 rounded text-xs bg-blue-100 text-blue-900">
-                          {getSourceLabel(user.source)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setShowDetailModal(true);
-                            }}
-                            className="p-2 hover:bg-blue-100 text-blue-900 rounded-lg transition-colors"
-                            title="Lihat detail"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => openEditModal(user)}
-                            className="p-2 hover:bg-yellow-100 text-yellow-900 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDeleteTargetId(user.id);
-                              setShowDeleteConfirm(true);
-                            }}
-                            className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
-                            title="Hapus"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                ))
+              )}
+            </tbody>
+          </table>
+          <div className="bg-gray-50 px-4 py-2 border-t-2 border-black flex justify-between items-center text-[9px] font-black uppercase tracking-widest italic decoration-black decoration-2">
+            <span>DATABASE_PERSONEL_AKTIF // MBG_CENTRAL</span>
+            <span className="text-gray-400">TOTAL_ASET: {filteredUsers.length}</span>
           </div>
-
-          {users.length > 0 && (
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
-              Menampilkan {users.length} dari {allUsers.length} user
-            </div>
-          )}
         </div>
 
-        {/* ===== MODAL: Add User ===== */}
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-              <div className="bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-5 flex justify-between items-center">
-                <h3 className="text-lg font-bold">Tambah Karyawan</h3>
-                <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-white/20 rounded-lg">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateUser} className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Karyawan</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                    placeholder="Masukkan nama karyawan"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Posisi</label>
-                  <select
-                    value={formData.posisi}
-                    onChange={(e) => setFormData({ ...formData, posisi: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                  >
-                    {roles.filter(r => r.value !== 'PIC_DAPUR' && r.value !== 'PIC_SEKOLAH' && r.value !== 'ADMIN' && r.value !== 'SUPERADMIN').map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Foto (Opsional)</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setFormData({ ...formData, foto: e.target.files?.[0] || null })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                  />
-                  {formData.foto && (
-                    <p className="text-sm text-gray-600 mt-2">File: {formData.foto.name}</p>
-                  )}
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={formLoading}
-                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {formLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                    Tambah
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ===== MODAL: Edit User ===== */}
-        {showEditModal && selectedUser && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-              <div className="bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-5 flex justify-between items-center">
-                <h3 className="text-lg font-bold">Edit User</h3>
-                <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setSelectedUser(null);
-                  }}
-                  className="p-2 hover:bg-white/20 rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleUpdateUser} className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Karyawan</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                    placeholder="Masukkan nama karyawan"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Posisi</label>
-                  <select
-                    value={formData.posisi}
-                    onChange={(e) => setFormData({ ...formData, posisi: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                  >
-                    {roles.filter(r => r.value !== 'PIC_DAPUR' && r.value !== 'PIC_SEKOLAH' && r.value !== 'ADMIN' && r.value !== 'SUPERADMIN').map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Foto (Opsional)</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setFormData({ ...formData, foto: e.target.files?.[0] || null })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                  />
-                  {formData.foto && (
-                    <p className="text-sm text-gray-600 mt-2">File: {formData.foto.name}</p>
-                  )}
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEditModal(false);
-                      setSelectedUser(null);
-                    }}
-                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={formLoading}
-                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {formLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Edit className="w-4 h-4" />}
-                    Update
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ===== MODAL: Delete Confirmation ===== */}
-        {showDeleteConfirm && deleteTargetId && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl">
-              <div className="p-6 text-center">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <AlertCircle className="w-6 h-6 text-red-600" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Hapus Karyawan?</h3>
-                <p className="text-sm text-gray-600 mb-6">Tindakan ini tidak dapat dibatalkan.</p>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowDeleteConfirm(false);
-                      setDeleteTargetId(null);
-                    }}
-                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    onClick={() => deleteTargetId && handleDeleteUser(deleteTargetId)}
-                    disabled={formLoading}
-                    className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {formLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                    Hapus
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ===== MODAL: Detail User ===== */}
+        {/* MODAL: DETAIL */}
         {showDetailModal && selectedUser && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
-              <div className="bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-5 flex items-center justify-between">
-                <h3 className="text-xl font-bold">Detail Karyawan</h3>
-                <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-white/20 rounded-lg">
-                  <X className="w-6 h-6" />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black max-w-lg w-full shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] animate-in zoom-in-95 duration-200 overflow-hidden text-black">
+              <div className="bg-black text-white p-5 flex justify-between items-center">
+                <h2 className="text-xl font-black uppercase italic tracking-tighter">DEKRIPSI_DATA_PERSONEL</h2>
+                <button
+                  onClick={() => { setShowDetailModal(false); setSelectedUser(null); }}
+                  className="w-8 h-8 border-2 border-white flex items-center justify-center text-xs font-black hover:bg-white hover:text-black transition-all"
+                >
+                  X
                 </button>
               </div>
-
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600">Nama</label>
-                  <p className="text-lg font-semibold text-gray-900 mt-1">{selectedUser.name}</p>
+              <div className="p-6 space-y-6">
+                <div className="flex gap-6">
+                  <div className="w-32 h-40 bg-black border-2 border-black flex-shrink-0 grayscale hover:grayscale-0 transition-all duration-500 cursor-zoom-in overflow-hidden">
+                    {getImageUrl(selectedUser.fotoUrl) ? (
+                      <img src={getImageUrl(selectedUser.fotoUrl)!} alt={selectedUser.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-white/20 p-4 text-center">
+                        <p className="text-5xl font-black">{selectedUser.name[0]}</p>
+                        <p className="text-[8px] font-black mt-2">KOSONG</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-4">
+                    <div>
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">NAMA_PERSONEL</p>
+                      <p className="text-2xl font-black uppercase italic leading-none">{selectedUser.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">ID_OTORITAS</p>
+                      <p className="text-xs font-black inline-block bg-gray-100 px-2 py-1">{selectedUser.id}</p>
+                    </div>
+                    <div className="pt-2">
+                       <span className={`px-4 py-1.5 border-2 font-black text-[10px] uppercase tracking-widest shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${getRoleConfig(selectedUser.role).color}`}>
+                        {getRoleConfig(selectedUser.role).label}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-
-                {selectedUser.phone && (
+                <div className="grid grid-cols-2 gap-4 border-t-2 border-black pt-4">
                   <div>
-                    <label className="text-xs font-semibold text-gray-600">Telepon</label>
-                    <p className="text-sm text-gray-900 mt-1 flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      {selectedUser.phone}
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">UNIT_SUMBER</p>
+                    <p className="text-xs font-black uppercase italic">{getSourceLabel(selectedUser.source)}</p>
+                    <p className="text-[9px] font-black text-gray-400 uppercase">{selectedUser.sourceName}</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">TANGGAL_DAFTAR</p>
+                    <p className="text-xs font-black uppercase italic">
+                        {selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString('id-ID') : 'N/A'}
                     </p>
                   </div>
-                )}
+                  <div className="col-span-2">
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">DATA_KONTAK</p>
+                    <p className="text-xs font-black italic">{selectedUser.phone || 'TIDAK_ADA_WhatsApp'}</p>
+                    {selectedUser.email && <p className="text-[10px] text-gray-400 font-bold break-all mt-1 lowercase font-medium tracking-normal">{selectedUser.email}</p>}
+                  </div>
+                </div>
+                <div className="flex gap-4 pt-4">
+                  {selectedUser.source === 'karyawan' && (
+                    <button
+                      onClick={() => { setShowDetailModal(false); setShowEditModal(true); setFormData({ name: selectedUser.name, posisi: selectedUser.role, foto: null }); }}
+                      className="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-gray-800"
+                    >
+                      UBAH_DATA
+                    </button>
+                  )}
+                  {selectedUser.source === 'karyawan' && (
+                    <button
+                      onClick={() => { setShowDetailModal(false); setDeleteTargetId(selectedUser.id); setShowDeleteConfirm(true); }}
+                      className="px-6 py-3 border-2 border-red-600 text-red-600 text-[10px] font-black uppercase tracking-widest hover:bg-red-50"
+                    >
+                      HAPUS
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
+        {/* MODAL: FORM (INTERNAL) */}
+        {(showAddModal || showEditModal) && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black max-w-sm w-full shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] animate-in zoom-in-95 duration-200 text-black">
+               <div className="bg-black text-white p-4 flex justify-between items-center">
+                <h2 className="text-lg font-black uppercase italic tracking-tighter">
+                    {showAddModal ? 'PERSONEL_BARU' : 'PEMBARUAN_DATA'}
+                </h2>
+                <button
+                  onClick={() => { setShowAddModal(false); setShowEditModal(false); setSelectedUser(null); }}
+                  className="font-black text-xs hover:text-red-500"
+                >
+                  [X]
+                </button>
+              </div>
+              <form onSubmit={showAddModal ? handleCreateUser : handleUpdateUser} className="p-6 space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-gray-600">Posisi</label>
-                  <div className="mt-2">
-                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${getRoleConfig(selectedUser.role).color}`}>
-                      {getRoleConfig(selectedUser.role).label}
-                    </span>
-                  </div>
+                  <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">NAMA LENGKAP</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full p-2.5 border-2 border-black text-sm font-black uppercase focus:bg-gray-50 outline-none"
+                    placeholder="MASUKKAN NAMA..."
+                  />
                 </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-gray-600">Sumber</label>
-                  <div className="mt-2">
-                    <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-900">
-                      {getSourceLabel(selectedUser.source)}
-                    </span>
-                  </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">JABATAN</label>
+                        <select
+                            value={formData.posisi}
+                            onChange={e => setFormData({ ...formData, posisi: e.target.value })}
+                            className="w-full p-2.5 border-2 border-black text-xs font-black uppercase outline-none bg-white"
+                        >
+                            {roles.filter(r => !['PIC_DAPUR', 'PIC_SEKOLAH', 'ADMIN', 'SUPERADMIN'].includes(r.value)).map(r => (
+                                <option key={r.value} value={r.value}>{r.label.toUpperCase()}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">UNGGAH_FOTO</label>
+                        <div className="relative h-[42px] border-2 border-black overflow-hidden bg-gray-50 flex items-center px-3">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={e => setFormData({ ...formData, foto: e.target.files ? e.target.files[0] : null })}
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                            />
+                            <span className="text-[8px] font-black truncate text-gray-400">
+                                {formData.foto ? formData.foto.name : 'PILIH_FILE'}
+                            </span>
+                        </div>
+                    </div>
                 </div>
-
-                {selectedUser.createdAt && (
-                  <div className="pt-4 border-t border-gray-200">
-                    <p className="text-xs text-gray-500">Dibuat: {new Date(selectedUser.createdAt).toLocaleDateString('id-ID')}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    onClick={() => {
-                      setShowDetailModal(false);
-                      openEditModal(selectedUser);
-                    }}
-                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-colors font-semibold flex items-center justify-center gap-2"
-                  >
-                    <Edit className="w-4 h-4" />
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => setShowDetailModal(false)}
-                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold"
-                  >
-                    Tutup
-                  </button>
+                <div className="flex gap-4 pt-4">
+                    <button
+                        type="button"
+                        onClick={() => { setShowAddModal(false); setShowEditModal(false); setSelectedUser(null); }}
+                        className="flex-1 py-3 border-2 border-black font-black uppercase text-[10px] tracking-widest hover:bg-gray-50"
+                    >
+                        BATAL
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={formLoading}
+                        className="flex-1 py-3 bg-black text-white font-black uppercase text-[10px] tracking-widest hover:bg-gray-800 disabled:opacity-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                    >
+                        {formLoading ? 'PROSES...' : 'EKSEKUSI_DATA'}
+                    </button>
                 </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: DELETE */}
+        {showDeleteConfirm && deleteTargetId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-red-600/80 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black max-w-xs w-full p-8 shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] text-center animate-in zoom-in-95 duration-200 text-black">
+              <div className="w-16 h-16 bg-red-600 border-4 border-black rounded-full flex items-center justify-center mx-auto mb-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                <span className="text-3xl font-black text-white italic">!</span>
+              </div>
+              <h3 className="text-xl font-black uppercase italic tracking-tighter mb-4">HAPUS DATA?</h3>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-relaxed mb-6">
+                Data yang dihapus tidak dapat dikembalikan ke sistem. Konfirmasi penghapusan personel?
+              </p>
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleDeleteUser(deleteTargetId)}
+                  disabled={formLoading}
+                  className="w-full py-3 bg-red-600 text-white font-black uppercase text-[10px] tracking-widest shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50 border-2 border-black"
+                >
+                  {formLoading ? '...PENGHAPUSAN' : 'KONFIRMASI_HAPUS'}
+                </button>
+                <button
+                  onClick={() => { setShowDeleteConfirm(false); setDeleteTargetId(null); }}
+                  className="w-full py-3 border-2 border-black font-black uppercase text-[10px] tracking-widest transition-all hover:bg-gray-50"
+                >
+                  BATAL
+                </button>
               </div>
             </div>
           </div>

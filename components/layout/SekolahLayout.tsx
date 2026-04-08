@@ -115,11 +115,10 @@ const BubbleReport = ({
         {/* Tombol Toggle View (Eye/EyeOff) - Posisinya di atas icon utama seperti notif */}
         <button
           onClick={() => setShowBubble(!showBubble)}
-          className={`absolute -top-2 -right-2 w-8 h-8 rounded-full shadow-lg transition-all flex items-center justify-center z-[51] border-2 border-white ${
-            showBubble 
-              ? 'bg-gray-100 text-gray-500 hover:bg-red-500 hover:text-white' 
+          className={`absolute -top-2 -right-2 w-8 h-8 rounded-full shadow-lg transition-all flex items-center justify-center z-[51] border-2 border-white ${showBubble
+              ? 'bg-gray-100 text-gray-500 hover:bg-red-500 hover:text-white'
               : 'bg-[#1B263A] text-[#D0B064] scale-125'
-          }`}
+            }`}
           title={showBubble ? "Sembunyikan Menu" : "Tampilkan Menu"}
         >
           {showBubble ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -139,7 +138,7 @@ const BubbleReport = ({
 
       {/* Modal Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-50 transition-opacity"
           onClick={handleClose}
         />
@@ -147,11 +146,10 @@ const BubbleReport = ({
 
       {/* Report Modal */}
       <div
-        className={`fixed bottom-24 right-8 w-96 bg-white rounded-2xl shadow-2xl z-50 transition-all transform ${
-          isOpen 
-            ? 'opacity-100 scale-100' 
+        className={`fixed bottom-24 right-8 w-96 bg-white rounded-2xl shadow-2xl z-50 transition-all transform ${isOpen
+            ? 'opacity-100 scale-100'
             : 'opacity-0 scale-75 pointer-events-none'
-        }`}
+          }`}
       >
         {/* Header */}
         <div className="bg-gradient-to-r from-[#D0B064] to-[#C9A355] px-6 py-4 rounded-t-2xl flex items-center justify-between">
@@ -303,7 +301,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
   const getNavigation = () => {
     return [
       { id: 'dashboard', name: 'Dashboard', icon: Home, path: '/sekolah/dashboard' },
-      
+
       // KATEGORI: DATA
       {
         id: 'data',
@@ -378,16 +376,16 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
                   </p>
                 </div>
               </div>
-              <button 
-                onClick={() => setSidebarOpen(false)} 
+              <button
+                onClick={() => setSidebarOpen(false)}
                 className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-white/50 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
             </>
           ) : (
-            <button 
-              onClick={() => setSidebarOpen(true)} 
+            <button
+              onClick={() => setSidebarOpen(true)}
               className="hover:bg-white/10 p-2.5 rounded-lg mx-auto transition-colors text-white/70 hover:text-white border border-white/5"
             >
               <Menu className="w-5 h-5" />
@@ -440,21 +438,19 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
                       handleNavigation(item.path);
                     }
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all border-l-4 ${
-                    isActive 
-                      ? 'bg-white/5 text-[#D0B064] border-[#D0B064] font-bold' 
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all border-l-4 ${isActive
+                      ? 'bg-white/5 text-[#D0B064] border-[#D0B064] font-bold'
                       : 'text-white/50 border-transparent hover:bg-white/5 hover:text-white'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   {sidebarOpen && (
                     <>
                       <span className="font-medium text-sm flex-1 text-left">{item.name}</span>
                       {item.hasSubmenu && (
-                        <ChevronDown 
-                          className={`w-4 h-4 transition-transform ${
-                            isSubmenuOpen ? 'rotate-180' : ''
-                          }`}
+                        <ChevronDown
+                          className={`w-4 h-4 transition-transform ${isSubmenuOpen ? 'rotate-180' : ''
+                            }`}
                         />
                       )}
                     </>
@@ -464,9 +460,8 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
                 {/* Submenu dengan Animasi */}
                 {item.hasSubmenu && sidebarOpen && (
                   <div
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      isSubmenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                    }`}
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${isSubmenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                      }`}
                   >
                     <div className="ml-4 mt-1 space-y-1 border-l border-white/10 pl-0">
                       {item.submenu.map((subitem: any, index: number) => (
@@ -477,15 +472,13 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
                             // Keep submenu open after navigation
                             // (state will update based on currentPage from parent)
                           }}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm transform ${
-                            isSubmenuOpen
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm transform ${isSubmenuOpen
                               ? 'translate-x-0 opacity-100'
                               : '-translate-x-2 opacity-0'
-                          } ${
-                            currentPage === subitem.id
+                            } ${currentPage === subitem.id
                               ? 'bg-[#D0B064]/30 text-[#D0B064] font-medium'
                               : 'text-gray-400 hover:text-white hover:bg-white/5'
-                          }`}
+                            }`}
                           style={{
                             transitionDelay: isSubmenuOpen ? `${index * 50}ms` : '0ms',
                           }}
@@ -504,7 +497,7 @@ const SekolahLayout = ({ children, currentPage = 'dashboard' }: SekolahLayoutPro
 
         {/* Logout */}
         <div className="p-4 border-t border-white/10">
-          <button 
+          <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-all"
           >

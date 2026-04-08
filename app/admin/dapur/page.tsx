@@ -29,6 +29,15 @@ interface Dapur {
   stokBahanBaku?: any[];
   sekolah?: any[];
   sekolahDilayani?: any[];
+  
+  // Stats added from BE summary
+  totalSekolah?: number;
+  totalKaryawan?: number;
+  totalStokKg?: number;
+  totalBebanSiswa?: number;
+  readinessScore?: number;
+  readinessStatus?: 'OPTIMAL' | 'WARNING' | 'CRITICAL';
+  
   _count?: {
     karyawan?: number;
     stokBahanBaku?: number;
@@ -126,6 +135,13 @@ const DapurMapDashboard = () => {
     'yogyakarta': 'Daerah Istimewa Yogyakarta',
     'di yogyakarta': 'Daerah Istimewa Yogyakarta',
     'west sulawesi': 'Sulawesi Barat',
+  };
+
+  const getImageUrl = (path?: string) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    const cleanPath = path.replace(/^\/+/, '');
+    return `${API_BASE_URL}/${cleanPath.startsWith('uploads') ? cleanPath : 'uploads/' + cleanPath}`;
   };
 
   const normalizeProvinceName = (name: string | null | undefined): string | null => {
@@ -469,51 +485,40 @@ const DapurMapDashboard = () => {
         filteredDapurList.forEach((d: Dapur) => {
           if (d.latitude && d.longitude) {
             try {
-              let iconColor = '#6b7280';
-              if (d.status === 'AKTIF') {
-                iconColor = '#22c55e';
-              } else if (d.status === 'TIDAK_AKTIF') {
-                iconColor = '#ef4444';
-              }
-              const iconHTML = `
-                <div style="
-                  background: ${iconColor};
-                  width: 32px;
-                  height: 32px;
-                  border-radius: 50%;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  color: white;
-                  font-weight: bold;
-                  font-size: 16px;
-                  border: 3px solid white;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                  cursor: pointer;
-                ">
-                  🍳
+              const statusColor = d.readinessStatus === 'CRITICAL' ? '#ef4444' : d.readinessStatus === 'WARNING' ? '#f97316' : d.readinessStatus === 'OPTIMAL' ? '#3b82f6' : '#22c55e';
+              
+              const svgIcon = `
+                <div style="position: relative; display: flex; align-items: center; justify-content: center; transform: translateY(-4px);">
+                  <svg width="32" height="42" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(4px 4px 0px rgba(0,0,0,1));">
+                    <path d="M16 2C8.268 2 2 8.268 2 16c0 10 14 24 14 24s14-14 14-24C30 8.268 23.732 2 16 2z" fill="${statusColor}" stroke="black" stroke-width="2"/>
+                    <circle cx="16" cy="16" r="5" fill="white" stroke="black" stroke-width="2"/>
+                  </svg>
                 </div>
               `;
 
               const customIcon = L.divIcon({
-                html: iconHTML,
+                html: svgIcon,
                 className: '',
-                iconSize: [32, 32],
-                iconAnchor: [16, 16],
-                popupAnchor: [0, -16],
+                iconSize: [32, 42],
+                iconAnchor: [16, 42],
+                popupAnchor: [0, -46],
               });
 
               const popupContent = `
-                <div class="w-48">
-                  <h4 class="font-bold text-sm mb-2">${d.nama}</h4>
-                  <p class="text-xs text-gray-600 mb-2">${d.alamat}</p>
-                  <div class="border-t pt-2 mt-2 text-xs">
-                    ${d.pic ? `<p class="mb-1"><strong>PIC:</strong> ${d.pic.name}</p>` : '<p class="mb-1 text-red-600"><strong>PIC:</strong> Belum ada</p>'}
-                    ${d.pic?.phone ? `<p class="mb-1"><strong>Telepon:</strong> ${d.pic.phone}</p>` : ''}
-                    <p class="mb-1"><strong>Drivers:</strong> ${d.drivers?.length || 0}</p>
-                    <p class="mb-1"><strong>Karyawan:</strong> ${d.karyawan || 0}</p>
-                    <p><strong>Sekolah:</strong> ${d.sekolah?.length || 0}</p>
+                <div style="font-family: inherit; width: 220px; border: 3px solid black; padding: 12px; background: white; box-shadow: 6px 6px 0px 0px rgba(0,0,0,1);">
+                  <div style="margin-bottom: 8px;">
+                    <p style="font-size: 8px; font-weight: 900; color: #9ca3af; text-transform: uppercase; letter-spacing: 2px; margin: 0; margin-bottom: 2px;">NAMA DAPUR</p>
+                    <h4 style="font-weight: 900; font-size: 14px; line-height: 1.2; text-transform: uppercase; margin: 0;">${d.nama}</h4>
                   </div>
+                  <div style="margin-bottom: 12px;">
+                    <p style="font-size: 8px; font-weight: 900; color: #9ca3af; text-transform: uppercase; letter-spacing: 2px; margin: 0; margin-bottom: 2px;">LOKASI</p>
+                    <p style="font-size: 10px; color: #4b5563; font-weight: 500; line-height: 1.3; margin: 0;">${d.alamat}</p>
+                  </div>
+
+                  ${d.pic ? `<p style="font-size: 10px; font-weight: 800; font-style: italic; margin: 0;">[PIC] ${d.pic.name}</p>` : `<p style="font-size: 10px; font-weight: 800; font-style: italic; margin: 0; color: red;">BELUM ADA PIC</p>`}
+                  <button class="map-detail-btn-dapur" data-id="${d.id}" style="width: 100%; margin-top: 8px; padding: 6px; background: white; border: 2px solid black; font-weight: 900; font-size: 10px; cursor: pointer; text-transform: uppercase; font-family: inherit;">
+                     LIHAT DETAIL
+                  </button>
                 </div>
               `;
 
@@ -522,11 +527,23 @@ const DapurMapDashboard = () => {
                 title: d.nama
               })
                 .bindPopup(popupContent)
-                .addTo(mapRef.current!)
-                .on('click', () => {
-                  setSelectedDapur(d);
-                  setShowDetailModal(true);
-                });
+                .addTo(mapRef.current!);
+
+              // Map click handling
+              marker.on('popupopen', () => {
+                setTimeout(() => {
+                  const btn = document.querySelector(`.map-detail-btn-dapur[data-id="${d.id}"]`);
+                  if (btn) {
+                    btn.addEventListener('click', () => {
+                      fetchDapurDetail(d.id);
+                    });
+                  }
+                }, 0);
+              });
+
+              marker.on('click', () => {
+                 // Nothing
+              });
 
               markersRef.current.push(marker);
             } catch (err) {
@@ -573,18 +590,34 @@ const DapurMapDashboard = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${API_BASE_URL}/api/dapur?page=1&limit=100`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const [dapurRes, statsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/dapur?page=1&limit=100`, {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json",
+          },
+        }),
+        fetch(`${API_BASE_URL}/api/admin/dapur/summary-stats`, {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json",
+          },
+        }).catch(() => null)
+      ]);
 
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
+      if (!dapurRes.ok) {
+        throw new Error(`API Error: ${dapurRes.status}`);
       }
 
-      const data = await response.json();
+      const data = await dapurRes.json();
+      
+      let statsMap = new Map();
+      if (statsRes && statsRes.ok) {
+        const statsData = await statsRes.json();
+        if (statsData.success && statsData.data) {
+          statsData.data.forEach((d: any) => statsMap.set(d.id, d));
+        }
+      }
 
       let dapurList = [];
       if (Array.isArray(data.data?.data)) {
@@ -595,18 +628,46 @@ const DapurMapDashboard = () => {
         dapurList = data;
       }
 
-      const mappedDapurList = dapurList.map((d: any) => ({
-        ...d,
-        pic: d.picDapur && d.picDapur.length > 0 ? d.picDapur[0] : undefined,
-        karyawan: d._count?.karyawan || 0,
-        stok: d._count?.stokBahanBaku || 0,
-        sekolah: d.sekolahDilayani || [],
-        province: (typeof d.province === 'object' && d.province?.name)
-          ? d.province.name
-          : (typeof d.provinces === 'object' && d.provinces?.name)
-            ? d.provinces.name
-            : (d.province || d.provinces) || null,
-      }));
+      const mappedDapurList = dapurList.map((d: any) => {
+        const beStats = statsMap.get(d.id);
+        
+        let totalSekolah = d.sekolahDilayani?.length || 0;
+        let totalKaryawan = d._count?.karyawan || 0;
+        let totalStokKg = 0;
+        let totalBebanSiswa = 0;
+        let readinessScore = 100;
+        let readinessStatus: 'OPTIMAL' | 'WARNING' | 'CRITICAL' = 'OPTIMAL';
+        
+        if (beStats) {
+          totalSekolah = beStats.totalSekolah;
+          totalKaryawan = beStats.totalKaryawan;
+          totalStokKg = beStats.totalStokKg;
+          totalBebanSiswa = beStats.totalBebanSiswa;
+          readinessScore = beStats.readinessScore;
+          
+          if (readinessScore < 50) readinessStatus = 'CRITICAL';
+          else if (readinessScore < 85) readinessStatus = 'WARNING';
+        }
+
+        return {
+          ...d,
+          pic: d.picDapur && d.picDapur.length > 0 ? d.picDapur[0] : undefined,
+          karyawan: totalKaryawan,
+          stok: d._count?.stokBahanBaku || 0,
+          sekolah: d.sekolahDilayani || [],
+          totalSekolah,
+          totalKaryawan,
+          totalStokKg,
+          totalBebanSiswa,
+          readinessScore,
+          readinessStatus,
+          province: (typeof d.province === 'object' && d.province?.name)
+            ? d.province.name
+            : (typeof d.provinces === 'object' && d.provinces?.name)
+              ? d.provinces.name
+              : (d.province || d.provinces) || null,
+        };
+      });
 
       setDapur(mappedDapurList);
     } catch (err: any) {
@@ -735,6 +796,14 @@ const DapurMapDashboard = () => {
     if (!authToken) return;
 
     try {
+      // INSTANT UI FEEDBACK: Set immediately from list if available
+      const cached = dapur.find(d => d.id === dapurId);
+      if (cached) {
+        setSelectedDapur(cached);
+        setShowDetailModal(true);
+      }
+
+      // BACKGROUND REFRESH
       const response = await fetch(`${API_BASE_URL}/api/dapur/${dapurId}`, {
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -747,13 +816,34 @@ const DapurMapDashboard = () => {
       }
 
       const data = await response.json();
-      const detail = data.data || data;
+      const detailRaw = data.data || data;
+      
+      const detail = {
+        ...detailRaw,
+        pic: detailRaw.picDapur && detailRaw.picDapur.length > 0 ? detailRaw.picDapur[0] : undefined,
+        sekolah: (detailRaw.sekolahDilayani || [])
+          .filter((sd: any) => sd.status !== 'REJECTED')
+          .map((sd: any) => ({
+            id: sd.sekolah?.id,
+            nama: sd.sekolah?.nama || sd.sekolah?.name,
+            status: sd.status
+          }))
+      };
+      
+      // Merge with our precalculated stats
+      if (cached) {
+          detail.readinessScore = cached.readinessScore;
+          detail.readinessStatus = cached.readinessStatus;
+          detail.totalBebanSiswa = cached.totalBebanSiswa;
+          detail.totalStokKg = cached.totalStokKg;
+      }
+      
       setSelectedDapur(detail);
       setShowDetailModal(true);
     } catch (err: any) {
-      showToast('error', 'Gagal mengambil detail dapur');
+      showToast('error', 'Gagal mengambil detail dapur: ' + err.message);
     }
-  }, [authToken]);
+  }, [authToken, dapur]);
 
   const openEditModal = (d: Dapur) => {
     setSelectedDapur(d);
@@ -914,97 +1004,74 @@ const DapurMapDashboard = () => {
     <AdminLayout currentPage="dapur">
       <div className="space-y-4">
         {toastMessage && (
-          <div className={`fixed top-4 right-4 px-4 py-3 rounded-lg text-white shadow-lg z-40 ${
-            toastMessage.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+          <div className={`fixed top-4 right-4 px-6 py-4 rounded-none text-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] font-black uppercase tracking-widest text-xs border-2 border-white z-[100] ${
+            toastMessage.type === 'success' ? 'bg-green-600' : 'bg-red-600'
           }`}>
             {toastMessage.text}
           </div>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between border-b-4 border-black pb-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Manajemen Dapur</h1>
-            <p className="text-gray-600 mt-1">Monitor dan kelola semua dapur di seluruh lokasi</p>
+            <h1 className="text-2xl font-black text-black uppercase tracking-tighter italic">Manajemen Dapur</h1>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Logistik & Distribusi Suplai Makanan</p>
           </div>
           <button 
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] transition-colors font-semibold shadow-md">
-            <Plus className="w-5 h-5" />
-            Tambah Dapur
+            className="px-6 py-3 bg-black text-white border border-black text-[10px] font-black uppercase tracking-[0.2em] hover:bg-gray-800 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)]">
+            TAMBAH DAPUR
           </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-600 font-medium mb-1">Total Dapur</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalDapur}</p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Building2 className="w-6 h-6 text-blue-600" />
-              </div>
+          <div className="bg-white border-l-4 border-l-blue-600 border border-gray-200 p-5 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,0.05)] transition-all">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Total Unit Dapur</p>
             </div>
+            <p className="text-3xl font-black text-black uppercase tracking-tighter">{stats.totalDapur}</p>
           </div>
 
-          <div className="bg-white rounded-lg p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-600 font-medium mb-1">PIC Dapur</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalPIC}</p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Users className="w-6 h-6 text-green-600" />
-              </div>
+          <div className="bg-white border-l-4 border-l-green-600 border border-gray-200 p-5 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,0.05)] transition-all">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">PIC Aktif</p>
             </div>
+            <p className="text-3xl font-black text-black uppercase tracking-tighter">{stats.totalPIC}</p>
           </div>
 
-          <div className="bg-white rounded-lg p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-600 font-medium mb-1">Total Driver</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalDriver}</p>
-              </div>
-              <div className="p-3 bg-orange-100 rounded-lg">
-                <Truck className="w-6 h-6 text-orange-600" />
-              </div>
+          <div className="bg-white border-l-4 border-l-orange-600 border border-gray-200 p-5 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,0.05)] transition-all">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Total Keranjang</p>
             </div>
+            <p className="text-3xl font-black text-black uppercase tracking-tighter">{stats.totalDriver || 0}</p>
           </div>
 
-          <div className="bg-white rounded-lg p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-600 font-medium mb-1">Total Karyawan</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalKaryawan}</p>
-              </div>
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Users className="w-6 h-6 text-purple-600" />
-              </div>
+          <div className="bg-white border-l-4 border-l-black border border-gray-200 p-5 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,0.05)] transition-all">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Total Personel</p>
             </div>
+            <p className="text-3xl font-black text-black uppercase tracking-tighter">{stats.totalKaryawan || 0}</p>
           </div>
         </div>
 
+
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-red-900">Error</p>
-              <p className="text-xs text-red-700 mt-1">{error}</p>
-            </div>
+          <div className="border-4 border-red-600 bg-red-50 p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-red-600">Terjadi Kesalahan</p>
+            <p className="text-xs text-red-700 mt-1 font-bold italic underline">{error}</p>
           </div>
         )}
 
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2">
-            <Search className="w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Cari nama dapur, alamat, atau PIC..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 px-4 py-2.5 border-0 focus:ring-0 focus:outline-none"
-            />
+        <div className="bg-white border-2 border-black p-0 flex items-center gap-0 overflow-hidden">
+          <div className="bg-black px-6 py-4 flex items-center justify-center">
+            <Search className="w-5 h-5 text-white" />
           </div>
+          <input
+            type="text"
+            placeholder="Cari nama dapur, alamat, atau PIC..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 px-4 py-3 placeholder:text-gray-400 text-sm font-bold uppercase border-0 focus:ring-0 focus:outline-none"
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[600px] relative z-0">
@@ -1012,94 +1079,88 @@ const DapurMapDashboard = () => {
             <div className="relative w-full h-full">
               <div id="map-container" className="w-full h-full" style={{ minHeight: '600px', position: 'relative', zIndex: 0 }}></div>
               
-              {/* Fullscreen Button */}
               <button
                 onClick={toggleFullscreen}
-                className="absolute top-4 right-4 z-40 p-2.5 bg-white text-gray-700 rounded-lg hover:bg-gray-50 shadow-lg transition-colors border border-gray-200"
-                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                className="absolute top-4 right-4 z-[400] bg-black text-white p-2 border border-white text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)]"
               >
-                {isFullscreen ? (
-                  <Minimize2 className="w-5 h-5" />
-                ) : (
-                  <Maximize2 className="w-5 h-5" />
-                )}
+                {isFullscreen ? 'TUTUP LAYAR PENUH' : 'LAYAR PENUH'}
               </button>
 
               {selectedProvince && (
-                <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-4 max-w-xs z-40">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-gray-900">Selected Province</h4>
+                <div className="absolute bottom-4 left-4 bg-black text-white border-2 border-white p-6 min-w-[240px] z-40 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)]">
+                  <div className="flex items-center justify-between mb-4 border-b border-white/20 pb-2">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-red-500 italic">Filter Wilayah</h4>
                     <button
                       onClick={() => {
                         setSelectedProvince(null);
                         if (selectedProvinceLayerRef.current) {
                           selectedProvinceLayerRef.current.setStyle({
-                            stroke: true,
-                            color: '#810FCB',
-                            weight: 2,
-                            opacity: 1,
-                            fill: true,
-                            fillColor: '#810FCB',
-                            fillOpacity: 0.08,
+                            stroke: true, color: '#810FCB', weight: 2, opacity: 1, fill: true, fillColor: '#810FCB', fillOpacity: 0.08,
                           });
                           selectedProvinceLayerRef.current = null;
                         }
                       }}
-                      className="text-gray-400 hover:text-gray-600"
+                      className="text-[9px] font-black uppercase tracking-tighter hover:text-red-500 transition-all underline underline-offset-4"
                     >
-                      <X className="w-4 h-4" />
+                      BATALKAN
                     </button>
                   </div>
-                  <p className="text-base font-bold text-gray-900 mb-2">{selectedProvince}</p>
-                  <div className="space-y-2 border-t border-gray-200 pt-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-600">Dapur di Province:</span>
-                      <span className="text-sm font-semibold text-[#D0B064]">{filteredDapur.length}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-600">Total di Sistem:</span>
-                      <span className="text-sm font-semibold text-gray-700">{dapur.length}</span>
+                  <p className="text-xl font-black uppercase tracking-tighter text-white mb-4 italic underline decoration-red-500">{selectedProvince}</p>
+                  <div className="space-y-3 pt-2">
+                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                      <span className="text-gray-400">DAPUR AKTIF</span>
+                      <span className="text-white text-lg leading-none">{filteredDapur.length}</span>
                     </div>
                   </div>
                 </div>
               )}
               
               {hoveredProvince && !selectedProvince && (
-                <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 max-w-xs z-40">
-                  <p className="text-sm font-semibold text-gray-900">{hoveredProvince}</p>
+                <div className="absolute bottom-4 left-4 bg-black text-white border-2 border-white p-3 z-40">
+                  <p className="text-[10px] font-black uppercase tracking-widest italic">{hoveredProvince}</p>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-200 bg-gray-50">
-              <h3 className="font-semibold text-gray-900">Daftar Dapur ({filteredDapur.length})</h3>
+          <div className="bg-white border-2 border-black overflow-hidden flex flex-col shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            <div className="p-4 border-b-2 border-black bg-black text-white">
+              <h3 className="text-xs font-black uppercase tracking-widest italic">KITCHEN LIST ({filteredDapur.length}) // MONITORING</h3>
             </div>
             <div className="flex-1 overflow-y-auto">
               {filteredDapur.length === 0 ? (
                 <div className="p-6 text-center text-gray-500">
-                  <Building2 className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">Tidak ada dapur ditemukan</p>
+                  <p className="text-sm font-black uppercase">Tidak ada dapur ditemukan</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200">
+                <div className="divide-y-2 divide-black">
                   {filteredDapur.map((d) => (
-                    <div key={d.id} className="p-4 hover:bg-gray-50 cursor-pointer transition-colors border-l-4 border-l-transparent hover:border-l-[#D0B064]">
-                      <div onClick={() => fetchDapurDetail(d.id)}>
-                        <p className="font-semibold text-gray-900 text-sm">{d.nama}</p>
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{d.alamat}</p>
-                        <p className="text-xs text-gray-600 mt-2 flex items-center gap-1">
-                          <Users className="w-3 h-3" />
-                          {d.pic?.name || 'Belum ada PIC'}
-                        </p>
+                    <div key={d.id} className={`p-4 transition-all group hover:bg-gray-50 border-l-4 ${selectedDapur?.id === d.id ? 'border-l-black bg-gray-50' : 'border-l-transparent'}`}>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1 pr-2 min-w-0">
+                           <div className="flex justify-between gap-2 items-start">
+                              <h3 className="text-xs font-black uppercase tracking-tighter text-black truncate flex-1">{d.nama}</h3>
+                              <div className="text-right flex-shrink-0">
+                                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">BEBAN SUPLAI</p>
+                                 <p className="text-sm font-black text-blue-600 leading-none">{d.totalSekolah || 0} SEKOLAH</p>
+                              </div>
+                           </div>
+                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 italic">{d.pic?.name || 'BELUM ADA PIC'}</p>
+                           <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5 truncate">{d.alamat}</p>
+                        </div>
                       </div>
-                      <div className="flex gap-2 mt-3">
+                      <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          onClick={() => fetchDapurDetail(d.id)}
+                          className="flex-1 p-2 bg-black text-white text-[8px] font-black uppercase tracking-widest border border-black hover:bg-gray-800"
+                        >
+                          DETAIL
+                        </button>
                         <button
                           onClick={() => openEditModal(d)}
-                          className="flex-1 p-1.5 bg-amber-50 text-amber-600 rounded text-xs hover:bg-amber-100 transition-colors"
+                          className="px-3 p-2 bg-white text-black border border-black hover:bg-gray-100 transition-colors flex items-center justify-center"
                         >
-                          <Edit className="w-3 h-3 mx-auto" />
+                          <Edit className="w-3 h-3" />
                         </button>
                         <button
                           onClick={() => openDeleteConfirm(d.id)}
@@ -1120,145 +1181,168 @@ const DapurMapDashboard = () => {
       {/* Detail Modal */}
       {showDetailModal && selectedDapur && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white p-6 sticky top-0 z-10 flex items-center justify-between">
+          <div className="bg-white border-4 border-black max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] relative">
+            <div className="bg-black text-white p-6 sticky top-0 z-10 flex items-center justify-between border-b-4 border-black">
               <div>
-                <h2 className="text-2xl font-bold">{selectedDapur.nama}</h2>
-                <p className="text-white/80 text-sm mt-1">Detail Dapur & Resources</p>
+                <h2 className="text-2xl font-black uppercase tracking-tighter italic">{selectedDapur.nama}</h2>
+                <p className="text-white/60 text-[10px] font-bold mt-1 uppercase tracking-widest">Detail Dapur & Resources</p>
               </div>
               <button
                 onClick={() => setShowDetailModal(false)}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 bg-white text-black border-2 border-black hover:bg-gray-200 transition-all shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-8 space-y-8">
               {/* Lokasi */}
               <div>
-                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <MapPinIcon className="w-5 h-5 text-blue-600" />
-                  Lokasi
+                <h3 className="font-black text-black mb-3 flex items-center gap-2 uppercase tracking-tight text-sm">
+                  <MapPinIcon className="w-5 h-5 text-black" />
+                  Lokasi & Alamat
                 </h3>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <p className="text-sm text-gray-700">{selectedDapur.alamat}</p>
+                <div className="bg-white p-4 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all">
+                  <p className="text-sm text-black font-bold uppercase">{selectedDapur.alamat}</p>
                 </div>
               </div>
 
               {/* PIC dengan Assign Button */}
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-green-600" />
-                    PIC Dapur
+                <div className="flex items-center justify-between mb-3 border-b-2 border-black pb-2">
+                  <h3 className="font-black text-black flex items-center gap-2 uppercase tracking-tight text-sm">
+                    <Users className="w-5 h-5 text-black" />
+                    Person In Charge (PIC)
                   </h3>
                   <button
                     onClick={openAssignPICModal}
-                    className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                    className="px-4 py-2 bg-black text-white text-[10px] uppercase font-black tracking-widest border-2 border-black hover:bg-white hover:text-black transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)]"
                   >
-                    {selectedDapur.pic ? "Ubah PIC" : "Assign PIC"}
+                    {selectedDapur.pic ? "UBAH PIC" : "ASSIGN PIC"}
                   </button>
                 </div>
 
                 {selectedDapur.pic ? (
-                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                    <p className="font-semibold text-gray-900">{selectedDapur.pic.name}</p>
-                    {selectedDapur.pic.phone && (
-                      <p className="text-sm text-gray-600 mt-1 flex items-center gap-2">
-                        <Phone className="w-4 h-4" />
-                        {selectedDapur.pic.phone}
-                      </p>
-                    )}
-                    {selectedDapur.pic.email && (
-                      <p className="text-sm text-gray-600 mt-1 flex items-center gap-2">
-                        <Mail className="w-4 h-4" />
-                        {selectedDapur.pic.email}
-                      </p>
-                    )}
+                  <div className="bg-white p-4 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex gap-4">
+                    <div className="w-16 h-20 bg-black border-2 border-black flex-shrink-0 grayscale hover:grayscale-0 transition-all cursor-zoom-in overflow-hidden">
+                        {(selectedDapur as any).picFoto || (selectedDapur as any).pic?.fotoUrl ? (
+                            <img 
+                                src={getImageUrl((selectedDapur as any).picFoto || (selectedDapur as any).pic?.fotoUrl)!} 
+                                alt={selectedDapur.pic.name} 
+                                className="w-full h-full object-cover" 
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white/20 text-xl font-black">
+                                {selectedDapur.pic.name[0]}
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-black text-gray-900 uppercase tracking-tight text-lg leading-none mb-1 truncate">{selectedDapur.pic.name}</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">PIC_RESMI</p>
+                        <div className="space-y-1">
+                            {selectedDapur.pic.phone && (
+                                <p className="text-[10px] font-black uppercase text-gray-400">
+                                    P: <span className="text-black">{selectedDapur.pic.phone}</span>
+                                </p>
+                            )}
+                            {selectedDapur.pic.email && (
+                                <p className="text-[10px] font-black uppercase text-gray-400 truncate">
+                                    E: <span className="text-black">{selectedDapur.pic.email}</span>
+                                </p>
+                            )}
+                        </div>
+                    </div>
                   </div>
                 ) : (
-                  <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-                    <p className="text-sm text-yellow-800">Belum ada PIC yang di-assign. Klik "Assign PIC" untuk menambahkan.</p>
+                  <div className="bg-yellow-300 p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-center">
+                    <p className="text-[10px] font-black text-black uppercase tracking-widest italic">MENUNGGU_PENGAKTIFAN_PIC</p>
                   </div>
                 )}
               </div>
 
               {/* Status Dapur */}
               <div>
-                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-cyan-600" />
-                  Status Dapur
+                <h3 className="font-black text-black mb-3 flex items-center gap-2 uppercase tracking-tight text-sm">
+                  <CheckCircle className="w-5 h-5 text-black" />
+                  Sirkulasi & Status
                 </h3>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="bg-white p-6 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Status saat ini:</p>
-                      <p className="text-lg font-bold text-gray-900">
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Status Sistem:</p>
+                      <p className="text-xl font-black text-black">
+                        <span className={`inline-block px-4 py-1 border-2 border-black ${
                           selectedDapur.status === 'AKTIF' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
+                            ? 'bg-green-400 text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]' 
+                            : 'bg-red-500 text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
                         }`}>
                           {selectedDapur.status || 'TIDAK DIKETAHUI'}
                         </span>
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2 mt-4">
+                  <div className="flex gap-4 mt-6 pt-6 border-t-2 border-black border-dashed">
                     <button
                       onClick={() => handleUpdateStatus(selectedDapur.id, 'AKTIF')}
                       disabled={updatingStatus || selectedDapur.status === 'AKTIF'}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      className={`flex-1 px-4 py-3 text-xs font-black uppercase tracking-widest transition-all border-2 border-black ${
                         selectedDapur.status === 'AKTIF'
-                          ? 'bg-green-100 text-green-700 cursor-not-allowed'
-                          : 'bg-green-600 text-white hover:bg-green-700'
-                      } disabled:opacity-50`}
+                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
+                          : 'bg-green-400 text-black hover:bg-green-500 hover:-translate-y-1 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
+                      }`}
                     >
-                      {updatingStatus ? 'Memproses...' : 'Aktifkan'}
+                      {updatingStatus ? 'PROCESSING...' : 'AKTIFKAN SISTEM'}
                     </button>
                     <button
                       onClick={() => handleUpdateStatus(selectedDapur.id, 'TIDAK_AKTIF')}
                       disabled={updatingStatus || selectedDapur.status === 'TIDAK_AKTIF'}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      className={`flex-1 px-4 py-3 text-xs font-black uppercase tracking-widest transition-all border-2 border-black ${
                         selectedDapur.status === 'TIDAK_AKTIF'
-                          ? 'bg-red-100 text-red-700 cursor-not-allowed'
-                          : 'bg-red-600 text-white hover:bg-red-700'
-                      } disabled:opacity-50`}
+                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
+                          : 'bg-red-500 text-white hover:bg-red-600 hover:-translate-y-1 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
+                      }`}
                     >
-                      {updatingStatus ? 'Memproses...' : 'Nonaktifkan'}
+                      {updatingStatus ? 'PROCESSING...' : 'NON-AKTIFKAN'}
                     </button>
                   </div>
                 </div>
               </div>
 
               {/* Resources */}
-              <div className="grid md:grid-cols-3 gap-4">
-                <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-                  <p className="text-xs text-orange-600 font-semibold mb-2">Drivers</p>
-                  <p className="text-3xl font-bold text-orange-900">{selectedDapur.drivers?.length || 0}</p>
+              <div className="grid md:grid-cols-3 gap-0 border-4 border-black">
+                <div className="bg-orange-400 p-6 border-b-4 md:border-b-0 md:border-r-4 border-black">
+                  <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Drivers</p>
+                  <p className="text-4xl font-black text-black">{selectedDapur.drivers?.length || 0}</p>
                 </div>
 
-                <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                  <p className="text-xs text-purple-600 font-semibold mb-2">Karyawan</p>
-                  <p className="text-3xl font-bold text-purple-900">{selectedDapur.karyawan?.length || 0}</p>
+                <div className="bg-purple-400 p-6 border-b-4 md:border-b-0 md:border-r-4 border-black">
+                  <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Karyawan</p>
+                  <p className="text-4xl font-black text-black">{selectedDapur.karyawan?.length || 0}</p>
                 </div>
 
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                  <p className="text-xs text-blue-600 font-semibold mb-2">Stok Bahan</p>
-                  <p className="text-3xl font-bold text-blue-900">{selectedDapur.stok?.length || 0}</p>
+                <div className="bg-blue-400 p-6">
+                  <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Stok Bahan</p>
+                  <p className="text-4xl font-black text-black">{selectedDapur.stok?.length || 0}</p>
                 </div>
               </div>
 
               {/* Sekolah */}
               {selectedDapur.sekolah && selectedDapur.sekolah.length > 0 && (
                 <div>
-                  <h3 className="font-bold text-gray-900 mb-3">Sekolah Terlayani ({selectedDapur.sekolah.length})</h3>
-                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                  <h3 className="font-black text-black mb-3 border-b-2 border-black pb-2 text-sm uppercase tracking-tight">
+                    Sekolah Terlayani ({selectedDapur.sekolah.length})
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 max-h-48 overflow-y-auto pr-2">
                     {selectedDapur.sekolah.map((s: any, idx: number) => (
-                      <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200 text-sm">
-                        <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-900 truncate">{s.nama || s.name}</span>
+                      <div key={idx} className="flex items-center gap-3 p-3 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] transition-all">
+                        <div className="bg-black p-2"><Building2 className="w-4 h-4 text-white flex-shrink-0" /></div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-black uppercase tracking-tighter text-black truncate block">{s.nama || s.name}</span>
+                          <span className={`text-[8px] font-black uppercase px-1 border border-black ${s.status === 'APPROVED' ? 'bg-green-400 text-black' : 'bg-yellow-300 text-black'}`}>
+                            {s.status || 'PENDING'}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1266,70 +1350,69 @@ const DapurMapDashboard = () => {
               )}
 
               {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex flex-col md:flex-row gap-4 pt-6 border-t-4 border-black">
                 <button
                   onClick={() => openEditModal(selectedDapur)}
-                  className="flex-1 px-4 py-2.5 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] transition-colors font-semibold"
+                  className="flex-1 px-4 py-4 bg-[#D0B064] text-black border-2 border-black hover:bg-[#C9A355] transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1"
                 >
-                  Edit Dapur
+                  EDIT INFORMASI
                 </button>
                 <button
                   onClick={() => openDeleteConfirm(selectedDapur.id)}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
+                  className="flex-1 px-4 py-4 bg-red-600 text-white border-2 border-black hover:bg-red-700 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1"
                 >
-                  Hapus
+                  HAPUS
                 </button>
                 <button
                   onClick={() => setShowDetailModal(false)}
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold"
+                  className="flex-1 px-4 py-4 bg-white text-black border-2 border-black hover:bg-gray-100 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1"
                 >
-                  Tutup
+                  BAIK, TUTUP
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </div>      )}
 
       {/* Assign PIC Modal */}
       {showAssignPICModal && selectedDapur && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-5 flex items-center justify-between sticky top-0">
+          <div className="bg-white border-4 border-black max-w-md w-full shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] max-h-[90vh] flex flex-col">
+            <div className="bg-black text-white px-6 py-5 flex items-center justify-between border-b-4 border-black flex-shrink-0">
               <div>
-                <h3 className="text-xl font-bold">Assign PIC ke Dapur</h3>
-                <p className="text-green-100 text-sm mt-1">{selectedDapur.nama}</p>
+                <h3 className="text-xl font-black uppercase italic tracking-tighter">ASSIGN PERSONEL (PIC)</h3>
+                <p className="text-white/60 text-[10px] font-bold mt-1 uppercase tracking-widest">{selectedDapur.nama}</p>
               </div>
               <button
                 onClick={() => {
                   setShowAssignPICModal(false);
                   setSelectedPicId("");
                 }}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 border-2 border-white hover:bg-white hover:text-black transition-all shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:shadow-none"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-8 space-y-6 overflow-y-auto">
               {/* Info */}
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                <p className="text-sm text-blue-900">
-                  <strong>Note:</strong> Pilih PIC yang sudah terdaftar. Data diambil dari daftar PIC yang ada di sistem.
+              <div className="bg-yellow-300 p-4 border-4 border-black text-black">
+                <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">
+                  NOTE: HANYA PERSONEL TERDAFTAR YANG DAPAT DIPILIH. DAFTARKAN DULU JIKA BELUM ADA.
                 </p>
               </div>
 
               {/* PIC List */}
               {picUsers.length > 0 && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Pilih PIC Dapur
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-3">
+                    PILIH KANDIDAT AKTIF:
                   </label>
-                  <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                  <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
                     {picUsers.map((pic) => (
                       <label
                         key={pic.id}
-                        className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                        className={`flex items-center p-4 border-4 border-black cursor-pointer transition-all ${selectedPicId === pic.id ? 'bg-black text-white shadow-none translate-x-1 translate-y-1' : 'bg-white text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]'}`}
                       >
                         <input
                           type="radio"
@@ -1337,13 +1420,16 @@ const DapurMapDashboard = () => {
                           value={pic.id}
                           checked={selectedPicId === pic.id}
                           onChange={(e) => setSelectedPicId(e.target.value)}
-                          className="w-4 h-4 text-green-600"
+                          className="hidden"
                         />
-                        <div className="ml-3 flex-1">
-                          <p className="text-sm font-semibold text-gray-900">{pic.name}</p>
-                          <p className="text-xs text-gray-600">{pic.email}</p>
+                        <div className="w-6 h-6 border-2 flex-shrink-0 flex items-center justify-center mr-4 transition-all ${selectedPicId === pic.id ? 'border-white bg-white' : 'border-black bg-white'}">
+                           {selectedPicId === pic.id && <div className="w-3 h-3 bg-black"></div>}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-black uppercase tracking-tight leading-none mb-1">{pic.name}</p>
+                          <p className="text-[9px] font-bold mt-1 opacity-60">E: {pic.email}</p>
                           {pic.phone && (
-                            <p className="text-xs text-gray-600">{pic.phone}</p>
+                            <p className="text-[9px] font-bold opacity-60">P: {pic.phone}</p>
                           )}
                         </div>
                       </label>
@@ -1354,41 +1440,31 @@ const DapurMapDashboard = () => {
 
               {/* No PIC Available */}
               {picUsers.length === 0 && (
-                <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-                  <p className="text-sm text-yellow-900">
-                    Belum ada PIC yang terdaftar di sistem. Silakan daftarkan PIC_DAPUR terlebih dahulu melalui sistem registrasi.
+                <div className="bg-red-500 p-6 border-4 border-black text-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-center">
+                  <p className="text-xs font-black uppercase italic tracking-widest">
+                    ⚠️ BELUM ADA PERSONEL (PIC_DAPUR) YANG TERSEDIA DI SISTEM.
                   </p>
                 </div>
               )}
 
               {/* Actions */}
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t-4 border-black">
                 <button
                   type="button"
                   onClick={() => {
                     setShowAssignPICModal(false);
                     setSelectedPicId("");
                   }}
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold"
+                  className="w-full sm:flex-1 px-4 py-4 bg-white text-black border-2 border-black hover:bg-gray-100 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1"
                 >
-                  Batal
+                  BATAL 
                 </button>
                 <button
                   onClick={handleAssignPIC}
                   disabled={assigningPic || !selectedPicId || picUsers.length === 0}
-                  className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full sm:flex-1 px-4 py-4 bg-green-500 text-black border-2 border-black hover:bg-green-600 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {assigningPic ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Meng-assign...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4" />
-                      Assign
-                    </>
-                  )}
+                  {assigningPic ? 'MEMPROSES...' : 'ASSIGN SEKARANG'}
                 </button>
               </div>
             </div>
@@ -1399,86 +1475,85 @@ const DapurMapDashboard = () => {
       {/* Edit Modal */}
       {showEditModal && selectedDapur && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white px-6 py-5 flex items-center justify-between sticky top-0">
-              <h3 className="text-xl font-bold">Edit Dapur</h3>
+          <div className="bg-white border-4 border-black max-w-md w-full shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] max-h-[90vh] overflow-y-auto">
+            <div className="bg-black text-white px-6 py-5 flex items-center justify-between border-b-4 border-black">
+              <h3 className="text-xl font-black uppercase italic tracking-tighter">EDIT DATA DAPUR</h3>
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setFormData({ nama: "", alamat: "", latitude: "", longitude: "" });
                 }}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 border-2 border-white hover:bg-white hover:text-black transition-all shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:shadow-none"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateDapur} className="p-6 space-y-4">
+            <form onSubmit={handleUpdateDapur} className="p-8 space-y-6">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Dapur</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">IDENTITAS DAPUR</label>
                 <input
                   type="text"
                   required
                   value={formData.nama}
                   onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                  className="w-full px-4 py-4 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Alamat</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">ALAMAT LENGKAP</label>
                 <textarea
                   required
                   value={formData.alamat}
                   onChange={(e) => setFormData({ ...formData, alamat: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                  className="w-full px-4 py-4 border-2 border-black text-sm font-bold uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                   rows={3}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Latitude</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">LATITUDE</label>
                   <input
                     type="number"
                     step="0.0001"
                     required
                     value={formData.latitude}
                     onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                    className="w-full px-4 py-4 border-2 border-black text-sm font-black focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Longitude</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">LONGITUDE</label>
                   <input
                     type="number"
                     step="0.0001"
                     required
                     value={formData.longitude}
                     onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                    className="w-full px-4 py-4 border-2 border-black text-sm font-black focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                   />
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row gap-4 pt-8">
                 <button
                   type="button"
                   onClick={() => {
                     setShowEditModal(false);
                     setFormData({ nama: "", alamat: "", latitude: "", longitude: "" });
                   }}
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+                  className="w-full sm:flex-1 px-4 py-4 bg-white text-black border-2 border-black hover:bg-gray-100 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1"
                 >
-                  Batal
+                  BATAL
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 bg-[#D0B064] text-white rounded-xl hover:bg-[#C9A355] transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full sm:flex-1 px-4 py-4 bg-[#D0B064] text-black border-2 border-black hover:bg-[#C9A355] transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 disabled:opacity-50"
                 >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Edit className="w-5 h-5" />}
-                  {submitting ? "Menyimpan..." : "Simpan"}
+                  {submitting ? "MEMPROSES..." : "SIMPAN PERUBAHAN"}
                 </button>
               </div>
             </form>
@@ -1489,107 +1564,101 @@ const DapurMapDashboard = () => {
       {/* Add Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="bg-gradient-to-r from-[#1B263A] to-[#2A3749] text-white px-6 py-5 flex items-center justify-between sticky top-0">
-              <h3 className="text-xl font-bold">Tambah Dapur Baru</h3>
+          <div className="bg-white border-4 border-black max-w-md w-full shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] max-h-[90vh] overflow-y-auto">
+            <div className="bg-black text-white px-6 py-5 flex items-center justify-between border-b-4 border-black">
+              <h3 className="text-xl font-black uppercase italic tracking-tighter">TAMBAH DAPUR BARU</h3>
               <button
                 onClick={() => {
                   setShowAddModal(false);
                   setFormData({ nama: "", alamat: "", latitude: "", longitude: "" });
                 }}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 border-2 border-white hover:bg-white hover:text-black transition-all shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:shadow-none"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateDapur} className="p-6 space-y-4">
+            <form onSubmit={handleCreateDapur} className="p-8 space-y-6">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Dapur</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">NAMA DAPUR</label>
                 <input
                   type="text"
                   required
                   value={formData.nama}
                   onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-                  placeholder="Contoh: Dapur MBG Pusat"
+                  className="w-full px-4 py-4 border-2 border-black text-sm font-black uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                  placeholder="CONTOH: DAPUR PUSAT"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Alamat</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">ALAMAT</label>
                 <textarea
                   required
                   value={formData.alamat}
                   onChange={(e) => setFormData({ ...formData, alamat: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
-                  placeholder="Jl. Merdeka No. 123, Jakarta"
+                  className="w-full px-4 py-4 border-2 border-black text-sm font-bold uppercase focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                  placeholder="JL. MERDEKA NO 123..."
                   rows={3}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Koordinat Lokasi</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">KORDINAT SINKRONISASI GPS</label>
                 <button
                   type="button"
                   onClick={getCurrentLocation}
                   disabled={locationLoading}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-blue-600 text-white border-2 border-black hover:bg-blue-700 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50 hover:-translate-y-1"
                 >
-                  {locationLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Navigation className="w-5 h-5" />
-                  )}
-                  {locationLoading ? "Mengambil lokasi..." : "Ambil Lokasi Saat Ini"}
+                  {locationLoading ? "MENGAMBIL LOKASI..." : "📍 AUTO-DETECT LOKASI SAAT INI"}
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Latitude</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">LATITUDE</label>
                   <input
                     type="number"
                     step="0.0001"
                     required
                     value={formData.latitude}
                     onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                    className="w-full px-4 py-4 border-2 border-black text-sm font-black focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                     placeholder="-6.2088"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Longitude</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-black mb-2">LONGITUDE</label>
                   <input
                     type="number"
                     step="0.0001"
                     required
                     value={formData.longitude}
                     onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D0B064] focus:border-transparent"
+                    className="w-full px-4 py-4 border-2 border-black text-sm font-black focus:outline-none focus:bg-gray-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                     placeholder="106.8456"
                   />
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row gap-4 pt-8">
                 <button
                   type="button"
                   onClick={() => {
                     setShowAddModal(false);
                     setFormData({ nama: "", alamat: "", latitude: "", longitude: "" });
                   }}
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+                  className="w-full sm:flex-1 px-4 py-4 bg-white text-black border-2 border-black hover:bg-gray-100 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1"
                 >
-                  Batal
+                  BATAL
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 bg-[#D0B064] text-white rounded-xl hover:bg-[#C9A355] transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full sm:flex-1 px-4 py-4 bg-[#D0B064] text-black border-2 border-black hover:bg-[#C9A355] transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 disabled:opacity-50"
                 >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                  {submitting ? "Menambahkan..." : "Tambah Dapur"}
+                  {submitting ? "MEMINTA..." : "DAFTARKAN DAPUR"}
                 </button>
               </div>
             </form>
@@ -1600,35 +1669,32 @@ const DapurMapDashboard = () => {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && deleteTargetId && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl">
-            <div className="p-6 text-center">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Hapus Dapur?</h3>
-              <p className="text-sm text-gray-600 mb-6">
-                Anda yakin ingin menghapus dapur ini? Tindakan ini tidak dapat dibatalkan.
-              </p>
+          <div className="bg-white border-4 border-black max-w-sm w-full shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] text-center p-8">
+            <div className="w-16 h-16 bg-red-500 border-4 border-black flex items-center justify-center mx-auto mb-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <AlertCircle className="w-8 h-8 text-black" />
+            </div>
+            <h3 className="text-2xl font-black uppercase italic tracking-tighter text-black mb-4">HAPUS DAPUR INI?</h3>
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-8 leading-relaxed">
+              TINDAKAN INI BERSIFAT PERMANEN DAN TIDAK BISA DIBATALKAN. PASTIKAN TIDAK ADA OPERASIONAL AKTIF.
+            </p>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowDeleteConfirm(false);
-                    setDeleteTargetId(null);
-                  }}
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={() => handleDeleteDapur(deleteTargetId)}
-                  disabled={submitting}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
-                  {submitting ? "Menghapus..." : "Hapus"}
-                </button>
-              </div>
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={() => handleDeleteDapur(deleteTargetId)}
+                disabled={submitting}
+                className="w-full px-4 py-4 bg-red-600 text-white border-2 border-black hover:bg-red-700 transition-all font-black uppercase tracking-widest text-xs shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 disabled:opacity-50"
+              >
+                {submitting ? "MENGHAPUS..." : "YA, HAPUS PERMANEN"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteTargetId(null);
+                }}
+                className="w-full px-4 py-4 bg-white text-black border-2 border-black hover:bg-gray-100 transition-all font-black uppercase tracking-widest text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1"
+              >
+                KEMBALI AMAN
+              </button>
             </div>
           </div>
         </div>

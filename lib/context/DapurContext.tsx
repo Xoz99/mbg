@@ -90,13 +90,11 @@ export function DapurProvider({ children }: { children: ReactNode }) {
       const plannings = extractArray(planningRes.data || [])
       const allSekolahs = extractArray(sekolahRes?.data || [])
       
-      // ✅ Only show APPROVED schools on the dashboard
-      const approvedSekolahs = allSekolahs.filter(s => s.status === 'APPROVED')
-
       setMenuPlannings(plannings)
-      setSekolahList(approvedSekolahs)
+      const visibleSekolahs = allSekolahs.filter(s => s.status !== 'REJECTED')
+      setSekolahList(visibleSekolahs)
 
-      console.log(`✅ [DapurContext] Data loaded: ${plannings.length} plannings, ${approvedSekolahs.length}/${allSekolahs.length} approved sekolah`)
+      console.log(`✅ [DapurContext] Data loaded: ${plannings.length} plannings, ${visibleSekolahs.length} schools (excluding rejected)`)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load context data'
       setError(message)

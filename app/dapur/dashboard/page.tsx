@@ -250,7 +250,12 @@ const DashboardDapur = () => {
                         <div className="px-4 py-3">
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-gray-900 text-sm">{planning.sekolahNama}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-gray-900 text-sm">{planning.sekolahNama}</p>
+                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 border border-black rounded ${planning.linkStatus === 'APPROVED' ? 'bg-green-400 text-black' : 'bg-yellow-300 text-black'}`}>
+                                  {planning.linkStatus || 'PENDING'}
+                                </span>
+                              </div>
                               {!isExpanded && (
                                 <p className="text-xs text-gray-500 mt-0.5 truncate">{planning.sekolahAlamat}</p>
                               )}

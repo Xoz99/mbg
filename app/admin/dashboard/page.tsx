@@ -4,9 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { apiCache, generateCacheKey } from '@/lib/utils/cache';
-import {
-  Building2, Users, Truck, Loader2, AlertCircle, TrendingUp, MessageSquare
-} from 'lucide-react';
+// No icons used, staying minimalist with text and borders
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
@@ -274,84 +272,62 @@ const AdminDashboard = () => {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard Admin</h1>
-          <p className="text-gray-600 mt-1">Overview sistem MBG secara keseluruhan</p>
+          <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tighter">Admin Dashboard</h1>
+          <p className="text-gray-500 mt-1 text-[10px] font-bold uppercase tracking-widest italic">Ringkasan Sistem MBG Secara Keseluruhan</p>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-red-900">Error</p>
-              <p className="text-xs text-red-700 mt-1">{error}</p>
-            </div>
+          <div className="border-4 border-red-600 bg-red-50 p-6 flex flex-col gap-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-red-600">Terjadi Kesalahan</p>
+            <p className="text-xs text-red-700 font-bold italic underline">{error}</p>
           </div>
         )}
 
         {/* Main Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Total Dapur */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Dapur</p>
-                <p className="text-4xl font-bold text-gray-900 mt-2">{stats.totalDapur}</p>
-                <p className="text-xs text-gray-500 mt-2">
-                  {stats.dapurDenganPIC} dengan PIC
-                </p>
-              </div>
-              <div className="p-4 bg-blue-100 rounded-lg">
-                <Building2 className="w-8 h-8 text-blue-600" />
-              </div>
+          <div className="bg-white border-l-4 border-l-blue-600 border border-gray-200 p-6 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)] transition-all">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total Dapur</p>
+            <p className="text-5xl font-black text-gray-900 mt-2">{stats.totalDapur}</p>
+            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Status PIC</span>
+              <span className="text-[10px] font-black text-blue-600 uppercase tracking-tighter">{stats.dapurDenganPIC} TERDATA</span>
             </div>
           </div>
 
           {/* Total Sekolah */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Sekolah</p>
-                <p className="text-4xl font-bold text-gray-900 mt-2">{stats.totalSekolah}</p>
-                <p className="text-xs text-gray-500 mt-2">Terdaftar dalam sistem</p>
-              </div>
-              <div className="p-4 bg-green-100 rounded-lg">
-                <Users className="w-8 h-8 text-green-600" />
-              </div>
+          <div className="bg-white border-l-4 border-l-green-600 border border-gray-200 p-6 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)] transition-all">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total Sekolah</p>
+            <p className="text-5xl font-black text-gray-900 mt-2">{stats.totalSekolah}</p>
+            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Registrasi</span>
+              <span className="text-[10px] font-black text-green-600 uppercase tracking-tighter">AKTIF</span>
             </div>
           </div>
 
           {/* Total Driver + Karyawan */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Driver + Karyawan</p>
-                <p className="text-4xl font-bold text-gray-900 mt-2">{stats.totalDriver + stats.totalKaryawan}</p>
-                <p className="text-xs text-gray-500 mt-2">
-                  {stats.totalDriver} driver, {stats.totalKaryawan} karyawan
-                </p>
-              </div>
-              <div className="p-4 bg-purple-100 rounded-lg">
-                <Truck className="w-8 h-8 text-purple-600" />
-              </div>
+          <div className="bg-white border-l-4 border-l-purple-600 border border-gray-200 p-6 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)] transition-all">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total Driver + Karyawan</p>
+            <p className="text-5xl font-black text-gray-900 mt-2">{stats.totalDriver + stats.totalKaryawan}</p>
+            <div className="mt-4 pt-4 border-t border-gray-100 flex gap-4">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">DRIVERS: <span className="text-black">{stats.totalDriver}</span></span>
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">STAFF: <span className="text-black">{stats.totalKaryawan}</span></span>
             </div>
           </div>
         </div>
 
         {/* Warning - Dapur Tanpa PIC */}
         {stats.dapurTanpaPIC > 0 && (
-          <div className="bg-yellow-50 rounded-lg shadow-sm border border-yellow-200 p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-yellow-100 rounded-lg flex-shrink-0">
-                <AlertCircle className="w-6 h-6 text-yellow-600" />
+          <div className="bg-white border-2 border-red-600 p-6 shadow-[8px_8px_0px_0px_rgba(220,38,38,1)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-600 mb-1">PERHATIAN: TINDAKAN DIPERLUKAN</p>
+                <p className="text-2xl font-black text-gray-900 uppercase tracking-tighter">{stats.dapurTanpaPIC} Dapur Belum Memiliki PIC</p>
+                <p className="text-[10px] text-gray-500 mt-2 font-bold uppercase tracking-widest italic">Segera tentukan PIC untuk mengelola operasional dapur.</p>
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-yellow-800">⚠️ Dapur Tanpa PIC</p>
-                <p className="text-2xl font-bold text-yellow-900">{stats.dapurTanpaPIC} dapur</p>
-                <p className="text-sm text-yellow-700 mt-1">Segera ditunjukkan PIC untuk mengelola dapur</p>
-              </div>
-              <div className="flex-shrink-0">
-                <TrendingUp className="w-8 h-8 text-yellow-400" />
+              <div className="px-4 py-2 border-2 border-red-600 text-red-600 font-black italic uppercase text-xs animate-pulse">
+                URGENT
               </div>
             </div>
           </div>
@@ -359,133 +335,95 @@ const AdminDashboard = () => {
 
         {/* Quick Actions */}
         <div>
-          <h3 className="font-semibold text-gray-900 mb-4">Aksi Cepat</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 border-b border-gray-100 pb-2">Aksi Akses Cepat</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
             {/* Register PIC Dapur */}
             <a
               href="/admin/register-pic"
-              className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-blue-300 transition-all group"
+              className="bg-white border-2 border-black p-5 hover:bg-black group transition-all"
             >
-              <div className="p-3 bg-blue-100 rounded-lg mb-3 w-fit group-hover:bg-blue-200 transition-colors">
-                <Building2 className="w-5 h-5 text-blue-600" />
-              </div>
-              <p className="text-sm font-semibold text-gray-900">Register PIC Dapur</p>
-              <p className="text-xs text-gray-500 mt-1">Tambah PIC baru</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-gray-500 mb-2">REGISTRASI</p>
+              <p className="text-sm font-black text-gray-900 group-hover:text-white uppercase tracking-tighter">PIC Dapur</p>
             </a>
 
             {/* Register PIC Sekolah */}
             <a
               href="/admin/register-pic-sekolah"
-              className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-green-300 transition-all group"
+              className="bg-white border-2 border-black p-5 hover:bg-black group transition-all"
             >
-              <div className="p-3 bg-green-100 rounded-lg mb-3 w-fit group-hover:bg-green-200 transition-colors">
-                <Users className="w-5 h-5 text-green-600" />
-              </div>
-              <p className="text-sm font-semibold text-gray-900">Register PIC Sekolah</p>
-              <p className="text-xs text-gray-500 mt-1">Tambah PIC baru</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-gray-500 mb-2">REGISTRASI</p>
+              <p className="text-sm font-black text-gray-900 group-hover:text-white uppercase tracking-tighter">PIC Sekolah</p>
             </a>
 
             {/* User Management */}
             <a
               href="/admin/user"
-              className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-purple-300 transition-all group"
+              className="bg-white border-2 border-black p-5 hover:bg-black group transition-all"
             >
-              <div className="p-3 bg-purple-100 rounded-lg mb-3 w-fit group-hover:bg-purple-200 transition-colors">
-                <Users className="w-5 h-5 text-purple-600" />
-              </div>
-              <p className="text-sm font-semibold text-gray-900">User Management</p>
-              <p className="text-xs text-gray-500 mt-1">Kelola pengguna</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-gray-500 mb-2">MANAGEMENT</p>
+              <p className="text-sm font-black text-gray-900 group-hover:text-white uppercase tracking-tighter">User List</p>
             </a>
 
             {/* Manajemen Dapur */}
             <a
               href="/admin/dapur"
-              className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-orange-300 transition-all group"
+              className="bg-white border-2 border-black p-5 hover:bg-black group transition-all"
             >
-              <div className="p-3 bg-orange-100 rounded-lg mb-3 w-fit group-hover:bg-orange-200 transition-colors">
-                <Building2 className="w-5 h-5 text-orange-600" />
-              </div>
-              <p className="text-sm font-semibold text-gray-900">Manajemen Dapur</p>
-              <p className="text-xs text-gray-500 mt-1">Lihat semua dapur</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-gray-500 mb-2">DRAFTER</p>
+              <p className="text-sm font-black text-gray-900 group-hover:text-white uppercase tracking-tighter">Kelola Dapur</p>
             </a>
 
             {/* Manajemen Sekolah */}
             <a
               href="/admin/sekolah"
-              className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-indigo-300 transition-all group"
+              className="bg-white border-2 border-black p-5 hover:bg-black group transition-all"
             >
-              <div className="p-3 bg-indigo-100 rounded-lg mb-3 w-fit group-hover:bg-indigo-200 transition-colors">
-                <Users className="w-5 h-5 text-indigo-600" />
-              </div>
-              <p className="text-sm font-semibold text-gray-900">Manajemen Sekolah</p>
-              <p className="text-xs text-gray-500 mt-1">Lihat semua sekolah</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-gray-500 mb-2">DRAFTER</p>
+              <p className="text-sm font-black text-gray-900 group-hover:text-white uppercase tracking-tighter">Kelola Sekolah</p>
             </a>
 
             {/* Laporan Tiketing */}
             <a
               href="/admin/tickets"
-              className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-red-300 transition-all group"
+              className="bg-white border-2 border-black p-5 hover:bg-black group transition-all"
             >
-              <div className="p-3 bg-red-100 rounded-lg mb-3 w-fit group-hover:bg-red-200 transition-colors">
-                <MessageSquare className="w-5 h-5 text-red-600" />
-              </div>
-              <p className="text-sm font-semibold text-gray-900">Laporan Tiketing</p>
-              <p className="text-xs text-gray-500 mt-1">Lihat semua tickets</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-gray-500 mb-2">HELPDESK</p>
+              <p className="text-sm font-black text-gray-900 group-hover:text-white uppercase tracking-tighter">Tickets</p>
             </a>
 
-            {/* Dapur Ke Sekolah */}
-            <a
-              href="/admin/LinkDapurSekolah"
-              className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-cyan-300 transition-all group"
-            >
-              <div className="p-3 bg-cyan-100 rounded-lg mb-3 w-fit group-hover:bg-cyan-200 transition-colors">
-                <Truck className="w-5 h-5 text-cyan-600" />
-              </div>
-              <p className="text-sm font-semibold text-gray-900">Dapur Ke Sekolah</p>
-              <p className="text-xs text-gray-500 mt-1">Link dapur & sekolah</p>
-            </a>
+
 
             {/* Pengaturan Sistem */}
             <a
               href="/admin/settings"
-              className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-gray-300 transition-all group"
+              className="bg-white border-2 border-black p-5 hover:bg-black group transition-all"
             >
-              <div className="p-3 bg-gray-100 rounded-lg mb-3 w-fit group-hover:bg-gray-200 transition-colors">
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <p className="text-sm font-semibold text-gray-900">Pengaturan Sistem</p>
-              <p className="text-xs text-gray-500 mt-1">Konfigurasi sistem</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-gray-500 mb-2">PREFERENCE</p>
+              <p className="text-sm font-black text-gray-900 group-hover:text-white uppercase tracking-tighter">Settings</p>
             </a>
           </div>
         </div>
 
         {/* Recent Tickets Carousel */}
         {recentTickets.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 bg-gray-50">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-gray-600" />
-                <h3 className="font-semibold text-gray-900">Tickets Terbaru</h3>
-                <span className="ml-auto text-xs text-gray-500">
-                  {currentTicketIndex + 1} / {recentTickets.length}
-                </span>
+          <div className="bg-white border-2 border-black overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] mt-8">
+            <div className="p-6 border-b-2 border-black bg-gray-50 flex items-center justify-between">
+              <div>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-black">Tickets Terbaru</h3>
               </div>
+              <span className="text-[10px] font-black uppercase tracking-tighter text-gray-400 italic">
+                Active Queue: {currentTicketIndex + 1} / {recentTickets.length}
+              </span>
             </div>
 
             {/* Carousel Container */}
             <div className="relative overflow-hidden">
-              {/* Tickets */}
               <div className="relative h-48">
                 {recentTickets.map((ticket, index) => {
                   const createdDate = new Date(ticket.createdAt).toLocaleDateString('id-ID', {
                     year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
+                    month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
                   });
 
                   const isActive = index === currentTicketIndex;
@@ -493,79 +431,50 @@ const AdminDashboard = () => {
                   return (
                     <div
                       key={ticket.id}
-                      className={`absolute inset-0 p-6 transition-all duration-500 ease-in-out ${
-                        isActive
-                          ? 'opacity-100 translate-x-0'
-                          : index < currentTicketIndex
+                      className={`absolute inset-0 p-8 transition-all duration-700 ease-in-out ${isActive
+                        ? 'opacity-100 translate-x-0'
+                        : index < currentTicketIndex
                           ? 'opacity-0 -translate-x-full'
                           : 'opacity-0 translate-x-full'
-                      }`}
+                        }`}
                     >
-                      <div className="flex items-start gap-4 h-full">
-                        <div className="p-3 bg-blue-100 rounded-lg flex-shrink-0 h-fit">
-                          <MessageSquare className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div className="flex-1 min-w-0 flex flex-col">
-                          <p className="font-semibold text-gray-900 line-clamp-1">{ticket.judul}</p>
-                          <p className="text-gray-600 text-sm mt-1 line-clamp-3 flex-1">{ticket.deskripsi}</p>
-                          <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-gray-200">
-                            <span className="truncate">{ticket.user.name}</span>
-                            <span className="flex-shrink-0 ml-2">{createdDate}</span>
-                          </div>
-                        </div>
+                      <div className="flex flex-col h-full border-l-4 border-l-black pl-6">
+                        <p className="text-[9px] font-black uppercase tracking-tighter text-gray-400 mb-1">{createdDate} | FROM: {ticket.user.name}</p>
+                        <p className="font-black text-gray-900 uppercase tracking-tighter text-lg line-clamp-1">{ticket.judul}</p>
+                        <p className="text-gray-500 text-xs mt-2 line-clamp-2 italic font-medium">{ticket.deskripsi}</p>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Navigation Arrows */}
-              <button
-                onClick={() =>
-                  setCurrentTicketIndex(
-                    (prev) => (prev - 1 + recentTickets.length) % recentTickets.length
-                  )
-                }
-                className="absolute left-3 top-1/2 -translate-y-1/2 z-10 p-2 bg-white/80 hover:bg-white rounded-lg shadow-md transition-all"
-              >
-                <svg
-                  className="w-5 h-5 text-gray-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              {/* Navigation */}
+              <div className="absolute right-6 bottom-6 flex gap-2">
+                <button
+                  onClick={() =>
+                    setCurrentTicketIndex(
+                      (prev) => (prev - 1 + recentTickets.length) % recentTickets.length
+                    )
+                  }
+                  className="px-3 py-1 bg-white border border-black text-[9px] font-black tracking-widest hover:bg-black hover:text-white transition-all uppercase"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setCurrentTicketIndex((prev) => (prev + 1) % recentTickets.length)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-2 bg-white/80 hover:bg-white rounded-lg shadow-md transition-all"
-              >
-                <svg
-                  className="w-5 h-5 text-gray-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                  PREV
+                </button>
+                <button
+                  onClick={() => setCurrentTicketIndex((prev) => (prev + 1) % recentTickets.length)}
+                  className="px-3 py-1 bg-white border border-black text-[9px] font-black tracking-widest hover:bg-black hover:text-white transition-all uppercase"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+                  NEXT
+                </button>
+              </div>
             </div>
 
-            {/* Pagination Dots */}
-            <div className="pt-3 flex items-center justify-center gap-2 border-t border-gray-200 bg-gray-50">
-              {recentTickets.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentTicketIndex(index)}
-                  className={`transition-all ${
-                    index === currentTicketIndex
-                      ? 'w-8 h-2 bg-blue-600 rounded-full'
-                      : 'w-2 h-2 bg-gray-300 rounded-full hover:bg-gray-400'
-                  }`}
-                  aria-label={`Go to ticket ${index + 1}`}
-                />
-              ))}
+            {/* Progress Bar */}
+            <div className="h-1 bg-gray-100 w-full overflow-hidden">
+               <div 
+                 className="h-full bg-black transition-all duration-500" 
+                 style={{ width: `${((currentTicketIndex + 1) / recentTickets.length) * 100}%` }}
+               ></div>
             </div>
           </div>
         )}
