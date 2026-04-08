@@ -654,12 +654,11 @@ const DapurMapDashboard = () => {
         return {
           ...d,
           pic: d.picDapur && d.picDapur.length > 0 ? d.picDapur[0] : undefined,
-          karyawan: totalKaryawan,
-          stok: d._count?.stokBahanBaku || 0,
+          karyawanList: d.karyawan || [],
+          totalKaryawan,
+          totalStok: totalStokKg || d._count?.stokBahanBaku || 0,
           sekolah: d.sekolahDilayani || [],
           totalSekolah,
-          totalKaryawan,
-          totalStokKg,
           totalBebanSiswa,
           readinessScore,
           readinessStatus,
@@ -942,7 +941,7 @@ const DapurMapDashboard = () => {
       totalDapur: dapur.length,
       totalPIC: dapur.filter(d => d.pic).length,
       totalDriver: dapur.reduce((sum, d) => sum + (d.drivers?.length || 0), 0),
-      totalKaryawan: dapur.reduce((sum, d) => sum + (d.karyawan?.length || 0), 0),
+      totalKaryawan: dapur.reduce((sum, d) => sum + (d.totalKaryawan || 0), 0),
     };
   }, [dapur]);
 
@@ -1315,17 +1314,17 @@ const DapurMapDashboard = () => {
               <div className="grid md:grid-cols-3 gap-0 border-4 border-black">
                 <div className="bg-orange-400 p-6 border-b-4 md:border-b-0 md:border-r-4 border-black">
                   <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Drivers</p>
-                  <p className="text-4xl font-black text-black">{selectedDapur.drivers?.length || 0}</p>
+                  <p className="text-4xl font-black text-black">{(selectedDapur as any).drivers?.length || 0}</p>
                 </div>
 
                 <div className="bg-purple-400 p-6 border-b-4 md:border-b-0 md:border-r-4 border-black">
                   <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Karyawan</p>
-                  <p className="text-4xl font-black text-black">{selectedDapur.karyawan?.length || 0}</p>
+                  <p className="text-4xl font-black text-black">{(selectedDapur as any).totalKaryawan || 0}</p>
                 </div>
 
                 <div className="bg-blue-400 p-6">
                   <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Stok Bahan</p>
-                  <p className="text-4xl font-black text-black">{selectedDapur.stok?.length || 0}</p>
+                  <p className="text-4xl font-black text-black">{(selectedDapur as any).totalStok || 0}</p>
                 </div>
               </div>
 
