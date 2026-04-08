@@ -64,21 +64,23 @@ const AdminTickets = () => {
     const isFetchingRef = useRef(false);
 
     useEffect(() => {
-        const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
-        const userData = localStorage.getItem('mbg_user');
-        if (!token || !userData) {
-            router.push('/auth/login');
-            return;
-        }
-        try {
-            const user = JSON.parse(userData);
-            if (user.role !== 'SUPERADMIN' && user.role !== 'ADMIN') {
-                router.push('/admin/dashboard');
+        if (typeof window !== 'undefined') {
+            const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
+            const userData = localStorage.getItem('mbg_user');
+            if (!token || !userData) {
+                router.push('/auth/login');
                 return;
             }
-            setAuthToken(token);
-        } catch (err) {
-            router.push('/auth/login');
+            try {
+                const user = JSON.parse(userData);
+                if (user.role !== 'SUPERADMIN' && user.role !== 'ADMIN') {
+                    router.push('/admin/dashboard');
+                    return;
+                }
+                setAuthToken(token);
+            } catch (err) {
+                router.push('/auth/login');
+            }
         }
     }, [router]);
 

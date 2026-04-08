@@ -49,13 +49,14 @@ const AdminDashboard = () => {
   const lastLoadTimeRef = useRef<number>(0); // ✅ Track last load time untuk smart refresh
 
   useEffect(() => {
-    const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
-    const userData = localStorage.getItem('mbg_user');
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
+      const userData = localStorage.getItem('mbg_user');
 
-    if (!token || !userData) {
-      router.push('/auth/login');
-      return;
-    }
+      if (!token || !userData) {
+        router.push('/auth/login');
+        return;
+      }
 
     try {
       const user = JSON.parse(userData);
@@ -66,9 +67,10 @@ const AdminDashboard = () => {
         return;
       }
 
-      setAuthToken(token);
-    } catch (err) {
-      router.push('/auth/login');
+        setAuthToken(token);
+      } catch (err) {
+        router.push('/auth/login');
+      }
     }
   }, [router]);
 

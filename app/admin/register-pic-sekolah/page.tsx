@@ -54,25 +54,27 @@ const RegisterPICSekolahPage = () => {
   };
 
   useEffect(() => {
-    const userData = localStorage.getItem('mbg_user');
-    const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
+    if (typeof window !== 'undefined') {
+      const userData = localStorage.getItem('mbg_user');
+      const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
 
-    if (!userData || !token) {
-        router.push('/auth/login');
-        return;
-    }
+      if (!userData || !token) {
+          router.push('/auth/login');
+          return;
+      }
 
-    try {
-        const user = JSON.parse(userData);
-        if ((user.role || user.routeRole) !== 'SUPERADMIN') {
-            router.push('/auth/login');
-            return;
-        }
-        setAuthToken(token);
-        fetchSekolah(token);
-        fetchSekolahList(token);
-    } catch (err) {
-        router.push('/auth/login');
+      try {
+          const user = JSON.parse(userData);
+          if ((user.role || user.routeRole) !== 'SUPERADMIN') {
+              router.push('/auth/login');
+              return;
+          }
+          setAuthToken(token);
+          fetchSekolah(token);
+          fetchSekolahList(token);
+      } catch (err) {
+          router.push('/auth/login');
+      }
     }
   }, [router]);
 

@@ -560,26 +560,28 @@ const DapurMapDashboard = () => {
   }, [dapur, searchQuery, isMapReady]);
 
   useEffect(() => {
-    const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
-    const userData = localStorage.getItem('mbg_user');
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
+      const userData = localStorage.getItem('mbg_user');
 
-    if (!token || !userData) {
-      router.push('/auth/login');
-      return;
-    }
-
-    try {
-      const user = JSON.parse(userData);
-      const role = user.role || user.routeRole;
-      
-      if (role !== 'SUPERADMIN') {
+      if (!token || !userData) {
         router.push('/auth/login');
         return;
       }
 
-      setAuthToken(token);
-    } catch (err) {
-      router.push('/auth/login');
+      try {
+        const user = JSON.parse(userData);
+        const role = user.role || user.routeRole;
+        
+        if (role !== 'SUPERADMIN') {
+          router.push('/auth/login');
+          return;
+        }
+
+        setAuthToken(token);
+      } catch (err) {
+        router.push('/auth/login');
+      }
     }
   }, [router]);
 

@@ -242,22 +242,24 @@ const AdminLayout = ({ children, currentPage }: AdminLayoutProps) => {
   const [userInfo, setUserInfo] = useState({ name: 'Admin', role: 'SUPERADMIN' });
 
   useEffect(() => {
-    const userData = localStorage.getItem('mbg_user');
-    const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
+    if (typeof window !== 'undefined') {
+      const userData = localStorage.getItem('mbg_user');
+      const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
 
-    if (!userData || !token) {
-      router.push('/auth/login');
-      return;
-    }
+      if (!userData || !token) {
+        router.push('/auth/login');
+        return;
+      }
 
-    try {
-      const user = JSON.parse(userData);
-      setUserInfo({
-        name: user.name || 'Admin',
-        role: (user.role || user.routeRole || 'SUPERADMIN').toUpperCase()
-      });
-    } catch (error) {
-      router.push('/auth/login');
+      try {
+        const user = JSON.parse(userData);
+        setUserInfo({
+          name: user.name || 'Admin',
+          role: (user.role || user.routeRole || 'SUPERADMIN').toUpperCase()
+        });
+      } catch (error) {
+        router.push('/auth/login');
+      }
     }
   }, [router]);
 
@@ -500,7 +502,7 @@ const AdminLayout = ({ children, currentPage }: AdminLayoutProps) => {
       {/* BubbleReport */}
       <BubbleReport
         apiBaseUrl={API_BASE_URL}
-        authToken={localStorage.getItem('mbg_token') || ""}
+        authToken=""
       />
     </div>
   );

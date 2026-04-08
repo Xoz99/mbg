@@ -85,24 +85,26 @@ const UserManagement = () => {
 
   // Auth check
   useEffect(() => {
-    const userData = localStorage.getItem('mbg_user');
-    const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
+    if (typeof window !== 'undefined') {
+      const userData = localStorage.getItem('mbg_user');
+      const token = localStorage.getItem('mbg_token') || localStorage.getItem('authToken');
 
-    if (!userData || !token) {
-      router.push('/auth/login');
-      return;
-    }
-
-    try {
-      const user = JSON.parse(userData);
-      const role = user.role || user.routeRole;
-      if (role !== 'SUPERADMIN') {
+      if (!userData || !token) {
         router.push('/auth/login');
         return;
       }
-      setAuthToken(token);
-    } catch (err) {
-      router.push('/auth/login');
+
+      try {
+        const user = JSON.parse(userData);
+        const role = user.role || user.routeRole;
+        if (role !== 'SUPERADMIN') {
+          router.push('/auth/login');
+          return;
+        }
+        setAuthToken(token);
+      } catch (err) {
+        router.push('/auth/login');
+      }
     }
   }, [router]);
 
