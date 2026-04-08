@@ -9,6 +9,7 @@ import {
   Loader2, CheckCircle, MapPinIcon, X, Navigation,
   Maximize2, Minimize2
 } from 'lucide-react';
+import Skeleton from '@/components/ui/Skeleton';
 import 'leaflet/dist/leaflet.css';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
@@ -34,6 +35,7 @@ interface Dapur {
   totalSekolah?: number;
   totalKaryawan?: number;
   totalStokKg?: number;
+  totalStok?: number;
   totalBebanSiswa?: number;
   readinessScore?: number;
   readinessStatus?: 'OPTIMAL' | 'WARNING' | 'CRITICAL';
@@ -59,6 +61,7 @@ const DapurMapDashboard = () => {
   const selectedProvinceLayerRef = useRef<any>(null);
   const [dapur, setDapur] = useState<Dapur[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -656,12 +659,12 @@ const DapurMapDashboard = () => {
           pic: d.picDapur && d.picDapur.length > 0 ? d.picDapur[0] : undefined,
           karyawanList: d.karyawan || [],
           totalKaryawan,
-          totalStok: totalStokKg || d._count?.stokBahanBaku || 0,
+          totalMenu: d._count?.menus || 1, // Placeholder for Menu
           sekolah: d.sekolahDilayani || [],
           totalSekolah,
           totalBebanSiswa,
-          readinessScore,
-          readinessStatus,
+          readinessScore: 100,
+          readinessStatus: 'OPTIMAL', // Gacor request: All Blue
           province: (typeof d.province === 'object' && d.province?.name)
             ? d.province.name
             : (typeof d.provinces === 'object' && d.provinces?.name)
@@ -805,6 +808,7 @@ const DapurMapDashboard = () => {
       }
 
       // BACKGROUND REFRESH
+      setLoadingDetail(true);
       const response = await fetch(`${API_BASE_URL}/api/dapur/${dapurId}`, {
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -831,18 +835,63 @@ const DapurMapDashboard = () => {
           }))
       };
       
-      // Merge with our precalculated stats
+      // Merge with our precalculated stats from list
       if (cached) {
-          detail.readinessScore = cached.readinessScore;
-          detail.readinessStatus = cached.readinessStatus;
+          detail.readinessScore = 100;
+          detail.readinessStatus = 'OPTIMAL';
           detail.totalBebanSiswa = cached.totalBebanSiswa;
-          detail.totalStokKg = cached.totalStokKg;
+          (detail as any).totalKaryawan = cached.totalKaryawan;
+          
+          // Super-aggressive deep search for menu
+          const jktToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+          
+          let allMenus: any[] = [];
+          
+          // Level 1: Check top-level planning properties
+          const topPlannings = detailRaw.menuPlanningData || detailRaw.menuPlannings || detailRaw.menuPlanning || [];
+          if (Array.isArray(topPlannings)) {
+              topPlannings.forEach((p: any) => {
+                  const menus = p.menuHarian || p.menus || [];
+                  if (Array.isArray(menus)) allMenus.push(...menus);
+              });
+          }
+          
+          // Level 2: Check deep nested school relations (Dapur -> SekolahDilayani -> Sekolah -> MenuPlannings)
+          const schools = detailRaw.sekolahDilayani || detailRaw.sekolah || [];
+          if (Array.isArray(schools)) {
+              schools.forEach((s: any) => {
+                  const targetSekolah = s.sekolah || s;
+                  const sPlannings = targetSekolah.menuPlannings || targetSekolah.menuPlanning || [];
+                  if (Array.isArray(sPlannings)) {
+                      sPlannings.forEach((p: any) => {
+                          const menus = p.menuHarian || p.menus || [];
+                          if (Array.isArray(menus)) allMenus.push(...menus);
+                      });
+                  }
+              });
+          }
+
+          // Level 3: Search for any direct menuHarian just in case
+          if (Array.isArray(detailRaw.menuHarian)) {
+              allMenus.push(...detailRaw.menuHarian);
+          }
+
+          const currentMenu = allMenus.find((m: any) => {
+              if (!m.tanggal) return false;
+              const mDate = new Date(m.tanggal).toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+              return mDate === jktToday;
+          }) || allMenus[0];
+
+          (detail as any).namaMenu = currentMenu?.namaMenu || null;
+          (detail as any).totalMenu = allMenus.length;
       }
       
       setSelectedDapur(detail);
-      setShowDetailModal(true);
+      // Only set to true at the very beginning to avoid popping back up after closing
     } catch (err: any) {
       showToast('error', 'Gagal mengambil detail dapur: ' + err.message);
+    } finally {
+      setLoadingDetail(false);
     }
   }, [authToken, dapur]);
 
@@ -1311,20 +1360,43 @@ const DapurMapDashboard = () => {
               </div>
 
               {/* Resources */}
-              <div className="grid md:grid-cols-3 gap-0 border-4 border-black">
-                <div className="bg-orange-400 p-6 border-b-4 md:border-b-0 md:border-r-4 border-black">
-                  <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Drivers</p>
-                  <p className="text-4xl font-black text-black">{(selectedDapur as any).drivers?.length || 0}</p>
-                </div>
+              <div className="relative border-4 border-black overflow-hidden">
+                {/* Gacor Loading Bar */}
+                {loadingDetail && (
+                  <div className="absolute top-0 left-0 right-0 h-1 z-20 overflow-hidden">
+                    <div className="h-full bg-white animate-loading-bar" 
+                         style={{ 
+                           width: '40%', 
+                           boxShadow: '0 0 10px white' 
+                         }} 
+                    />
+                  </div>
+                )}
+                
+                <div className="grid md:grid-cols-3 gap-0">
+                  <div className="bg-orange-400 p-6 border-b-4 md:border-b-0 md:border-r-4 border-black relative overflow-hidden">
+                    {loadingDetail && <div className="absolute inset-0 bg-white/10 animate-pulse pointer-events-none" />}
+                    <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Drivers</p>
+                    <p className="text-4xl font-black text-black">{(selectedDapur as any).drivers?.length || 0}</p>
+                  </div>
 
-                <div className="bg-purple-400 p-6 border-b-4 md:border-b-0 md:border-r-4 border-black">
-                  <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Karyawan</p>
-                  <p className="text-4xl font-black text-black">{(selectedDapur as any).totalKaryawan || 0}</p>
-                </div>
+                  <div className="bg-purple-400 p-6 border-b-4 md:border-b-0 md:border-r-4 border-black relative overflow-hidden">
+                    {loadingDetail && <div className="absolute inset-0 bg-white/10 animate-pulse pointer-events-none" />}
+                    <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Karyawan</p>
+                    <p className="text-4xl font-black text-black">{(selectedDapur as any).totalKaryawan || 0}</p>
+                  </div>
 
-                <div className="bg-blue-400 p-6">
-                  <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Stok Bahan</p>
-                  <p className="text-4xl font-black text-black">{(selectedDapur as any).totalStok || 0}</p>
+                  <div className="bg-blue-400 p-6 relative overflow-hidden">
+                    {loadingDetail && <div className="absolute inset-0 bg-white/10 animate-pulse pointer-events-none" />}
+                    <p className="text-[10px] text-black font-black uppercase tracking-widest mb-1 italic">Menu Hari Ini</p>
+                    <p className="text-xl font-black text-black leading-tight uppercase italic break-words">
+                      {(selectedDapur as any).namaMenu 
+                        ? (selectedDapur as any).namaMenu 
+                        : loadingDetail 
+                          ? "SINKRONISASI..." 
+                          : "BELUM ADA MENU"}
+                    </p>
+                  </div>
                 </div>
               </div>
 
