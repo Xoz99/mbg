@@ -997,10 +997,19 @@ const AbsensiPenerima = () => {
                 </div>
 
                 {/* Instruction */}
-                <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
+                <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-3 w-full">
                   <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
                     {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
                   </div>
+                  
+                  {!faceDetected && (
+                    <button 
+                      onClick={(e) => { e.preventDefault(); capturePhoto(); }}
+                      className="bg-white/20 hover:bg-white/30 backdrop-blur text-white px-4 py-2 rounded-lg text-xs font-bold transition-all border border-white/30 pointer-events-auto"
+                    >
+                      Ambil Foto Manual
+                    </button>
+                  )}
                 </div>
               </div>
             </>
@@ -1427,25 +1436,35 @@ const AbsensiPenerima = () => {
             )}
           </div>
 
-          {/* Switch Camera Button - Floating */}
-          {availableCameras.length > 1 && (
-            <button
-              onClick={() => {
-                const currentIndex = availableCameras.findIndex((cam) => cam.deviceId === selectedCameraId)
-                const nextIndex = (currentIndex + 1) % availableCameras.length
-                const nextCamera = availableCameras[nextIndex]
-                setSelectedCameraId(nextCamera.deviceId)
-                stopCamera(true) // Keep preparation countdown running
-                setTimeout(() => {
-                  startCamera("environment", nextCamera.deviceId)
-                }, 100)
-              }}
-              className="absolute bottom-6 right-6 bg-black/60 hover:bg-black/80 backdrop-blur text-white px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all border border-gray-600"
+          {/* Bottom Controls */}
+          <div className="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-4 px-6">
+            <button 
+              onClick={(e) => { e.preventDefault(); capturePhoto(); }}
+              className="bg-[#1B263A] hover:bg-[#2A3749] text-white px-6 py-3 rounded-xl text-sm font-bold shadow-xl transition-all flex items-center gap-2 pointer-events-auto"
             >
-              <RefreshCw className="w-4 h-4" />
-              Ganti Kamera
+              <Camera className="w-4 h-4" />
+              Ambil Foto Manual
             </button>
-          )}
+
+            {availableCameras.length > 1 && (
+              <button
+                onClick={() => {
+                  const currentIndex = availableCameras.findIndex((cam) => cam.deviceId === selectedCameraId)
+                  const nextIndex = (currentIndex + 1) % availableCameras.length
+                  const nextCamera = availableCameras[nextIndex]
+                  setSelectedCameraId(nextCamera.deviceId)
+                  stopCamera(true) // Keep preparation countdown running
+                  setTimeout(() => {
+                    startCamera("environment", nextCamera.deviceId)
+                  }, 100)
+                }}
+                className="bg-white hover:bg-gray-50 text-[#1B263A] px-4 py-3 rounded-xl text-xs font-bold transition-all border border-gray-200 shadow-xl pointer-events-auto flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Ganti Kamera
+              </button>
+            )}
+          </div>
         </div>
   </div>
   )
