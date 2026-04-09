@@ -1,21 +1,28 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import SekolahLayout from "@/components/layout/SekolahLayout"
-import { AlertCircle, CheckCircle2, Loader, Sparkles, XCircle, Camera, RefreshCw, Nfc } from "lucide-react"
+import { useSekolahDataCache } from "@/lib/hooks/useSekolahDataCache"
+import { AlertCircle, CheckCircle, CheckCircle2, Loader, Sparkles, XCircle, Camera, RefreshCw, Nfc, User, Users, School } from "lucide-react"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 const PengembalianMakanan = () => {
   const [authToken, setAuthToken] = useState("")
+  const [sekolahId, setSekolahId] = useState("")
   const [credentialsReady, setCredentialsReady] = useState(false)
+
+  // Cache data state
+  const [siswaData, setSiswaData] = useState<Array<any>>([])
+  const [kelasData, setKelasData] = useState<Array<any>>([])
+  const [loading, setLoading] = useState(true)
 
   // Step management
   const [step, setStep] = useState<"camera-face" | "processing-face" | "rfid-scan" | "camera-food" | "keterangan" | "submitting" | "result">("camera-face")
 
   // Face detection
   const [faceDetected, setFaceDetected] = useState(false)
-  const [countdown, setCountdown] = useState(3)
+  const [countdown, setCountdown] = useState(5)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
   const [facePhoto, setFacePhoto] = useState<string | null>(null)
@@ -25,7 +32,7 @@ const PengembalianMakanan = () => {
   // Food detection
   const [foodConditionOk, setFoodConditionOk] = useState(false)
   const [foodCondition, setFoodCondition] = useState<string>("")
-  const [foodCountdown, setFoodCountdown] = useState(3)
+  const [foodCountdown, setFoodCountdown] = useState(5)
   const [isFoodCountdownActive, setIsFoodCountdownActive] = useState(false)
   const [isPreparationActive, setIsPreparationActive] = useState(false)
   const [preparationCountdown, setPreparationCountdown] = useState(5)
@@ -78,6 +85,7 @@ const PengembalianMakanan = () => {
 
     if (schoolId) {
       setAuthToken(token)
+      setSekolahId(schoolId)
       setCredentialsReady(true)
       return
     }
@@ -86,6 +94,7 @@ const PengembalianMakanan = () => {
       const newSchoolId = localStorage.getItem("sekolahId")
       if (newSchoolId) {
         setAuthToken(token)
+        setSekolahId(newSchoolId)
         clearInterval(pollInterval)
         setCredentialsReady(true)
       }
@@ -101,6 +110,61 @@ const PengembalianMakanan = () => {
       clearTimeout(timeout)
     }
   }, [credentialsReady])
+
+  // Data Loading Logic
+  const handleCacheUpdate = useCallback((cachedData: any) => {
+    setSiswaData(cachedData.siswaData || [])
+    setKelasData(cachedData.kelasData || [])
+  }, [])
+
+  const { loadData } = useSekolahDataCache(handleCacheUpdate)
+  const hasInitialized = useRef(false)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!credentialsReady || !authToken || !sekolahId || hasInitialized.current) return
+
+    const fetchAllData = async () => {
+      try {
+        hasInitialized.current = true
+        const cachedData = await loadData(sekolahId, authToken)
+        if (cachedData) {
+          setSiswaData(cachedData.siswaData || [])
+          setKelasData(cachedData.kelasData || [])
+          setError(null)
+        }
+      } catch (err) {
+        console.error("Error loading data:", err)
+        setError(err instanceof Error ? err.message : "Gagal mengambil data")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    setLoading(true)
+    fetchAllData()
+  }, [credentialsReady, authToken, sekolahId, loadData])
+
+  const stats = useMemo(() => {
+    const total = siswaData.length
+    const lakiLaki = siswaData.filter((s) => s.jenisKelamin === "LAKI_LAKI").length
+    const perempuan = siswaData.filter((s) => s.jenisKelamin === "PEREMPUAN").length
+    const uniqueKelas = new Set(siswaData.map((s) => s.kelas).filter((k) => k))
+    const totalKelas = uniqueKelas.size
+
+    return { total, lakiLaki, perempuan, totalKelas }
+  }, [siswaData])
+
+  const StatCard = ({ title, value, subtitle, icon: Icon, color }: any) => (
+    <div className="py-1">
+      <div className="flex items-center gap-2 mb-0.5">
+        <Icon className={`w-3 h-3 ${color}`} />
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
+      </div>
+      <p className="text-lg font-bold text-gray-900 mb-0">{value}</p>
+      <p className="text-[10px] text-gray-400">{subtitle}</p>
+    </div>
+  )
 
   // Enumerate cameras on mount
   useEffect(() => {
@@ -152,7 +216,7 @@ const PengembalianMakanan = () => {
       clearInterval(countdownIntervalRef.current)
       countdownIntervalRef.current = null
     }
-    setCountdown(3)
+    setCountdown(5)
   }, [])
 
   const stopFaceDetection = useCallback(() => {
@@ -170,7 +234,7 @@ const PengembalianMakanan = () => {
       foodCountdownIntervalRef.current = null
     }
     setIsFoodCountdownActive(false)
-    setFoodCountdown(3)
+    setFoodCountdown(5)
   }, [])
 
   const stopFoodDetection = useCallback(() => {
@@ -229,8 +293,8 @@ const PengembalianMakanan = () => {
   }, [step, stopCamera])
 
   const startCountdown = useCallback(() => {
-    setCountdown(2)
-    let count = 2
+    setCountdown(5)
+    let count = 5
     countdownIntervalRef.current = setInterval(() => {
       count -= 1
       setCountdown(count)
@@ -238,7 +302,7 @@ const PengembalianMakanan = () => {
         stopCountdown()
         capturePhoto()
       }
-    }, 500)
+    }, 1000)
   }, [stopCountdown, capturePhoto])
 
   const startFaceDetection = useCallback(() => {
@@ -278,8 +342,8 @@ const PengembalianMakanan = () => {
 
   const startFoodCountdown = useCallback(() => {
     setIsFoodCountdownActive(true)
-    setFoodCountdown(3)
-    let count = 3
+    setFoodCountdown(5)
+    let count = 5
     foodCountdownIntervalRef.current = setInterval(() => {
       count -= 1
       setFoodCountdown(count)
@@ -597,6 +661,39 @@ const PengembalianMakanan = () => {
         <p className="text-gray-600 mt-0.5 text-xs">Deteksi wajah & pilih status makanan</p>
       </div>
 
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 mb-4 border border-gray-100 rounded-xl p-3 bg-white">
+        <StatCard
+          title="Total Siswa"
+          value={stats.total}
+          subtitle="terdaftar"
+          icon={Users}
+          color="text-[#1B263A]"
+        />
+
+        <StatCard
+          title="Laki-laki"
+          value={stats.lakiLaki}
+          subtitle="siswa"
+          icon={User}
+          color="text-emerald-600"
+        />
+        <StatCard
+          title="Perempuan"
+          value={stats.perempuan}
+          subtitle="siswa"
+          icon={User}
+          color="text-pink-600"
+        />
+        <StatCard
+          title="Total Kelas"
+          value={stats.totalKelas}
+          subtitle="aktif"
+          icon={School}
+          color="text-amber-500"
+        />
+      </div>
+
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 flex gap-2">
           <AlertCircle className="w-4 h-4 text-red-600" />
@@ -621,55 +718,80 @@ const PengembalianMakanan = () => {
               </button>
             </div>
           ) : (
-            <div className="relative bg-black h-[350px] md:h-[450px]">
-              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transform scale-x-[-1]" />
-              <canvas ref={canvasRef} className="hidden" />
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className={`w-64 h-64 border-2 rounded-full transition-all ${faceDetected ? "border-emerald-400" : "border-gray-500 opacity-50"}`}>
-                  {faceDetected && countdown > 0 && (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-white text-6xl font-bold">{countdown}</div>
+            <>
+              {/* Status Bar */}
+              <div className="bg-[#1B263A] px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-semibold text-white">Kamera Aktif</span>
+                </div>
+                <span className="text-xs text-gray-400 font-mono">FACE DETECT</span>
+              </div>
+
+              {/* Camera Container */}
+              <div className="relative bg-black overflow-hidden w-full h-[350px] md:h-[450px]">
+                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transform scale-x-[-1]" />
+                <canvas ref={canvasRef} className="hidden" />
+
+                {/* Overlay Guide */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className={`w-64 h-64 border-2 rounded-full transition-all duration-300 ${faceDetected ? "border-emerald-400 scale-100" : "border-gray-500 opacity-50 scale-95"}`}>
+                    {faceDetected && countdown > 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-white text-6xl font-bold animate-pulse">{countdown}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Badges */}
+                <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+                  {faceDetected && (
+                    <div className="bg-emerald-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Terdeteksi
                     </div>
                   )}
                 </div>
-              </div>
-              <div className="absolute top-4 right-4 flex gap-2">
-                {availableCameras.length > 1 && (
-                  <button onClick={switchCamera} className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all" title="Switch Camera">
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-                )}
-                <button onClick={handleReset} className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all" title="Reset">
-                  <XCircle className="w-4 h-4" />
-                </button>
-              </div>
 
-              {cameraError && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-600/80 backdrop-blur px-6 py-4 rounded-2xl text-white text-center shadow-xl border border-red-500/50">
-                  <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-                  <p className="font-bold text-sm">Error Kamera</p>
-                  <p className="text-[10px] opacity-90 mt-1 mb-4">{cameraError}</p>
-                  <button onClick={() => { setCameraError(null); startCamera("user", selectedCameraId); }} className="px-4 py-2 bg-white text-red-600 rounded-lg font-bold text-xs">
-                    Coba Lagi
+                <div className="absolute top-4 left-4 flex gap-2">
+                  {availableCameras.length > 1 && (
+                    <button onClick={switchCamera} className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all font-bold text-xs" title="Switch Camera">
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button onClick={handleReset} className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all" title="Reset">
+                    <XCircle className="w-4 h-4" />
                   </button>
                 </div>
-              )}
 
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 w-full">
-                <div className="bg-black/60 backdrop-blur px-4 py-2 rounded-full text-white text-xs font-semibold">
-                  {faceDetected ? "✓ Mengambil foto..." : "Posisikan wajah di lingkaran"}
-                </div>
-
-                {!faceDetected && (
-                  <button
-                    onClick={(e) => { e.preventDefault(); capturePhoto(); }}
-                    className="bg-white/20 hover:bg-white/30 backdrop-blur text-white px-4 py-2 rounded-lg text-xs font-bold transition-all border border-white/30 pointer-events-auto"
-                  >
-                    Ambil Foto Manual
-                  </button>
+                {cameraError && (
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-600/80 backdrop-blur px-6 py-4 rounded-2xl text-white text-center shadow-xl border border-red-500/50">
+                    <AlertCircle className="w-8 h-8 mx-auto mb-2" />
+                    <p className="font-bold text-sm">Error Kamera</p>
+                    <p className="text-[10px] opacity-90 mt-1 mb-4">{cameraError}</p>
+                    <button onClick={() => { setCameraError(null); startCamera("user", selectedCameraId); }} className="px-4 py-2 bg-white text-red-600 rounded-lg font-bold text-xs">
+                      Coba Lagi
+                    </button>
+                  </div>
                 )}
+
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 w-full">
+                  <div className="bg-black/60 backdrop-blur px-6 py-3 rounded-full text-white text-sm font-medium">
+                    {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
+                  </div>
+
+                  {!faceDetected && (
+                    <button
+                      onClick={(e) => { e.preventDefault(); capturePhoto(); }}
+                      className="bg-white/20 hover:bg-white/30 backdrop-blur text-white px-4 py-2 rounded-lg text-xs font-bold transition-all border border-white/30 pointer-events-auto"
+                    >
+                      Ambil Foto Manual
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       )}
@@ -683,83 +805,131 @@ const PengembalianMakanan = () => {
         </div>
       )}
 
+      {/* STEP 3: RFID SCAN */}
       {step === "rfid-scan" && selectedSiswa && (
-        <div className="w-full bg-white rounded-xl border border-gray-100 overflow-hidden mx-auto shadow-sm">
-          <div className="bg-emerald-50 px-4 py-3 border-b border-emerald-100 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span className="text-xs font-bold text-emerald-800">Wajah Teridentifikasi</span>
-          </div>
-          <div className="p-4">
-            <div className="flex flex-col md:flex-row items-center gap-6 bg-gray-50 p-6 rounded-2xl mb-6 border border-gray-100 shadow-sm">
-              <div className="relative">
-                <img src={selectedSiswa.fotoSiswa} className="w-24 h-24 md:w-28 md:h-28 rounded-2xl object-cover border-4 border-white shadow-sm" alt="Student profile" />
-                <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-1.5 rounded-lg shadow-lg">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-center md:text-left flex-1">
-                <h2 className="text-xl md:text-2xl font-black text-[#1B263A] tracking-tight mb-1">{selectedSiswa.nama}</h2>
-                <p className="text-gray-400 text-[10px] font-extrabold uppercase tracking-widest">{selectedSiswa.kelas?.nama} • NIS {selectedSiswa.nis}</p>
-
-                {selectedSiswa.pickupInfo ? (
-                  <div className="mt-4 inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl shadow-md shadow-blue-200">
-                    <Nfc className="w-4 h-4" />
-                    <span className="text-[11px] font-black uppercase tracking-wider">KEMBALIKAN TRAY: {selectedSiswa.pickupInfo.idTray}</span>
-                  </div>
-                ) : (
-                  <div className="mt-4 inline-flex items-center gap-2 bg-red-100 text-red-700 px-4 py-2 rounded-xl">
-                    <AlertCircle className="w-4 h-4" />
-                    <span className="text-[11px] font-black uppercase tracking-tight">BELUM AMBIL MAKANAN HARI INI</span>
-                  </div>
-                )}
-              </div>
+        <div className="w-full bg-white rounded-xl border border-gray-100 overflow-hidden mx-auto">
+          <div className="bg-emerald-50 px-5 py-3 border-b border-emerald-100">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-semibold text-emerald-800">Wajah Dikenali</span>
             </div>
-            <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center">
-              {!selectedSiswa.pickupInfo ? (
-                <div className="px-8 flex flex-col items-center">
-                  <XCircle className="w-12 h-12 text-red-400 mb-4" />
-                  <h3 className="font-bold text-red-600">Tidak Bisa Kembalikan</h3>
-                  <p className="text-xs text-slate-500 mt-2">Siswa ini tercatat belum melakukan pengambilan makanan hari ini.</p>
-                  <button onClick={handleReset} className="mt-6 px-6 py-2 bg-slate-200 text-slate-600 rounded-lg text-xs font-bold">Coba Siswa Lain</button>
-                </div>
-              ) : !showManualInput ? (
-                <>
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md mb-4">
-                    <Nfc className="w-8 h-8 text-[#1B263A] animate-pulse" />
-                  </div>
-                  <h3 className="font-bold text-[#1B263A]">Tempelkan Tray RFID</h3>
-                  <p className="text-[11px] text-gray-400 mt-1 uppercase tracking-widest font-bold">Scanning...</p>
-                  <button
-                    onClick={() => setShowManualInput(true)}
-                    className="mt-6 text-[10px] text-[#1B263A] font-extrabold uppercase tracking-widest hover:underline"
-                  >
-                    Gunakan Input Manual
-                  </button>
-                </>
-              ) : (
-                <div className="w-full px-6">
-                  <h3 className="font-bold text-[#1B263A] mb-4 text-sm">Input ID Tray Manual</h3>
-                  {trayId && selectedSiswa.pickupInfo?.idTray && trayId !== selectedSiswa.pickupInfo.idTray && (
-                    <div className="mb-4 bg-orange-50 border border-orange-200 p-2 rounded-lg flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-orange-500" />
-                      <p className="text-[10px] text-orange-700 font-bold uppercase">Tray Tidak Cocok! (Harusnya: {selectedSiswa.pickupInfo.idTray})</p>
+          </div>
+
+          <div className="p-4">
+            <div className="text-center border border-gray-100 bg-gray-50 rounded-xl p-3 mb-4">
+              <h3 className="text-xl font-bold text-gray-900 mb-1">{selectedSiswa.nama}</h3>
+              <p className="text-sm text-gray-500 mb-1">{selectedSiswa.kelas?.nama}</p>
+              <p className="text-xs text-gray-400 mb-4">NIS: {selectedSiswa.nis}</p>
+
+              <div className="flex justify-center items-center gap-6 my-4">
+                <div>
+                  {selectedSiswa.fotoSiswa ? (
+                    <img
+                      src={selectedSiswa.fotoSiswa || "/placeholder.svg"}
+                      alt="Foto"
+                      className="w-20 h-20 rounded-lg object-cover bg-white border border-gray-200"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+                      <User className="w-8 h-8 text-gray-400" />
                     </div>
                   )}
-                  <input
-                    type="text"
-                    value={trayId}
-                    onChange={(e) => setTrayId(e.target.value.toUpperCase())}
-                    className={`w-full p-4 border-2 rounded-2xl text-center font-mono font-black text-xl mb-4 transition-all outline-none ${trayId && selectedSiswa.pickupInfo?.idTray && trayId !== selectedSiswa.pickupInfo.idTray ? "border-orange-300 bg-orange-50" : "border-slate-200 focus:border-[#1B263A]"}`}
-                    placeholder="CONTOH: TRAY-123"
-                    autoFocus
-                  />
-                  <div className="flex gap-3">
+                  <p className="text-xs text-gray-500 mt-2">Foto Data Base</p>
+                </div>
+
+                <div className="flex items-center gap-2 text-emerald-500">
+                  <div className="w-4 h-px bg-emerald-200"></div>
+                  <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                  <div className="w-4 h-px bg-emerald-200"></div>
+                </div>
+
+                <div>
+                  {facePhoto && (
+                    <img
+                      src={facePhoto || "/placeholder.svg"}
+                      alt="Deteksi"
+                      className="w-20 h-20 rounded-lg object-cover bg-white border border-gray-200"
+                    />
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">Deteksi</p>
+                </div>
+              </div>
+
+              {!selectedSiswa.pickupInfo && (
+                <div className="mt-4 inline-flex items-center gap-2 bg-red-100 text-red-700 px-4 py-2 rounded-xl">
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="text-[11px] font-black uppercase tracking-tight">BELUM ABSEN PENERIMA</span>
+                </div>
+              )}
+            </div>
+
+            {!selectedSiswa.pickupInfo ? (
+              <div className="text-center mb-4">
+                <button onClick={handleReset} className="w-full px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
+                  Coba Siswa Lain
+                </button>
+              </div>
+            ) : !showManualInput ? (
+              <>
+                {/* RFID Scan Section */}
+                <div className="text-center mb-6">
+                  <div className="relative w-32 h-32 mx-auto mb-6 bg-white rounded-full flex flex-col items-center justify-center border-2 border-gray-100 shadow-xl shadow-gray-100/50">
+                    {isScanning && (
+                      <div className="absolute inset-0 border border-[#1B263A] rounded-full animate-ping opacity-20"></div>
+                    )}
+                    <Nfc className="w-8 h-8 text-[#1B263A]" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">Tempelkan RFID Tray</h3>
+                  <p className="text-gray-500 text-xs">Dekatkan tray ke pembaca RFID</p>
+
+                  {isScanning && (
+                    <div className="mt-4 flex justify-center items-center gap-2">
+                      <Loader className="w-4 h-4 text-[#1B263A] animate-spin" />
+                      <span className="text-sm text-[#1B263A] font-medium">Menunggu scan...</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setShowManualInput(true)}
+                  className="w-full text-center py-2 text-gray-500 hover:text-gray-900 transition-colors text-xs underline"
+                >
+                  Input tray manual
+                </button>
+              </>
+            ) : (
+              <div className="w-full">
+                <div className="bg-[#1B263A] px-5 py-3 rounded-t-xl">
+                  <div className="flex items-center gap-2">
+                    <Nfc className="w-4 h-4 text-white" />
+                    <span className="text-sm font-semibold text-white">MASUKKAN ID TRAY</span>
+                  </div>
+                </div>
+                <div className="p-6 border border-gray-100 rounded-b-xl">
+                  {trayId && selectedSiswa.pickupInfo?.idTray && trayId !== selectedSiswa.pickupInfo.idTray && (
+                    <div className="mb-4 bg-orange-50 border border-orange-200 p-3 rounded-lg flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-orange-500" />
+                      <p className="text-xs text-orange-700 font-bold">Tray Tidak Cocok! (Harusnya: {selectedSiswa.pickupInfo.idTray})</p>
+                    </div>
+                  )}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">ID TRAY</label>
+                    <input
+                      type="text"
+                      value={trayId}
+                      onChange={(e) => setTrayId(e.target.value.toUpperCase())}
+                      placeholder="Contoh: TRAY001"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#1B263A] focus:border-[#1B263A] font-mono text-lg transition-all"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={() => {
                         setShowManualInput(false)
                         setTrayId("")
                       }}
-                      className="flex-1 py-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600 tracking-wider"
+                      className="px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
                     >
                       Batal
                     </button>
@@ -776,88 +946,102 @@ const PengembalianMakanan = () => {
                         }
                       }}
                       disabled={!trayId.trim()}
-                      className="flex-[2] py-4 bg-[#1B263A] text-white rounded-xl font-bold text-xs shadow-lg shadow-slate-200 disabled:opacity-50 disabled:shadow-none"
+                      className="px-4 py-2 bg-[#1B263A] text-white rounded-lg hover:bg-[#2A3749] transition-colors text-sm font-medium disabled:opacity-50"
                     >
-                      Lanjutkan
+                      Lanjut
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
-            <button onClick={handleReset} className="w-full mt-4 py-3 border border-gray-200 text-gray-600 rounded-lg text-sm font-bold hover:bg-gray-50 transition-all">Ulang Proses</button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {step === "camera-food" && selectedSiswa && (
-        <div className="w-full bg-white rounded-xl border border-gray-100 overflow-hidden mx-auto shadow-sm">
-          <div className="bg-[#1B263A] px-4 py-3 text-white flex justify-between items-center">
+      {step === "camera-food" && (
+        <div className="w-full bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
+          {/* Status Bar */}
+          <div className="bg-[#1B263A] px-4 py-3 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Camera className="w-4 h-4 text-[#D0B064]" />
-              <span className="text-xs font-bold">Foto Makanan Sisa</span>
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-sm font-semibold text-white">Kamera Aktif</span>
             </div>
-            <span className="text-[10px] font-bold opacity-70 bg-white/10 px-2 py-0.5 rounded uppercase">TRAY: {trayId}</span>
+
+            <div className="flex items-center gap-3">
+              {availableCameras.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedCameraId}
+                    onChange={(e) => {
+                      setSelectedCameraId(e.target.value)
+                      localStorage.setItem("preferred_camera_id", e.target.value)
+                      stopCamera()
+                      // useEffect restarts it
+                    }}
+                    className="px-3 py-1.5 border border-gray-600 bg-gray-800 text-white rounded-lg text-xs font-medium focus:ring-1 focus:ring-emerald-500 transition-all outline-none"
+                  >
+                    {availableCameras.map((camera, index) => (
+                      <option key={camera.deviceId} value={camera.deviceId}>
+                        {camera.label || `Camera ${index + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="bg-white/10 px-3 py-1 rounded text-[10px] font-mono text-white/70">
+                TRAY: {trayId}
+              </div>
+            </div>
           </div>
-          <div className="relative h-[350px] md:h-[450px] bg-black text-white">
+
+          {/* Camera View */}
+          <div className="relative bg-black h-[350px] md:h-[450px] overflow-hidden">
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             <canvas ref={canvasRef} className="hidden" />
 
-            <div className="absolute top-4 right-4 flex gap-2 pointer-events-auto z-20">
-              {availableCameras.length > 1 && (
-                <button onClick={switchCamera} className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all" title="Ganti Kamera">
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              )}
-              <button onClick={handleReset} className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all" title="Reset">
-                <XCircle className="w-4 h-4" />
-              </button>
-            </div>
-
-            {cameraError && (
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-600/80 backdrop-blur px-6 py-4 rounded-2xl text-white text-center shadow-xl border border-red-500/50 z-30 min-w-[240px]">
-                <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-                <p className="font-bold text-sm">Error Kamera</p>
-                <p className="text-[10px] opacity-90 mt-1 mb-4">{cameraError}</p>
-                <button onClick={() => { setCameraError(null); startCamera("environment", selectedCameraId); }} className="px-4 py-2 bg-white text-red-600 rounded-lg font-bold text-xs shadow-md">
-                  Coba Lagi
-                </button>
-              </div>
-            )}
-
+            {/* Overlays */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className={`w-80 h-60 border-2 rounded-2xl transition-all duration-300 ${isPreparationActive ? "border-[#D0B064] scale-100" : foodConditionOk ? "border-emerald-400 scale-100 shadow-[0_0_20px_rgba(52,211,153,0.3)]" : "border-white/30 opacity-50 scale-95"}`}>
-                {(isPreparationActive || (isFoodCountdownActive && foodCountdown > 0)) && (
-                  <div className="flex items-center justify-center h-full bg-black/20 rounded-2xl">
-                    <div className="text-white text-8xl font-black drop-shadow-lg">
-                      {isPreparationActive ? preparationCountdown : foodCountdown}
+              <div className={`w-96 h-64 border-2 rounded-xl transition-all duration-300 ${isPreparationActive ? "border-blue-400 scale-100" : foodConditionOk ? "border-emerald-400 scale-100" : "border-gray-500 opacity-50 scale-95"}`}>
+                {isPreparationActive && preparationCountdown > 0 && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                    <div className="text-white text-8xl font-bold animate-pulse">{preparationCountdown}</div>
+                    <div className="text-white text-xs font-semibold bg-black/60 px-4 py-2 rounded-lg backdrop-blur">
+                      Persiapan Frame
                     </div>
+                  </div>
+                )}
+                {isFoodCountdownActive && foodCountdown > 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-white text-9xl font-bold animate-pulse">{foodCountdown}</div>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-4 px-6">
+            {/* Instruction */}
+            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-3 w-full">
+              <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
+                {isPreparationActive ? "Mempersiapkan kamera..." : foodConditionOk ? "✓ Menangkap foto..." : "Arahkan kamera ke sisa makanan"}
+              </div>
+              
               {!isPreparationActive && (
                 <button
-                  onClick={(e) => { e.preventDefault(); capturePhoto(); }}
-                  className="bg-[#D0B064] hover:bg-[#E0C074] text-[#1B263A] px-6 py-3 rounded-xl text-sm font-black shadow-xl transition-all flex items-center gap-2 pointer-events-auto transform hover:scale-105 active:scale-95"
+                  onClick={capturePhoto}
+                  className="bg-white/20 hover:bg-white/30 backdrop-blur text-white px-4 py-2 rounded-lg text-xs font-bold transition-all border border-white/30 pointer-events-auto"
                 >
-                  <Camera className="w-5 h-5" />
-                  AMBIL FOTO SEKARANG
+                  Ambil Foto Manual
                 </button>
               )}
             </div>
-
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 w-full px-8">
-              <div className="bg-black/60 backdrop-blur px-4 py-1.5 rounded-full text-white text-[10px] font-bold uppercase tracking-wider border border-white/10 text-center">
-                {isPreparationActive ? "Persiapan Frame" : isFoodCountdownActive ? "📸 Mengambil Foto..." : foodConditionOk ? "Menangkap Makanan..." : "Atur Posisi Makanan"}
-              </div>
-              <button
-                onClick={capturePhoto}
-                className="w-full max-w-xs py-3 bg-white text-[#1B263A] rounded-xl font-bold text-sm shadow-xl hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
+            
+            {/* Top Right Controls */}
+            <div className="absolute top-4 right-4 flex gap-2">
+              <button 
+                onClick={handleReset}
+                className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all font-bold text-xs" 
+                title="Reset"
               >
-                <Camera className="w-4 h-4" />
-                Ambil Foto Manual
+                <XCircle className="w-4 h-4" />
               </button>
             </div>
           </div>

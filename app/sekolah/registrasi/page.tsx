@@ -189,7 +189,7 @@ export default function RegistrasiSiswaPage() {
   }
 
   const startCountdown = () => {
-    setCountdown(3)
+    setCountdown(5)
 
     const doCountdown = (num: number) => {
       if (num > 0) {
@@ -202,7 +202,7 @@ export default function RegistrasiSiswaPage() {
       }
     }
 
-    doCountdown(3)
+    doCountdown(5)
   }
 
   const manualCapture = () => {

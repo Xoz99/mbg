@@ -12,7 +12,7 @@ const AbsensiPenerima = () => {
   >("camera-face")
   const [faceDetected, setFaceDetected] = useState(false)
   const [facePosition, setFacePosition] = useState<string>("") // 'too-dark', 'too-bright'
-  const [countdown, setCountdown] = useState(3)
+  const [countdown, setCountdown] = useState(5)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
   const [facePhoto, setFacePhoto] = useState<string | null>(null)
@@ -43,7 +43,7 @@ const AbsensiPenerima = () => {
   const [duplicateSiswaInfo, setDuplicateSiswaInfo] = useState<any>(null) // Info siswa yang sudah absen
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]) // List semua kamera yang tersedia
   const [selectedCameraId, setSelectedCameraId] = useState<string>("") // ID kamera yang dipilih
-  const [menuCountdown, setMenuCountdown] = useState(3) // Countdown untuk auto-capture foto makanan
+  const [menuCountdown, setMenuCountdown] = useState(5) // Countdown untuk auto-capture foto makanan
   const [isMenuCountdownActive, setIsMenuCountdownActive] = useState(false) // Flag untuk countdown aktif
   const [foodConditionOk, setFoodConditionOk] = useState(false) // Flag kondisi foto makanan OK
   const [foodCondition, setFoodCondition] = useState<string>("") // Status kondisi: 'too-dark', 'too-bright', 'ok'
@@ -411,8 +411,8 @@ const AbsensiPenerima = () => {
   }
 
   const startCountdown = () => {
-    setCountdown(2)
-    let count = 2
+    setCountdown(5)
+    let count = 5
 
     countdownIntervalRef.current = setInterval(() => {
       count -= 1
@@ -422,7 +422,7 @@ const AbsensiPenerima = () => {
         stopCountdown()
         capturePhotoForValidation()
       }
-    }, 500)
+    }, 1000)
   }
 
   const stopCountdown = () => {
@@ -430,13 +430,13 @@ const AbsensiPenerima = () => {
       clearInterval(countdownIntervalRef.current)
       countdownIntervalRef.current = null
     }
-    setCountdown(2)
+    setCountdown(5)
   }
 
   const startMenuCountdown = () => {
     setIsMenuCountdownActive(true)
-    setMenuCountdown(3)
-    let count = 3
+    setMenuCountdown(5)
+    let count = 5
 
     menuCountdownIntervalRef.current = setInterval(() => {
       count -= 1
@@ -455,7 +455,7 @@ const AbsensiPenerima = () => {
       menuCountdownIntervalRef.current = null
     }
     setIsMenuCountdownActive(false)
-    setMenuCountdown(3)
+    setMenuCountdown(5)
   }
 
   const startFoodDetection = () => {
@@ -699,7 +699,7 @@ const AbsensiPenerima = () => {
       try {
         const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
 
-        const response = await fetch(`${API_BASE_URL}/api/rfid/latest`, {
+        const response = await fetch(`${API_BASE_URL}/api/rfid/latest?tipe=MASUK`, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",

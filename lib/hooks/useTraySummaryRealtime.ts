@@ -24,7 +24,7 @@ export const useTraySummaryRealtime = (sekolahId: string) => {
         ? localStorage.getItem('mbg_token') || localStorage.getItem('authToken')
         : ''
 
-      const response = await fetch(`${API_BASE_URL}/api/rfid/tray-summary?sekolahId=${sekolahId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/rfid/tray-summary?sekolahId=${sekolahId}&tipe=MASUK`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -72,7 +72,7 @@ export const useTraySummaryRealtime = (sekolahId: string) => {
 
       // Pass token as query param since WebSocket doesn't support custom headers
       const wsBaseUrl = API_BASE_URL.replace('https://', 'wss://').replace('http://', 'ws://')
-      const wsUrl = `${wsBaseUrl}/api/rfid/tray-summary-ws?sekolahId=${sekolahId}&token=${encodeURIComponent(token)}`
+      const wsUrl = `${wsBaseUrl}/api/rfid/tray-summary-ws?sekolahId=${sekolahId}&tipe=MASUK&token=${encodeURIComponent(token)}`
       const ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {

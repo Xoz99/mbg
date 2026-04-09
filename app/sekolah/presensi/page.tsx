@@ -44,7 +44,7 @@ const Presensi = () => {
 
   const [faceDetected, setFaceDetected] = useState(false)
   const [facePosition, setFacePosition] = useState<string>("")
-  const [countdown, setCountdown] = useState(3)
+  const [countdown, setCountdown] = useState(5)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
 
@@ -244,8 +244,8 @@ const Presensi = () => {
   }
 
   const startCountdown = () => {
-    setCountdown(2)
-    let count = 2
+    setCountdown(5)
+    let count = 5
 
     countdownIntervalRef.current = setInterval(() => {
       count -= 1
@@ -255,7 +255,7 @@ const Presensi = () => {
         stopCountdown()
         capturePhotoForValidation()
       }
-    }, 500)
+    }, 1000)
   }
 
   const stopCountdown = () => {
@@ -263,7 +263,7 @@ const Presensi = () => {
       clearInterval(countdownIntervalRef.current)
       countdownIntervalRef.current = null
     }
-    setCountdown(2)
+    setCountdown(5)
   }
 
   const capturePhotoForValidation = () => {
@@ -688,10 +688,19 @@ const Presensi = () => {
                     </div>
 
                     {/* Instruction */}
-                    <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
+                    <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-3 w-full">
                       <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
                         {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
                       </div>
+
+                      {!faceDetected && (
+                        <button
+                          onClick={(e) => { e.preventDefault(); capturePhotoForValidation(); }}
+                          className="bg-white/20 hover:bg-white/30 backdrop-blur text-white px-4 py-2 rounded-lg text-xs font-bold transition-all border border-white/30 pointer-events-auto"
+                        >
+                          Ambil Foto Manual
+                        </button>
+                      )}
                     </div>
                   </div>
                 </>
