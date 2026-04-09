@@ -793,7 +793,8 @@ const DataSiswa = () => {
     const normal = siswaData.filter((s) => s.statusGizi === "NORMAL").length
     const giziKurang = siswaData.filter((s) => s.statusGizi === "GIZI_KURANG").length
     const giziBuruk = siswaData.filter((s) => s.statusGizi === "GIZI_BURUK").length
-    const stunted = siswaData.filter((s) => s.statusStunting && s.statusStunting !== "NORMAL").length
+    // Untuk saat ini, Risiko Stunting kita petakan ke Gizi Buruk (Status Gizi paling rendah)
+    const stunted = giziBuruk
 
     return { total, normal, giziKurang, giziBuruk, stunted }
   }, [siswaData])

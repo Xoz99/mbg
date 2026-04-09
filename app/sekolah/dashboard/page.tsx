@@ -448,6 +448,7 @@ const DashboardSekolah = () => {
     sudahMakan: 0,
     totalKelas: 0,
     rataGizi: 0,
+    statusPengiriman: "",
   })
   const [kelasList, setKelasList] = useState<any[]>([])
   const [kalenderReminder, setKalenderReminder] = useState<any>(null)
@@ -485,8 +486,22 @@ const DashboardSekolah = () => {
     const obesitas = siswaData.filter((s: any) => s.statusGizi === "OBESITAS").length || 0
     const rataGizi = totalSiswa > 0 ? Math.round((normalGizi / totalSiswa) * 100) : 0
 
-    // Compute attendance stats (simplified - using cached reminder)
-    const hadirHariIni = Math.ceil(totalSiswa * 0.75) // Estimate based on total siswa
+    // Compute attendance stats from actual class data
+    const attendanceSum = kelasData.reduce((acc: number, k: any) => acc + (k.hadirHariIni || 0), 0)
+
+    // ✅ FALLBACK 1: Use totalPickupToday if attendance module hasn't been used yet but students have taken food
+    // ✅ FALLBACK 2: Use matching day from chart data if current school stats are lagging
+    const todayName = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"][new Date().getDay()]
+    const chartToday = cachedData.absensiChartData?.find((d: any) => d.hari === todayName)?.hadir || 0
+
+    const hadirHariIni = Math.max(attendanceSum, cachedData.totalPickupToday || 0, chartToday)
+
+    // Also compute already eaten count - currently same as hadir (since pickup = present)
+    const sudahMakan = hadirHariIni
+
+    const realPengiriman = cachedData.pengirimanData?.jumlahTray || 0
+    const statusPengiriman = cachedData.pengirimanData?.status
+    const pengirimanSelesai = statusPengiriman === 'TELAH_SAMPAI' ? realPengiriman : 0
 
     setStats({
       totalSiswa,
@@ -494,9 +509,10 @@ const DashboardSekolah = () => {
       giziKurang,
       stuntingRisiko: giziBuruk,
       hadirHariIni,
-      pengirimanSelesai: Math.floor(hadirHariIni * 0.8),
-      totalPengiriman: 0,
-      sudahMakan: hadirHariIni,
+      pengirimanSelesai,
+      totalPengiriman: realPengiriman,
+      statusPengiriman,
+      sudahMakan,
       totalKelas: kelasData.length,
       rataGizi,
     })
@@ -517,8 +533,31 @@ const DashboardSekolah = () => {
     console.log("[DASHBOARD] absensiChartData length:", cachedData.absensiChartData?.length)
 
     if (Array.isArray(cachedData.absensiChartData) && cachedData.absensiChartData.length > 0) {
-      console.log("[DASHBOARD] ✅ Using absensiChartData from cache:", cachedData.absensiChartData)
-      setAbsensiChart(cachedData.absensiChartData)
+      console.log("[DASHBOARD] ✅ Using absensiChartData from cache - synchronizing with totalSiswa:", totalSiswa)
+
+      // Force chart to sum up to totalSiswa
+      const synchronizedChart = cachedData.absensiChartData.map((day: any, index: number) => {
+        // Ambil hari ini (0=Minggu, 1=Senin... 4=Kamis, 5=Jumat)
+        const now = new Date()
+        const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000))
+        let todayIdx = wibTime.getUTCDay()
+        if (todayIdx === 0) todayIdx = 7 // Minggu jadi 7
+
+        // Map index chart (0=Senin, 1=Selasa, 2=Rabu, 3=Kamis, 4=Jumat)
+        const chartDayIdx = index + 1 // Senin = 1, Jumat = 5
+        const isFuture = chartDayIdx > todayIdx
+
+        return {
+          ...day,
+          // Jika masa depan, paksa 0. Jika hari ini atau masa lalu, paksa totalSiswa.
+          hadir: isFuture ? 0 : (day.hadir || 0),
+          tidakHadir: (totalSiswa > 0 && !isFuture)
+            ? Math.max(0, totalSiswa - (day.hadir || 0))
+            : 0
+        }
+      })
+
+      setAbsensiChart(synchronizedChart)
     } else {
       console.log("[DASHBOARD] ⚠️ No absensiChartData, using fallback")
       // Fallback if no chart data
@@ -883,7 +922,6 @@ const DashboardSekolah = () => {
           <StatCard title="Total Siswa" value={stats.totalSiswa} subtitle="Semua siswa aktif" icon={Users} color="bg-[#1B263A]" />
           <StatCard title="Gizi Normal" value={stats.normalGizi} subtitle="Status optimal" icon={Heart} color="bg-[#D0B064]" />
           <StatCard title="Hadir Hari Ini" value={stats.hadirHariIni} subtitle="Siswa hadir" icon={CheckCircle} color="bg-[#1B263A]" />
-          <StatCard title="Pengiriman" value={stats.pengirimanSelesai} subtitle="Porsi dikirim" icon={Truck} color="bg-[#1B263A]" />
           <StatCard title="Gizi Kurang" value={stats.giziKurang} subtitle="Perlu intervensi" icon={AlertCircle} color="bg-[#D0B064]" />
           <StatCard title="Risiko Stunting" value={stats.stuntingRisiko} subtitle="Monitoring ketat" icon={AlertTriangle} color="bg-red-500" />
         </div>

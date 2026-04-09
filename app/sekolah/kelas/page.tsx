@@ -624,7 +624,8 @@ const DataKelas = () => {
     const totalKelas = kelasData.length;
     const totalSiswa = kelasData.reduce((acc, k) => acc + (k.totalSiswa || 0), 0);
     const totalAlergi = kelasData.reduce((acc, k) => acc + (k.alergiCount || 0), 0);
-    const avgKehadiran = totalSiswa > 0 ? "95" : "0";
+    const totalHadir = kelasData.reduce((acc, k) => acc + (k.hadirHariIni || 0), 0);
+    const avgKehadiran = totalSiswa > 0 ? Math.round((totalHadir / totalSiswa) * 100).toString() : "0";
     const persenAlergi = totalSiswa > 0 ? Math.round((totalAlergi / totalSiswa) * 100) : 0;
     return { totalKelas, totalSiswa, avgKehadiran, totalAlergi, persenAlergi };
   }, [kelasData]);
@@ -772,11 +773,14 @@ const DataKelas = () => {
                         <p className="text-xl font-bold text-gray-900">{kelas.perempuan || 0}</p>
                       </div>
                     </div>
-
                     <div className="space-y-1.5 text-sm mb-4">
                       <div className="flex items-center justify-between">
                         <span className="text-gray-500">Total Siswa</span>
                         <span className="font-medium text-gray-900">{kelas.totalSiswa || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-emerald-500 text-xs">Hadir Hari Ini</span>
+                        <span className="text-xs font-medium text-emerald-600">{kelas.hadirHariIni || 0} hadir</span>
                       </div>
                       {kelas.alergiCount > 0 && (
                         <div className="flex items-center justify-between">
@@ -792,40 +796,6 @@ const DataKelas = () => {
                       onClick={async () => {
                         const kelasId = kelas.id || kelas._id;
                         setSelectedKelas(kelas);
-                        try {
-                          const authToken = localStorage.getItem("authToken") || localStorage.getItem("mbg_token");
-                          if (!authToken) return;
-                          const url = `${API_BASE_URL}/api/kelas/${kelasId}/absensi`;
-                          const response = await fetch(url, {
-                            method: "GET",
-                            headers: {
-                              Authorization: `Bearer ${authToken}`,
-                              "Content-Type": "application/json",
-                            },
-                          });
-                          if (response.ok) {
-                            const data = await response.json();
-                            let hadirCount = 0;
-                            const today = new Date().toISOString().split('T')[0];
-                            if (Array.isArray(data.data?.data)) {
-                              const todayRecords = data.data.data.filter((record: any) => {
-                                const recordDate = record.tanggal?.split('T')[0];
-                                return recordDate === today;
-                              });
-                              if (todayRecords.length > 0) hadirCount = todayRecords[0].jumlahHadir || 0;
-                            } else if (Array.isArray(data.data)) {
-                              const todayRecord = data.data.find((record: any) => record.tanggal?.split('T')[0] === today);
-                              hadirCount = todayRecord?.jumlahHadir || 0;
-                            } else if (typeof data.data === 'object' && data.data?.jumlahHadir !== undefined) {
-                              hadirCount = data.data.jumlahHadir || 0;
-                            } else if (data.jumlahHadir !== undefined) {
-                              hadirCount = data.jumlahHadir || 0;
-                            }
-                            setSelectedKelas((prev: any) => ({ ...prev, hadirHariIni: hadirCount }));
-                          }
-                        } catch (err) {
-                          console.error("[CLICK AUTO-FETCH] Error:", err);
-                        }
                       }}
                       className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                     >
@@ -1176,14 +1146,14 @@ const DataKelas = () => {
                       {/* Detail siswa dengan alergi */}
                       <div className="mt-4 pt-4 border-t border-red-200">
                         <p className="text-xs font-semibold text-red-900 mb-2">Detail Siswa ({siswaData.filter(s => {
-                          const kelasId = s.kelasId?.id || s.kelasId;
-                          return String(kelasId) === String(selectedKelas.id);
+                          const kelasId = s.kelasId?.id || s.kelasId?._id || s.kelasId;
+                          return String(kelasId) === String(selectedKelas.id || selectedKelas._id);
                         }).length}):</p>
                         <div className="space-y-2 max-h-40 overflow-y-auto">
                           {siswaData
                             .filter(siswa => {
-                              const siswaKelasId = String(siswa.kelasId?.id || siswa.kelasId || '');
-                              const selectedKelasId = String(selectedKelas.id || '');
+                              const siswaKelasId = String(siswa.kelasId?.id || siswa.kelasId?._id || siswa.kelasId || '');
+                              const selectedKelasId = String(selectedKelas.id || selectedKelas._id || '');
                               return siswaKelasId === selectedKelasId;
                             })
                             .filter(siswa => {

@@ -27,6 +27,7 @@ interface SekolahCachedData {
   kalenderReminder: any | null
   menuHariIni: any | null
   invitations: any[] // NEW: Incoming kitchen invitations
+  totalPickupToday: number // NEW: For attendance fallback
   hash: string
   timestamp: number
 }
@@ -36,6 +37,7 @@ interface SekolahData {
   kelasData: any[]
   absensiData: any[]
   absensiChartData: any[] // NEW: For dashboard attendance chart
+  totalPickupToday: number // NEW: For attendance fallback
   pengirimanData: any | null
   kalenderData: any[]
   kalenderReminder: any | null
@@ -201,8 +203,8 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
       // Update kelas dengan siswa count
       const finalKelasList = kelasList.map((kelas: any) => {
-        // Normalize kelas.id to string for consistent matching
-        const normalizedKelasId = String(kelas.id || '')
+        // Normalize kelas.id or _id to string for consistent matching
+        const normalizedKelasId = String(kelas.id || kelas._id || '')
         const siswaCount = siswaPerKelas[normalizedKelasId]
 
         console.log(`[FETCH KELAS] Kelas ${kelas.nama} (ID: ${normalizedKelasId}) -> siswaCount:`, siswaCount)
@@ -226,7 +228,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
   // ✅ Fetch absensi data untuk semua kelas
   const fetchAbsensiDataReturn = useCallback(
-    async (kelasList: any[], token: string) => {
+    async (kelasList: any[], token: string, siswaList: any[]) => {
       try {
         console.time("fetchAbsensi")
         const headers = {
@@ -252,8 +254,13 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
               // Cek jika response adalah array of absensi records
               if (Array.isArray(absensiData.data?.data)) {
-                // Filter untuk hari ini (tanggal sesuai hari ini)
-                const today = new Date().toISOString().split('T')[0]
+                // Filter untuk hari ini (tanggal sesuai hari ini di WIB)
+                const now = new Date()
+                const wibNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
+                const today = wibNow.getUTCFullYear() + '-' + 
+                              String(wibNow.getUTCMonth() + 1).padStart(2, '0') + '-' + 
+                              String(wibNow.getUTCDate()).padStart(2, '0')
+                
                 const todayRecords = absensiData.data.data.filter((record: any) => {
                   const recordDate = record.tanggal?.split('T')[0]
                   return recordDate === today
@@ -265,7 +272,12 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
                 }
               } else if (Array.isArray(absensiData.data)) {
                 // Direct array of records
-                const today = new Date().toISOString().split('T')[0]
+                const now = new Date()
+                const wibNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
+                const today = wibNow.getUTCFullYear() + '-' + 
+                              String(wibNow.getUTCMonth() + 1).padStart(2, '0') + '-' + 
+                              String(wibNow.getUTCDate()).padStart(2, '0')
+                
                 const todayRecord = absensiData.data.find((record: any) => {
                   const recordDate = record.tanggal?.split('T')[0]
                   return recordDate === today
@@ -296,14 +308,65 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
         })
 
         const absensiResults = await Promise.all(absensiPromises)
-        const allAbsensi = absensiResults.flatMap((r) => r.data)
+        const allAbsensi = absensiResults.flatMap((r: any) => r.data)
+
+        let totalPickupToday = 0
+        
+        // ✅ SYNC PICKUP DATA TO CLASSES
+        // If a student picks up food, they are considered present today!
+        const todayStr = new Date(new Date().getTime() + 7 * 60 * 60 * 1000).getUTCFullYear() + '-' + 
+                         String(new Date(new Date().getTime() + 7 * 60 * 60 * 1000).getUTCMonth() + 1).padStart(2, '0') + '-' + 
+                         String(new Date(new Date().getTime() + 7 * 60 * 60 * 1000).getUTCDate()).padStart(2, '0')
+        
+        const pickupsUrl = `${API_BASE_URL}/api/pengambilan-makanan?tanggal=${todayStr}&limit=1000`
+        try {
+          const pickupsRes = await fetch(pickupsUrl, { headers })
+          if (pickupsRes.ok) {
+            const pickupsData = await pickupsRes.json()
+            const pickupsList = Array.isArray(pickupsData.data?.data) ? pickupsData.data.data : []
+            totalPickupToday = pickupsList.length
+
+            // Create a lookup map of siswaId -> kelasId using the siswaList already fetched
+            const siswaToKelasMap: { [key: string]: string } = {}
+            if (Array.isArray(siswaList)) {
+              siswaList.forEach(s => {
+                const kId = String(s.kelasId?.id || s.kelasId || s.kelasId?._id || '')
+                if (kId) {
+                  siswaToKelasMap[s.id || s._id] = kId
+                }
+              })
+            }
+
+            // Count unique students per class from today's pickups
+            const pickupsPerKelas: { [key: string]: Set<string> } = {}
+            pickupsList.forEach((pickup: any) => {
+              if (pickup.siswaId) {
+                // Use fallback from our mapper if API response is missing nested class info
+                const kId = pickup.siswa?.kelasId || pickup.siswa?.kelas?.id || siswaToKelasMap[pickup.siswaId]
+                if (kId) {
+                  const normalizedKId = String(kId)
+                  if (!pickupsPerKelas[normalizedKId]) pickupsPerKelas[normalizedKId] = new Set()
+                  pickupsPerKelas[normalizedKId].add(pickup.siswaId)
+                }
+              }
+            })
+
+            // Update absensiPerKelas with the consolidated counts
+            Object.keys(pickupsPerKelas).forEach(kId => {
+              const countFromPickups = pickupsPerKelas[kId].size
+              absensiPerKelas[kId] = Math.max(absensiPerKelas[kId] || 0, countFromPickups)
+            })
+          }
+        } catch (pickupErr) {
+          console.warn("[ABSENSI SYNC] Failed to fetch or process pickup records:", pickupErr)
+        }
 
         console.timeEnd("fetchAbsensi")
 
-        return { allAbsensi, absensiPerKelas }
+        return { allAbsensi, absensiPerKelas, totalPickupToday }
       } catch (err) {
         console.error("[FETCH ABSENSI] Global error:", err)
-        return { allAbsensi: [], absensiPerKelas: {} }
+        return { allAbsensi: [], absensiPerKelas: {}, totalPickupToday: 0 }
       }
     },
     []
@@ -311,7 +374,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
   // ✅ Fetch absensi history dari endpoint /api/sekolah/:sekolahId/abseni dan process untuk weekly chart
   const fetchAbsensiTotalPerWeek = useCallback(
-    async (schoolId: string, token: string) => {
+    async (schoolId: string, token: string, totalSiswaCount: number) => {
       try {
         console.time("fetchAbsensiWeek")
         const headers = {
@@ -373,15 +436,24 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
         } = {}
 
         // Initialize chart data for Monday-Friday
+        const now = new Date()
+        const wibNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
+        const todayString = wibNow.getUTCFullYear() + '-' + 
+                            String(wibNow.getUTCMonth() + 1).padStart(2, '0') + '-' + 
+                            String(wibNow.getUTCDate()).padStart(2, '0')
+
         for (let i = 0; i < 5; i++) {
           const dateForDay = new Date(mondayDate)
           dateForDay.setDate(mondayDate.getDate() + i)
           const dateString = dateForDay.toISOString().split("T")[0]
 
+          // Only show attendance (even as 'Tidak Hadir' fallback) if the date is NOT in the future
+          const isFuture = dateString > todayString
+
           chartDataMap[dateString] = {
             hari: daysOfWeek[i],
             hadir: 0,
-            tidakHadir: 0,
+            tidakHadir: isFuture ? 0 : (totalSiswaCount || 0),
           }
         }
 
@@ -438,16 +510,14 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
           }
 
           // Check if this record is within our week
-          if (chartDataMap[recordDate] && (hadir > 0 || tidakHadir > 0)) {
+          if (chartDataMap[recordDate]) {
             console.log(
-              `[MATCHED] ${recordDate} matches week range - adding hadir: ${hadir}, tidakHadir: ${tidakHadir}`
+              `[MATCHED] ${recordDate} matches week range - adding hadir: ${hadir}`
             )
             chartDataMap[recordDate].hadir += hadir
-            chartDataMap[recordDate].tidakHadir += tidakHadir
+            // Update tidakHadir to always match total - hadir
+            chartDataMap[recordDate].tidakHadir = Math.max(0, totalSiswaCount - chartDataMap[recordDate].hadir)
             matchedRecords++
-          } else if (chartDataMap[recordDate]) {
-            console.log(`[MATCHED BUT ZERO] ${recordDate} matches week but hadir=0 and tidakHadir=0`)
-            unmatchedRecords++
           } else {
             console.log(
               `[NOT MATCHED] ${recordDate} is outside week range (week keys: ${Object.keys(chartDataMap).join(", ")})`
@@ -499,14 +569,22 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
       if (!response.ok) return null
 
       const data = await response.json()
+      
+      const shipments = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
 
-      if (Array.isArray(data.data) && data.data.length > 0) {
-        const latestPengiriman = data.data[0]
+      if (shipments.length > 0) {
+        // Cari status yang paling relevan (sedang diantar atau telah sampai)
+        const relevantPengiriman = shipments.find((p: any) => 
+          p.status === 'SEDANG_DIANTAR' || p.status === 'TELAH_SAMPAI' || p.status === 'MENUNGGU_PENGIRIMAN'
+        ) || shipments[0]
+
         console.timeEnd("fetchPengiriman")
         return {
-          tanggalMulai: latestPengiriman.tanggal || latestPengiriman.createdAt,
-          deskripsi: `Pengiriman ke ${latestPengiriman.namaSekolah || "Sekolah"}`,
-          status: latestPengiriman.status,
+          tanggalMulai: relevantPengiriman.tanggal || relevantPengiriman.createdAt,
+          deskripsi: `Pengiriman ke ${relevantPengiriman.namaSekolah || "Sekolah"}`,
+          status: relevantPengiriman.status,
+          jumlahTray: Number(relevantPengiriman.jumlahTray) || 0,
+          jumlahKeranjang: Number(relevantPengiriman.jumlahKeranjang) || 0,
         }
       }
 
@@ -660,18 +738,18 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
 
         // 3. Fetch absensi + absensi chart for dashboard
         console.log("[FETCH ALL] Step 3: Fetching absensi...")
-        const { allAbsensi, absensiPerKelas } = await fetchAbsensiDataReturn(kelasList, token)
-        console.log("[FETCH ALL] ✅ Absensi fetched:", allAbsensi.length, "absensiPerKelas:", absensiPerKelas)
+        const { allAbsensi, absensiPerKelas, totalPickupToday } = await fetchAbsensiDataReturn(kelasList, token, siswaList)
+        console.log("[FETCH ALL] ✅ Absensi fetched:", allAbsensi.length, "totalPickupToday:", totalPickupToday)
 
         // ✅ Merge hadirHariIni into kelas data
         const kelasDataWithAbsensi = kelasList.map((kelas: any) => ({
           ...kelas,
-          hadirHariIni: absensiPerKelas[kelas.id] || 0
+          hadirHariIni: absensiPerKelas[kelas.id] || absensiPerKelas[kelas._id] || 0
         }))
 
         // 4. Fetch absensi per minggu untuk dashboard chart
         console.log("[FETCH ALL] Step 4: Fetching absensi chart per minggu...")
-        const absensiChartData = await fetchAbsensiTotalPerWeek(schoolId, token)
+        const absensiChartData = await fetchAbsensiTotalPerWeek(schoolId, token, siswaList.length)
         console.log("[FETCH ALL] ✅ Absensi chart generated:", absensiChartData)
 
         // 5. Fetch pengiriman, kalender, dan menu in parallel
@@ -689,6 +767,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
           kelasData: kelasDataWithAbsensi,
           absensiData: allAbsensi,
           absensiChartData,
+          totalPickupToday,
           pengirimanData: pengirimanResult,
           kalenderData: kalenderResult.list,
           kalenderReminder: kalenderResult.reminder || pengirimanResult,
@@ -822,6 +901,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
           kelasData,
           absensiData,
           absensiChartData,
+          totalPickupToday: data.totalPickupToday,
           pengirimanData,
           kalenderData,
           kalenderReminder,
@@ -904,6 +984,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
           kalenderReminder: null,
           menuHariIni: null,
           invitations: [],
+          totalPickupToday: 0,
           hash: "",
           timestamp: Date.now(),
         }
@@ -915,6 +996,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
         kelasData: newData.kelasData ?? cachedData.kelasData,
         absensiData: newData.absensiData ?? cachedData.absensiData,
         absensiChartData: newData.absensiChartData ?? cachedData.absensiChartData,
+        totalPickupToday: newData.totalPickupToday ?? cachedData.totalPickupToday,
         pengirimanData: newData.pengirimanData ?? cachedData.pengirimanData,
         kalenderData: newData.kalenderData ?? cachedData.kalenderData,
         kalenderReminder: newData.kalenderReminder ?? cachedData.kalenderReminder,
@@ -953,6 +1035,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
         kelasData: Array.isArray(updatedData.kelasData) ? updatedData.kelasData : [],
         absensiData: Array.isArray(updatedData.absensiData) ? updatedData.absensiData : [],
         absensiChartData: Array.isArray(updatedData.absensiChartData) ? updatedData.absensiChartData : [],
+        totalPickupToday: Number(updatedData.totalPickupToday) || 0,
         pengirimanData: updatedData.pengirimanData,
         kalenderData: Array.isArray(updatedData.kalenderData) ? updatedData.kalenderData : [],
         kalenderReminder: updatedData.kalenderReminder,
@@ -977,6 +1060,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
             kalenderReminder: freshData.kalenderReminder,
             menuHariIni: freshData.menuHariIni,
             invitations: Array.isArray((freshData as any).invitations) ? (freshData as any).invitations : [],
+            totalPickupToday: Number(freshData.totalPickupToday) || 0,
             hash: freshData.hash,
             timestamp: freshData.timestamp,
           }
@@ -1031,6 +1115,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
           kelasData,
           absensiData,
           absensiChartData,
+          totalPickupToday: freshData.totalPickupToday || 0,
           pengirimanData,
           kalenderData,
           kalenderReminder,
