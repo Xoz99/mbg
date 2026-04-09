@@ -38,7 +38,7 @@ const PengembalianMakanan = () => {
   const [statusMakanan, setStatusMakanan] = useState<"habis" | "tidak_habis">("habis")
 
   const [validationResult, setValidationResult] = useState<any>(null)
-  
+
   // State Refs to avoid stale closures in intervals
   const trayIdRef = useRef(trayId)
   const stepRef = useRef(step)
@@ -115,7 +115,7 @@ const PengembalianMakanan = () => {
         const devices = await navigator.mediaDevices.enumerateDevices()
         const videoDevices = devices.filter((device) => device.kind === "videoinput")
         setAvailableCameras(videoDevices)
-        
+
         // Pick the best default camera (prefer one that might be 'user' or just the first one)
         if (videoDevices.length > 0) {
           const stored = localStorage.getItem("preferred_camera_id");
@@ -139,7 +139,7 @@ const PengembalianMakanan = () => {
     const nextId = availableCameras[nextIndex].deviceId;
     setSelectedCameraId(nextId);
     localStorage.setItem("preferred_camera_id", nextId);
-    
+
     // Restart camera if active
     if (isCameraActive) {
       stopCamera();
@@ -347,15 +347,15 @@ const PengembalianMakanan = () => {
       const constraints: MediaStreamConstraints = {
         video: deviceId
           ? {
-              deviceId: { exact: deviceId },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            }
+            deviceId: { exact: deviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          }
           : {
-              facingMode,
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
+            facingMode,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
       }
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
@@ -371,7 +371,7 @@ const PengembalianMakanan = () => {
             startPreparationCountdown()
           }
         }
-        
+
         // Ensure play is called
         videoRef.current.play().catch(e => console.error("Error playing video:", e));
       }
@@ -404,6 +404,33 @@ const PengembalianMakanan = () => {
       if (!response.ok) throw new Error(result.message || "Wajah tidak dikenali")
 
       const detectedSiswa = result.data?.siswa || result.siswa || result.data || result
+
+      // BACKUP: If backend didn't return pickupInfo, try to fetch it manually
+      if (detectedSiswa && !detectedSiswa.pickupInfo) {
+        try {
+          const todayStr = new Date().toISOString().split('T')[0]
+          const pickupResponse = await fetch(`${API_BASE_URL}/api/pengambilan-makanan?siswaId=${detectedSiswa.siswaId || detectedSiswa.id}&tanggal=${todayStr}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+
+          if (pickupResponse.ok) {
+            const pickupResult = await pickupResponse.json()
+            const pickups = pickupResult.data?.data || pickupResult.data || []
+            if (pickups.length > 0) {
+              // Use the latest pickup from today
+              detectedSiswa.pickupInfo = {
+                id: pickups[0].id,
+                idTray: pickups[0].idTray,
+                tanggalPengambilan: pickups[0].tanggalPengambilan
+              }
+            }
+          }
+        } catch (fetchErr) {
+          console.error("Failed to fetch backup pickup info:", fetchErr)
+        }
+      }
 
       if (detectedSiswa && (detectedSiswa.siswaId || detectedSiswa.id)) {
         let alergiArray: string[] = []
@@ -491,7 +518,7 @@ const PengembalianMakanan = () => {
   const startRfidPolling = useCallback(() => {
     setIsScanning(true)
     let lastDetectedRfid = ""
-    
+
     // Prevent multiple intervals
     if (rfidPollingRef.current) clearInterval(rfidPollingRef.current)
 
@@ -506,7 +533,7 @@ const PengembalianMakanan = () => {
           const detectedTrayId = result.data?.uid || result.uid || result.trayId
           if (detectedTrayId) {
             const formatted = String(detectedTrayId).toUpperCase()
-            
+
             // Critical Safety Checks:
             // 1. If we are no longer in the RFID scan step, STOP everything.
             if (stepRef.current !== "rfid-scan") {
@@ -519,12 +546,12 @@ const PengembalianMakanan = () => {
 
             if (formatted !== lastDetectedRfid) {
               lastDetectedRfid = formatted
-              
+
               // Validate against pickup info if available
               if (selectedSiswa?.pickupInfo && formatted !== selectedSiswa.pickupInfo.idTray) {
                 if (!window.confirm(`Tray ID (${formatted}) tidak cocok dengan data pengambilan siswa ini (${selectedSiswa.pickupInfo.idTray}). Proses tetap dilanjutkan?`)) {
-                   lastDetectedRfid = ""
-                   return;
+                  lastDetectedRfid = ""
+                  return;
                 }
               }
 
@@ -534,7 +561,7 @@ const PengembalianMakanan = () => {
             }
           }
         }
-      } catch (err) {}
+      } catch (err) { }
     }, 500)
   }, [trayId])
 
@@ -586,7 +613,7 @@ const PengembalianMakanan = () => {
               </div>
               <h2 className="text-xl font-bold mb-2">Scan Wajah</h2>
               <p className="text-gray-500 text-xs mb-6">Posisikan wajah di depan kamera</p>
-              <button 
+              <button
                 onClick={() => setCameraReady(true)}
                 className="px-8 py-3 bg-[#1B263A] text-white rounded-xl font-bold text-sm mx-auto flex items-center gap-2 hover:bg-[#2A3749] transition-all"
               >
@@ -613,10 +640,10 @@ const PengembalianMakanan = () => {
                   </button>
                 )}
                 <button onClick={handleReset} className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all" title="Reset">
-                   <XCircle className="w-4 h-4" />
+                  <XCircle className="w-4 h-4" />
                 </button>
               </div>
-              
+
               {cameraError && (
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-600/80 backdrop-blur px-6 py-4 rounded-2xl text-white text-center shadow-xl border border-red-500/50">
                   <AlertCircle className="w-8 h-8 mx-auto mb-2" />
@@ -632,9 +659,9 @@ const PengembalianMakanan = () => {
                 <div className="bg-black/60 backdrop-blur px-4 py-2 rounded-full text-white text-xs font-semibold">
                   {faceDetected ? "✓ Mengambil foto..." : "Posisikan wajah di lingkaran"}
                 </div>
-                
+
                 {!faceDetected && (
-                  <button 
+                  <button
                     onClick={(e) => { e.preventDefault(); capturePhoto(); }}
                     className="bg-white/20 hover:bg-white/30 backdrop-blur text-white px-4 py-2 rounded-lg text-xs font-bold transition-all border border-white/30 pointer-events-auto"
                   >
@@ -673,7 +700,7 @@ const PengembalianMakanan = () => {
               <div className="text-center md:text-left flex-1">
                 <h2 className="text-xl md:text-2xl font-black text-[#1B263A] tracking-tight mb-1">{selectedSiswa.nama}</h2>
                 <p className="text-gray-400 text-[10px] font-extrabold uppercase tracking-widest">{selectedSiswa.kelas?.nama} • NIS {selectedSiswa.nis}</p>
-                
+
                 {selectedSiswa.pickupInfo ? (
                   <div className="mt-4 inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl shadow-md shadow-blue-200">
                     <Nfc className="w-4 h-4" />
@@ -690,10 +717,10 @@ const PengembalianMakanan = () => {
             <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center">
               {!selectedSiswa.pickupInfo ? (
                 <div className="px-8 flex flex-col items-center">
-                   <XCircle className="w-12 h-12 text-red-400 mb-4" />
-                   <h3 className="font-bold text-red-600">Tidak Bisa Kembalikan</h3>
-                   <p className="text-xs text-slate-500 mt-2">Siswa ini tercatat belum melakukan pengambilan makanan hari ini.</p>
-                   <button onClick={handleReset} className="mt-6 px-6 py-2 bg-slate-200 text-slate-600 rounded-lg text-xs font-bold">Coba Siswa Lain</button>
+                  <XCircle className="w-12 h-12 text-red-400 mb-4" />
+                  <h3 className="font-bold text-red-600">Tidak Bisa Kembalikan</h3>
+                  <p className="text-xs text-slate-500 mt-2">Siswa ini tercatat belum melakukan pengambilan makanan hari ini.</p>
+                  <button onClick={handleReset} className="mt-6 px-6 py-2 bg-slate-200 text-slate-600 rounded-lg text-xs font-bold">Coba Siswa Lain</button>
                 </div>
               ) : !showManualInput ? (
                 <>
@@ -702,7 +729,7 @@ const PengembalianMakanan = () => {
                   </div>
                   <h3 className="font-bold text-[#1B263A]">Tempelkan Tray RFID</h3>
                   <p className="text-[11px] text-gray-400 mt-1 uppercase tracking-widest font-bold">Scanning...</p>
-                  <button 
+                  <button
                     onClick={() => setShowManualInput(true)}
                     className="mt-6 text-[10px] text-[#1B263A] font-extrabold uppercase tracking-widest hover:underline"
                   >
@@ -714,11 +741,11 @@ const PengembalianMakanan = () => {
                   <h3 className="font-bold text-[#1B263A] mb-4 text-sm">Input ID Tray Manual</h3>
                   {trayId && selectedSiswa.pickupInfo?.idTray && trayId !== selectedSiswa.pickupInfo.idTray && (
                     <div className="mb-4 bg-orange-50 border border-orange-200 p-2 rounded-lg flex items-center gap-2">
-                       <AlertCircle className="w-4 h-4 text-orange-500" />
-                       <p className="text-[10px] text-orange-700 font-bold uppercase">Tray Tidak Cocok! (Harusnya: {selectedSiswa.pickupInfo.idTray})</p>
+                      <AlertCircle className="w-4 h-4 text-orange-500" />
+                      <p className="text-[10px] text-orange-700 font-bold uppercase">Tray Tidak Cocok! (Harusnya: {selectedSiswa.pickupInfo.idTray})</p>
                     </div>
                   )}
-                  <input 
+                  <input
                     type="text"
                     value={trayId}
                     onChange={(e) => setTrayId(e.target.value.toUpperCase())}
@@ -727,7 +754,7 @@ const PengembalianMakanan = () => {
                     autoFocus
                   />
                   <div className="flex gap-3">
-                    <button 
+                    <button
                       onClick={() => {
                         setShowManualInput(false)
                         setTrayId("")
@@ -736,7 +763,7 @@ const PengembalianMakanan = () => {
                     >
                       Batal
                     </button>
-                    <button 
+                    <button
                       onClick={() => {
                         if (trayId.trim()) {
                           if (trayId !== selectedSiswa.pickupInfo?.idTray) {
@@ -796,7 +823,7 @@ const PengembalianMakanan = () => {
                 </button>
               </div>
             )}
-            
+
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className={`w-80 h-60 border-2 rounded-2xl transition-all duration-300 ${isPreparationActive ? "border-[#D0B064] scale-100" : foodConditionOk ? "border-emerald-400 scale-100 shadow-[0_0_20px_rgba(52,211,153,0.3)]" : "border-white/30 opacity-50 scale-95"}`}>
                 {(isPreparationActive || (isFoodCountdownActive && foodCountdown > 0)) && (
@@ -811,7 +838,7 @@ const PengembalianMakanan = () => {
 
             <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-4 px-6">
               {!isPreparationActive && (
-                <button 
+                <button
                   onClick={(e) => { e.preventDefault(); capturePhoto(); }}
                   className="bg-[#D0B064] hover:bg-[#E0C074] text-[#1B263A] px-6 py-3 rounded-xl text-sm font-black shadow-xl transition-all flex items-center gap-2 pointer-events-auto transform hover:scale-105 active:scale-95"
                 >
@@ -825,7 +852,7 @@ const PengembalianMakanan = () => {
               <div className="bg-black/60 backdrop-blur px-4 py-1.5 rounded-full text-white text-[10px] font-bold uppercase tracking-wider border border-white/10 text-center">
                 {isPreparationActive ? "Persiapan Frame" : isFoodCountdownActive ? "📸 Mengambil Foto..." : foodConditionOk ? "Menangkap Makanan..." : "Atur Posisi Makanan"}
               </div>
-              <button 
+              <button
                 onClick={capturePhoto}
                 className="w-full max-w-xs py-3 bg-white text-[#1B263A] rounded-xl font-bold text-sm shadow-xl hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
               >
@@ -844,24 +871,24 @@ const PengembalianMakanan = () => {
           </div>
           <div className="p-6">
             <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl mb-6 border border-gray-100">
-               {foodPhoto && <img src={foodPhoto} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />}
-               <div>
-                  <h4 className="font-bold text-[#1B263A]">{selectedSiswa.nama}</h4>
-                  <p className="text-xs text-gray-500">TRAY ID: {trayId}</p>
-               </div>
+              {foodPhoto && <img src={foodPhoto} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />}
+              <div>
+                <h4 className="font-bold text-[#1B263A]">{selectedSiswa.nama}</h4>
+                <p className="text-xs text-gray-500">TRAY ID: {trayId}</p>
+              </div>
             </div>
 
             <p className="text-xs font-bold text-[#1B263A] mb-3 uppercase tracking-wider">Kondisi Makanan</p>
             <div className="grid grid-cols-2 gap-3 mb-6">
-              <button 
-                onClick={() => setStatusMakanan("habis")} 
+              <button
+                onClick={() => setStatusMakanan("habis")}
                 className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all gap-2 ${statusMakanan === "habis" ? "bg-emerald-50 border-emerald-500 text-emerald-700 shadow-md ring-4 ring-emerald-500/10" : "bg-white border-gray-100 text-gray-400 hover:border-emerald-200"}`}
               >
                 <CheckCircle2 className={`w-8 h-8 ${statusMakanan === "habis" ? "text-emerald-500" : "text-gray-200"}`} />
                 <span className="font-bold text-sm">Habis</span>
               </button>
-              <button 
-                onClick={() => setStatusMakanan("tidak_habis")} 
+              <button
+                onClick={() => setStatusMakanan("tidak_habis")}
                 className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all gap-2 ${statusMakanan === "tidak_habis" ? "bg-amber-50 border-amber-500 text-amber-700 shadow-md ring-4 ring-amber-500/10" : "bg-white border-gray-100 text-gray-400 hover:border-amber-200"}`}
               >
                 <AlertCircle className={`w-8 h-8 ${statusMakanan === "tidak_habis" ? "text-amber-500" : "text-gray-200"}`} />
@@ -870,10 +897,10 @@ const PengembalianMakanan = () => {
             </div>
 
             <p className="text-xs font-bold text-[#1B263A] mb-3 uppercase tracking-wider">Catatan Tambahan</p>
-            <textarea 
-              value={keterangan} 
-              onChange={(e) => setKeterangan(e.target.value)} 
-              placeholder="Berikan alasan jika makanan bersisa..." 
+            <textarea
+              value={keterangan}
+              onChange={(e) => setKeterangan(e.target.value)}
+              placeholder="Berikan alasan jika makanan bersisa..."
               className="w-full p-4 border border-gray-200 rounded-2xl text-sm mb-6 outline-none focus:ring-2 focus:ring-[#1B263A]/10 focus:border-[#1B263A] transition-all resize-none"
               rows={3}
             />
