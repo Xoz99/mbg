@@ -13,6 +13,7 @@ import {
   X,
   AlertCircle,
   Trash2,
+  Edit2,
   Filter,
   AlertTriangle,
   Users,
@@ -493,6 +494,7 @@ function ModalCreateMenuHarian({
   setDisplayMonth,
   menuHarianList,
   absensiAggregatedMap,
+  editingId,
 }: any) {
   if (!isOpen) return null
 
@@ -612,7 +614,7 @@ function ModalCreateMenuHarian({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="bg-[#1B263A] text-white px-6 py-4 flex justify-between items-center sticky top-0 z-10">
-          <h3 className="font-bold text-lg">Tambah Menu Harian</h3>
+          <h3 className="font-bold text-lg">{editingId ? "Edit Menu Harian" : "Tambah Menu Harian"}</h3>
           <button onClick={onClose} className="hover:opacity-80 transition">
             <X className="w-5 h-5" />
           </button>
@@ -973,7 +975,7 @@ function ModalCreateMenuHarian({
               disabled={isSubmitting}
               className="flex-1 px-4 py-2 bg-[#D0B064] text-white rounded-lg hover:bg-[#C9A355] disabled:opacity-50 font-medium transition"
             >
-              {isSubmitting ? "Memproses..." : "Tambah"}
+              {isSubmitting ? "Memproses..." : editingId ? "Simpan Perubahan" : "Tambah"}
             </button>
           </div>
         </div>
@@ -1015,6 +1017,7 @@ export default function MenuPlanningPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null) // 🔥 Track which planning is being deleted
   const [isDeletingMenu, setIsDeletingMenu] = useState<string | null>(null) // 🔥 Track which menu harian is being deleted
+  const [editingMenuId, setEditingMenuId] = useState<string | null>(null) // Track menu being edited
 
   const [displayMonth, setDisplayMonth] = useState<Date>(new Date())
   const [showCompletedWeeks, setShowCompletedWeeks] = useState(false)
@@ -1539,6 +1542,90 @@ export default function MenuPlanningPage() {
     }
   }
 
+  const handleOpenEditMenu = (menu: MenuHarian) => {
+    setEditingMenuId(menu.id)
+    setMenuFormData({
+      tanggal: normalizeDateString(menu.tanggal) || "",
+      namaMenu: menu.namaMenu,
+      biayaPerTray: menu.biayaPerTray?.toString() || "",
+      jamMulaiMasak: menu.jamMulaiMasak || "",
+      jamSelesaiMasak: menu.jamSelesaiMasak || "",
+      kalori: menu.kalori?.toString() || "",
+      protein: menu.protein?.toString() || "",
+      karbohidrat: menu.karbohidrat?.toString() || "",
+      targetTray: menu.targetTray?.toString() || "",
+      jamSajikan: menu.jamSajikan || "",
+      lemak: menu.lemak?.toString() || "",
+    })
+    setDisplayMonth(new Date(menu.tanggal || new Date()))
+    setShowCreateMenuModal(true)
+  }
+
+  const handleEditMenuHarian = async () => {
+    if (!editingMenuId) return
+    if (!menuFormData.tanggal || !menuFormData.namaMenu || !menuFormData.jamMulaiMasak || !menuFormData.jamSelesaiMasak || !menuFormData.jamSajikan) {
+      alert("Isi semua field yang wajib")
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+
+      const requestBody = {
+        tanggal: menuFormData.tanggal,
+        namaMenu: menuFormData.namaMenu,
+        biayaPerTray: parseFloat(menuFormData.biayaPerTray) || 0,
+        jamMulaiMasak: menuFormData.jamMulaiMasak,
+        jamSelesaiMasak: menuFormData.jamSelesaiMasak,
+        kalori: parseFloat(menuFormData.kalori) || 0,
+        protein: parseFloat(menuFormData.protein) || 0,
+        lemak: parseFloat(menuFormData.lemak) || 0,
+        targetTray: parseFloat(menuFormData.targetTray) || 0,
+        jamSajikan: menuFormData.jamSajikan,
+        karbohidrat: parseFloat(menuFormData.karbohidrat) || 0,
+      }
+
+      await apiCall(`/api/menu-harian/${editingMenuId}`, {
+        method: "PUT",
+        body: JSON.stringify(requestBody),
+      })
+
+      // Optimistic update
+      setMenuHarianList(prev => prev.map(m => m.id === editingMenuId ? { ...m, ...requestBody } : m))
+
+      // Clear cache & reload
+      const cacheKeyMenuHarian = generateCacheKey(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
+      apiCache.remove(cacheKeyMenuHarian)
+
+      const reloadRes = await apiCall<any>(`/api/menu-planning/${selectedPlanningId}/menu-harian`)
+      const reloadMenus = extractArray(reloadRes?.data || [])
+      setMenuHarianList(reloadMenus)
+
+      await refreshMenuCache()
+
+      alert("Menu harian berhasil diperbarui")
+      setShowCreateMenuModal(false)
+      setEditingMenuId(null)
+      setMenuFormData({
+        tanggal: "",
+        namaMenu: "",
+        biayaPerTray: "",
+        jamMulaiMasak: "",
+        jamSelesaiMasak: "",
+        kalori: "",
+        protein: "",
+        karbohidrat: "",
+        targetTray: "",
+        jamSajikan: "",
+        lemak: "",
+      })
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Gagal memperbarui menu harian")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   // 🎯 ✅ DELETE MENU PLANNING - REALTIME dengan rollback otomatis
   const handleDeleteMenuPlanning = async (planningId: string) => {
     // 🔥 PREVENT DOUBLE-CLICK
@@ -1907,6 +1994,7 @@ export default function MenuPlanningPage() {
               <h2 className="text-lg font-bold text-gray-800">Daftar Menu Harian</h2>
               <button
                 onClick={() => {
+                  setEditingMenuId(null)
                   setDisplayMonth(new Date(currentPlanning?.tanggalMulai || new Date()))
                   // ✅ Reset form saat membuka modal
                   setMenuFormData({
@@ -1945,6 +2033,7 @@ export default function MenuPlanningPage() {
               <p className="text-gray-600 mb-6">Tambahkan menu harian untuk minggu ini</p>
               <button
                 onClick={() => {
+                  setEditingMenuId(null)
                   setDisplayMonth(new Date(currentPlanning?.tanggalMulai || new Date()))
                   // ✅ Reset form saat membuka modal
                   setMenuFormData({
@@ -1989,21 +2078,30 @@ export default function MenuPlanningPage() {
                           </div>
                           <p className="text-sm font-medium text-gray-600">{formatDateSafe(menu.tanggal)}</p>
                         </div>
-                        <button
-                          onClick={() => handleDeleteMenuHarian(menu.id)}
-                          disabled={isDeletingMenu === menu.id}
-                          className={`p-1.5 rounded-lg transition-colors ml-2 ${isDeletingMenu === menu.id
-                            ? "bg-orange-50 text-orange-500 cursor-wait"
-                            : "bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-700"
-                            }`}
-                          title={isDeletingMenu === menu.id ? "Menghapus..." : "Hapus menu"}
-                        >
-                          {isDeletingMenu === menu.id ? (
-                            <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
+                        <div className="flex items-center gap-1 ml-2">
+                          <button
+                            onClick={() => handleOpenEditMenu(menu)}
+                            className="p-1.5 rounded-lg transition-colors bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-700"
+                            title="Edit menu"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMenuHarian(menu.id)}
+                            disabled={isDeletingMenu === menu.id}
+                            className={`p-1.5 rounded-lg transition-colors ${isDeletingMenu === menu.id
+                              ? "bg-orange-50 text-orange-500 cursor-wait"
+                              : "bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-700"
+                              }`}
+                            title={isDeletingMenu === menu.id ? "Menghapus..." : "Hapus menu"}
+                          >
+                            {isDeletingMenu === menu.id ? (
+                              <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </div>
 
                       {absensiForDate && (
@@ -2077,10 +2175,13 @@ export default function MenuPlanningPage() {
 
       <ModalCreateMenuHarian
         isOpen={showCreateMenuModal}
-        onClose={() => setShowCreateMenuModal(false)}
+        onClose={() => {
+          setShowCreateMenuModal(false)
+          setEditingMenuId(null)
+        }}
         formData={menuFormData}
         setFormData={setMenuFormData}
-        onSubmit={handleCreateMenuHarian}
+        onSubmit={editingMenuId ? handleEditMenuHarian : handleCreateMenuHarian}
         isSubmitting={isSubmitting}
         currentPlanning={currentPlanning}
         alergiList={alergiList}
@@ -2091,6 +2192,7 @@ export default function MenuPlanningPage() {
         setDisplayMonth={setDisplayMonth}
         menuHarianList={menuHarianList}
         absensiAggregatedMap={absensiAggregatedMap}
+        editingId={editingMenuId}
       />
     </DapurLayout>
   )
