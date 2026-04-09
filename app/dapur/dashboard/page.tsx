@@ -165,8 +165,13 @@ const DashboardDapur = () => {
     }
   }, [router])
 
-  // ✅ Load data menggunakan hook
+  // ✅ Load data menggunakan hook - tunggu dapurId ready dulu
   useEffect(() => {
+    if (!dapurId) {
+      console.log("⏳ [DashboardDapur] Waiting for dapurId before loading data...")
+      return
+    }
+
     const loadDashboardData = async () => {
       try {
         console.log("🔄 [DashboardDapur] Calling loadData()...");
@@ -184,7 +189,7 @@ const DashboardDapur = () => {
     }
 
     loadDashboardData()
-  }, [loadData])
+  }, [loadData, dapurId])
 
   // ✅ Setup auto-refresh interval
   useEffect(() => {

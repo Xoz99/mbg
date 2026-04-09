@@ -200,7 +200,12 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
   const CACHE_EMIT_KEY = getCacheEmitKey(dapurId)
 
   // Get menu plannings and sekolah list from global context
-  const { menuPlannings: contextPlannings, sekolahList: contextSekolahList, isLoading: contextLoading } = useDapurContext()
+  const { 
+    menuPlannings: contextPlannings, 
+    sekolahList: contextSekolahList, 
+    isLoading: contextLoading,
+    error: contextError 
+  } = useDapurContext()
 
   // ✅ Setup listener untuk cache updates dari component lain (dalam tab yang sama)
   useEffect(() => {
@@ -526,9 +531,10 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
       const age = Date.now() - cached.timestamp
 
       // ✅ Check if cache matches current context (school count must be same)
-      const isCacheConsistent = cached.stats.totalSekolah === contextSekolahList.length
+      // Only skip cache if context is loaded, not in error, and has different length
+      const isCacheConsistent = contextError ? true : (contextSekolahList.length === 0 ? true : cached.stats.totalSekolah === contextSekolahList.length)
       
-      if (!isCacheConsistent) {
+      if (!isCacheConsistent && !contextError && contextSekolahList.length > 0) {
         console.log("⚠️ [DAPUR DASHBOARD CACHE] Cache inconsistent with context (school count mismatch), skipping cache")
       } else if (age < CACHE_EXPIRY) {
         console.log("✅ [DAPUR DASHBOARD CACHE] Using memory cache", { age, expiry: CACHE_EXPIRY })
@@ -551,7 +557,7 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
           const age = Date.now() - parsed.timestamp
 
           // ✅ Check if cache matches current context
-          const isCacheConsistent = parsed.stats.totalSekolah === contextSekolahList.length
+          const isCacheConsistent = contextError ? true : (contextSekolahList.length === 0 ? true : parsed.stats.totalSekolah === contextSekolahList.length)
 
           if (isCacheConsistent && age < CACHE_EXPIRY) {
             console.log("✅ [DAPUR DASHBOARD CACHE] Using localStorage cache", { age, expiry: CACHE_EXPIRY })
@@ -582,7 +588,14 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
   const fetchAndUpdateCache = useCallback(
     async (cacheId: string) => {
       // Wait for context to load
-      if (contextLoading) {
+      if (contextLoading || contextError) {
+        console.log(`[DAPUR DASHBOARD CACHE] 🛑 Fetch skipped: contextLoading=${contextLoading}, contextError=${!!contextError}`)
+        return
+      }
+
+      // Don't overwrite with empty data if we have 0 plannings but context has schools
+      if (contextSekolahList.length > 0 && contextPlannings.length === 0) {
+        console.log("[DAPUR DASHBOARD CACHE] 🛑 Fetch skipped: Schools available in context but 0 plannings found. Avoiding cache wipe.")
         return
       }
 
@@ -694,8 +707,9 @@ export const useDapurDashboardCache = (onCacheUpdate?: (data: DapurDashboardData
   )
 
   // ✅ Auto-load data when context is ready or context data changes
+  // Guard: hanya load kalau dapurId sudah tersedia (avoid race condition saat navigate back)
   useEffect(() => {
-    if (!contextLoading) {
+    if (!contextLoading && dapurId) {
       console.log("[DAPUR DASHBOARD CACHE] 🔄 Context ready or changed - triggering loadData()")
       loadData()
     }
