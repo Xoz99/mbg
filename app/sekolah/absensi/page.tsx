@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import SekolahLayout from "@/components/layout/SekolahLayout"
 import { useSekolahDataCache } from "@/lib/hooks/useSekolahDataCache"
 import { Users, Loader, Camera, CheckCircle, School, X, CheckCircle2, Hash, XCircle, Sparkles, Zap, AlertTriangle, User, Users2, RefreshCw, Nfc } from "lucide-react"
+import { toast } from "sonner"
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
 const AbsensiPenerima = () => {
@@ -731,6 +732,7 @@ const AbsensiPenerima = () => {
               console.log("[v0] Updating state with RFID:", trayIdFormatted)
 
               setTrayId(trayIdFormatted)
+              toast.success(`Tray ${trayIdFormatted} terdeteksi!`)
               // Stop polling immediately once we have a NEW valid ID
               stopRfidPolling()
               setStep("confirm")
@@ -739,6 +741,7 @@ const AbsensiPenerima = () => {
         }
       } catch (err) {
         console.error("[RFID] Polling error:", err)
+        toast.error("Gagal membaca RFID, mencoba ulang...")
       }
     }
 
@@ -809,6 +812,7 @@ const AbsensiPenerima = () => {
         siswa: selectedSiswa,
         data: result.data,
       })
+      toast.success("Pengambilan makanan berhasil dicatat!")
       setStep("result")
 
       // Refresh absensi data setelah submit
@@ -821,10 +825,12 @@ const AbsensiPenerima = () => {
       }, 5000)
     } catch (err) {
       console.error("Error submitting:", err)
+      const errMsg = err instanceof Error ? err.message : "Terjadi kesalahan"
       setValidationResult({
         success: false,
-        message: err instanceof Error ? err.message : "Terjadi kesalahan",
+        message: errMsg,
       })
+      toast.error(`Gagal: ${errMsg}`)
       setStep("result")
 
       setTimeout(() => {

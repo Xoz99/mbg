@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import SekolahLayout from "@/components/layout/SekolahLayout"
 import { useSekolahDataCache } from "@/lib/hooks/useSekolahDataCache"
 import { AlertCircle, CheckCircle, CheckCircle2, Loader, Sparkles, XCircle, Camera, RefreshCw, Nfc, User, Users, School } from "lucide-react"
+import { toast } from "sonner"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
@@ -565,10 +566,13 @@ const PengembalianMakanan = () => {
       if (!response.ok) throw new Error(result.message || "Gagal submit")
 
       setValidationResult({ success: true, message: "Berhasil dicatat!", siswa: selectedSiswa })
+      toast.success("Pengembalian makanan berhasil dicatat!")
       setStep("result")
       setTimeout(handleReset, 5000)
     } catch (err) {
-      setValidationResult({ success: false, message: err instanceof Error ? err.message : "Terjadi kesalahan" })
+      const errMsg = err instanceof Error ? err.message : "Terjadi kesalahan"
+      setValidationResult({ success: false, message: errMsg })
+      toast.error(`Gagal: ${errMsg}`)
       setStep("result")
       setTimeout(handleReset, 5000)
     }
@@ -620,12 +624,15 @@ const PengembalianMakanan = () => {
               }
 
               setTrayId(formatted)
+              toast.success(`Tray ${formatted} terdeteksi!`)
               stopRfidPolling()
               setStep("camera-food")
             }
           }
         }
-      } catch (err) { }
+      } catch (err) {
+        toast.error("Gagal membaca RFID, mencoba ulang...")
+      }
     }, 500)
   }, [trayId])
 
