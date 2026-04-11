@@ -67,6 +67,7 @@ const AbsensiPenerima = () => {
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const rfidPollingRef = useRef<NodeJS.Timeout | null>(null)
+  const rfidWsRef = useRef<WebSocket | null>(null)
   const menuCountdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const foodDetectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const preparationIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -694,12 +695,78 @@ const AbsensiPenerima = () => {
 
   const startRfidPolling = useCallback(() => {
     setIsScanning(true)
-    let lastDetectedRfid = ""
+
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    const storedSekolahId = localStorage.getItem("sekolahId") || sekolahId
+
+    // WebSocket URL
+    const wsProtocol = API_BASE_URL.startsWith("https") ? "wss" : "ws"
+    const wsHost = API_BASE_URL.replace(/^https?:\/\//, "")
+    const wsUrl = `${wsProtocol}://${wsHost}/api/rfid/tray-summary-ws?sekolahId=${storedSekolahId}&token=${token}`
+
+    // Cleanup existing WS
+    if (rfidWsRef.current) {
+      rfidWsRef.current.close()
+      rfidWsRef.current = null
+    }
+
+    try {
+      const ws = new WebSocket(wsUrl)
+      rfidWsRef.current = ws
+
+      ws.onopen = () => {
+        console.log("[WS] Connected for RFID scan events")
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data)
+
+          // Handle scan event (pushed dari backend saat ada scan baru)
+          if (message.type === "RFID_SCAN" && message.data?.uid) {
+            const trayIdFormatted = String(message.data.uid).toUpperCase()
+
+            if (stepRef.current !== "rfid-scan") {
+              stopRfidPolling()
+              return
+            }
+
+            if (trayIdFormatted === trayIdRef.current) return
+
+            console.log("[WS] RFID detected:", trayIdFormatted)
+            setTrayId(trayIdFormatted)
+            toast.success(`Tray ${trayIdFormatted} terdeteksi!`)
+            stopRfidPolling()
+            setStep("confirm")
+          }
+        } catch (err) {
+          console.error("[WS] Parse error:", err)
+        }
+      }
+
+      ws.onerror = (err) => {
+        console.warn("[WS] Error, falling back to polling:", err)
+        ws.close()
+        // Fallback ke polling kalau WebSocket gagal
+        startPollingFallback()
+      }
+
+      ws.onclose = () => {
+        console.log("[WS] Connection closed")
+      }
+    } catch (err) {
+      console.warn("[WS] Failed to connect, falling back to polling")
+      startPollingFallback()
+    }
+  }, [sekolahId])
+
+  // Fallback polling kalau WebSocket ga jalan
+  const startPollingFallback = useCallback(() => {
+    if (rfidPollingRef.current) return // Udah jalan
 
     const pollRfid = async () => {
       try {
         const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
-
         const response = await fetch(`${API_BASE_URL}/api/rfid/latest?tipe=MASUK`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -714,38 +781,26 @@ const AbsensiPenerima = () => {
 
           if (detectedTrayId) {
             const trayIdFormatted = String(detectedTrayId).toUpperCase()
-            
-            // Critical Safety Checks:
-            // 1. If we are no longer in the RFID scan step, STOP everything.
+
             if (stepRef.current !== "rfid-scan") {
               stopRfidPolling()
               return
             }
 
-            // 2. If the state already has this ID, don't update/log again.
-            if (trayIdFormatted === trayIdRef.current) return;
+            if (trayIdFormatted === trayIdRef.current) return
 
-            console.log("[v0] RFID detected instantly:", trayIdFormatted)
-
-            if (trayIdFormatted !== lastDetectedRfid) {
-              lastDetectedRfid = trayIdFormatted
-              console.log("[v0] Updating state with RFID:", trayIdFormatted)
-
-              setTrayId(trayIdFormatted)
-              toast.success(`Tray ${trayIdFormatted} terdeteksi!`)
-              // Stop polling immediately once we have a NEW valid ID
-              stopRfidPolling()
-              setStep("confirm")
-            }
+            console.log("[Polling] RFID detected:", trayIdFormatted)
+            setTrayId(trayIdFormatted)
+            toast.success(`Tray ${trayIdFormatted} terdeteksi!`)
+            stopRfidPolling()
+            setStep("confirm")
           }
         }
       } catch (err) {
-        console.error("[RFID] Polling error:", err)
-        toast.error("Gagal membaca RFID, mencoba ulang...")
+        console.error("[Polling] error:", err)
       }
     }
 
-    // Interval is safe with empty dependencies because we use Refs now!
     rfidPollingRef.current = setInterval(pollRfid, 500)
     pollRfid()
   }, [])
@@ -754,6 +809,10 @@ const AbsensiPenerima = () => {
     if (rfidPollingRef.current) {
       clearInterval(rfidPollingRef.current)
       rfidPollingRef.current = null
+    }
+    if (rfidWsRef.current) {
+      rfidWsRef.current.close()
+      rfidWsRef.current = null
     }
     setIsScanning(false)
   }, [])
@@ -764,8 +823,7 @@ const AbsensiPenerima = () => {
     } else {
       stopRfidPolling()
     }
-    
-    // Proper Cleanup for the listener
+
     return () => stopRfidPolling()
   }, [step, startRfidPolling, stopRfidPolling])
 

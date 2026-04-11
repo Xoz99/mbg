@@ -65,6 +65,7 @@ const PengembalianMakanan = () => {
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const rfidPollingRef = useRef<NodeJS.Timeout | null>(null)
+  const rfidWsRef = useRef<WebSocket | null>(null)
   const foodDetectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const foodCountdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const preparationIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -579,16 +580,92 @@ const PengembalianMakanan = () => {
   }
 
   const stopRfidPolling = useCallback(() => {
-    if (rfidPollingRef.current) clearInterval(rfidPollingRef.current)
+    if (rfidPollingRef.current) {
+      clearInterval(rfidPollingRef.current)
+      rfidPollingRef.current = null
+    }
+    if (rfidWsRef.current) {
+      rfidWsRef.current.close()
+      rfidWsRef.current = null
+    }
     setIsScanning(false)
   }, [])
 
   const startRfidPolling = useCallback(() => {
     setIsScanning(true)
-    let lastDetectedRfid = ""
 
-    // Prevent multiple intervals
-    if (rfidPollingRef.current) clearInterval(rfidPollingRef.current)
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    const storedSekolahId = localStorage.getItem("sekolahId") || sekolahId
+
+    // WebSocket URL
+    const wsProtocol = API_BASE_URL.startsWith("https") ? "wss" : "ws"
+    const wsHost = API_BASE_URL.replace(/^https?:\/\//, "")
+    const wsUrl = `${wsProtocol}://${wsHost}/api/rfid/tray-summary-ws?sekolahId=${storedSekolahId}&token=${token}`
+
+    // Cleanup existing WS
+    if (rfidWsRef.current) {
+      rfidWsRef.current.close()
+      rfidWsRef.current = null
+    }
+
+    try {
+      const ws = new WebSocket(wsUrl)
+      rfidWsRef.current = ws
+
+      ws.onopen = () => {
+        console.log("[WS] Connected for RFID scan events")
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data)
+
+          if (message.type === "RFID_SCAN" && message.data?.uid) {
+            const formatted = String(message.data.uid).toUpperCase()
+
+            if (stepRef.current !== "rfid-scan") {
+              stopRfidPolling()
+              return
+            }
+
+            if (formatted === trayIdRef.current) return
+
+            // Validate against pickup info if available
+            if (selectedSiswa?.pickupInfo && formatted !== selectedSiswa.pickupInfo.idTray) {
+              if (!window.confirm(`Tray ID (${formatted}) tidak cocok dengan data pengambilan siswa ini (${selectedSiswa.pickupInfo.idTray}). Proses tetap dilanjutkan?`)) {
+                return
+              }
+            }
+
+            console.log("[WS] RFID detected:", formatted)
+            setTrayId(formatted)
+            toast.success(`Tray ${formatted} terdeteksi!`)
+            stopRfidPolling()
+            setStep("camera-food")
+          }
+        } catch (err) {
+          console.error("[WS] Parse error:", err)
+        }
+      }
+
+      ws.onerror = () => {
+        console.warn("[WS] Error, falling back to polling")
+        ws.close()
+        startPollingFallback()
+      }
+
+      ws.onclose = () => {
+        console.log("[WS] Connection closed")
+      }
+    } catch (err) {
+      console.warn("[WS] Failed to connect, falling back to polling")
+      startPollingFallback()
+    }
+  }, [sekolahId, selectedSiswa])
+
+  // Fallback polling kalau WebSocket ga jalan
+  const startPollingFallback = useCallback(() => {
+    if (rfidPollingRef.current) return
 
     rfidPollingRef.current = setInterval(async () => {
       try {
@@ -602,39 +679,30 @@ const PengembalianMakanan = () => {
           if (detectedTrayId) {
             const formatted = String(detectedTrayId).toUpperCase()
 
-            // Critical Safety Checks:
-            // 1. If we are no longer in the RFID scan step, STOP everything.
             if (stepRef.current !== "rfid-scan") {
               stopRfidPolling()
               return
             }
 
-            // 2. If the state already has this ID, don't update/log again.
-            if (formatted === trayIdRef.current) return;
+            if (formatted === trayIdRef.current) return
 
-            if (formatted !== lastDetectedRfid) {
-              lastDetectedRfid = formatted
-
-              // Validate against pickup info if available
-              if (selectedSiswa?.pickupInfo && formatted !== selectedSiswa.pickupInfo.idTray) {
-                if (!window.confirm(`Tray ID (${formatted}) tidak cocok dengan data pengambilan siswa ini (${selectedSiswa.pickupInfo.idTray}). Proses tetap dilanjutkan?`)) {
-                  lastDetectedRfid = ""
-                  return;
-                }
+            if (selectedSiswa?.pickupInfo && formatted !== selectedSiswa.pickupInfo.idTray) {
+              if (!window.confirm(`Tray ID (${formatted}) tidak cocok dengan data pengambilan siswa ini (${selectedSiswa.pickupInfo.idTray}). Proses tetap dilanjutkan?`)) {
+                return
               }
-
-              setTrayId(formatted)
-              toast.success(`Tray ${formatted} terdeteksi!`)
-              stopRfidPolling()
-              setStep("camera-food")
             }
+
+            setTrayId(formatted)
+            toast.success(`Tray ${formatted} terdeteksi!`)
+            stopRfidPolling()
+            setStep("camera-food")
           }
         }
       } catch (err) {
         toast.error("Gagal membaca RFID, mencoba ulang...")
       }
     }, 500)
-  }, [trayId])
+  }, [selectedSiswa])
 
   useEffect(() => {
     if (step === "camera-face" && !isCameraActive && cameraReady) {
