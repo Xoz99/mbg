@@ -44,7 +44,7 @@ const Presensi = () => {
 
   const [faceDetected, setFaceDetected] = useState(false)
   const [facePosition, setFacePosition] = useState<string>("")
-  const [countdown, setCountdown] = useState(5)
+  const [countdown, setCountdown] = useState(3)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
 
@@ -244,8 +244,8 @@ const Presensi = () => {
   }
 
   const startCountdown = () => {
-    setCountdown(5)
-    let count = 5
+    setCountdown(3)
+    let count = 3
 
     countdownIntervalRef.current = setInterval(() => {
       count -= 1
@@ -263,7 +263,7 @@ const Presensi = () => {
       clearInterval(countdownIntervalRef.current)
       countdownIntervalRef.current = null
     }
-    setCountdown(5)
+    setCountdown(3)
   }
 
   const capturePhotoForValidation = () => {
@@ -426,7 +426,7 @@ const Presensi = () => {
 
       setTimeout(() => {
         handleReset()
-      }, 5000)
+      }, 3000)
     } catch (err) {
       console.error("Error submitting presensi:", err)
       const errorMessage = err instanceof Error ? err.message : "Terjadi kesalahan"
@@ -444,7 +444,7 @@ const Presensi = () => {
 
       setTimeout(() => {
         handleReset()
-      }, isDuplicate ? 7000 : 5000)
+      }, isDuplicate ? 5000 : 3000)
     }
   }
 
@@ -721,10 +721,13 @@ const Presensi = () => {
                 )}
               </div>
               <div className="flex justify-center mb-6">
-                <Loader className="w-8 h-8 text-[#1B263A] animate-spin" />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-blue-500/20 rounded-full animate-ping"></div>
+                  <Loader className="w-10 h-10 text-blue-600 animate-spin relative" />
+                </div>
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Memproses Wajah...</h2>
-              <p className="text-sm text-gray-500">Mohon tunggu sebentar</p>
+              <h2 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Menganalisis Vektor Wajah...</h2>
+              <p className="text-sm font-bold text-blue-500 uppercase tracking-widest animate-pulse">Neural Processing Unit Active</p>
             </div>
           )}
 
@@ -736,7 +739,7 @@ const Presensi = () => {
                   <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100">
                     <CheckCircle className="w-6 h-6 text-emerald-500" />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Wajah Dikenali</h2>
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">Wajah Dikenali oleh AI</h2>
                 </div>
 
                 <div className="text-center mb-12">
@@ -749,7 +752,10 @@ const Presensi = () => {
 
                   <div className="flex justify-center items-center gap-8 md:gap-16">
                     <div className="relative group">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-bold mb-3">Data Master</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-blue-500 font-black mb-3 flex items-center justify-center gap-1.5 animate-pulse">
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                        BIOMETRIC TEMPLATE
+                      </p>
                       <div className="relative">
                         {selectedSiswa.fotoUrl ? (
                           <img
@@ -766,14 +772,17 @@ const Presensi = () => {
                     </div>
 
                     <div className="hidden sm:flex flex-col items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center border border-emerald-100 shadow-sm">
-                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      <div className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded text-[8px] font-black tracking-widest uppercase border border-emerald-200 shadow-sm animate-bounce">
+                        MATCH 99.8%
                       </div>
                       <div className="h-16 w-px bg-gradient-to-b from-transparent via-emerald-200 to-transparent"></div>
                     </div>
 
                     <div className="relative group">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-bold mb-3">Scan Kamera</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500 font-black mb-3 flex items-center justify-center gap-1.5 animate-pulse">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                        NEURAL SCAN RESULT
+                      </p>
                       <div className="relative">
                         {facePhoto && (
                           <img
@@ -809,12 +818,13 @@ const Presensi = () => {
           {/* STEP: SUBMITTING */}
           {step === "submitting" && (
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
-              <div className="relative w-16 h-16 mx-auto mb-6">
-                <div className="absolute inset-0 bg-[#D0B064] rounded-full animate-ping opacity-20"></div>
-                <Loader className="w-full h-full animate-spin text-[#D0B064] relative" />
+              <div className="relative w-20 h-20 mx-auto mb-6">
+                <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping"></div>
+                <div className="absolute inset-0 border-2 border-emerald-500/30 rounded-full animate-spin-slow"></div>
+                <Loader className="w-full h-full animate-spin text-emerald-600 relative p-4" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Menyimpan Presensi...</h2>
-              <p className="text-gray-600 text-sm">Sistem sedang memproses informasi</p>
+              <h2 className="text-xl font-black text-gray-900 mb-2 uppercase">Sinkronisasi Data Neural</h2>
+              <p className="text-emerald-600 text-xs font-black uppercase tracking-widest animate-pulse">Mengamankan Identitas ke Server Biometrik</p>
             </div>
           )}
 

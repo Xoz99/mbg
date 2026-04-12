@@ -23,7 +23,7 @@ const PengembalianMakanan = () => {
 
   // Face detection
   const [faceDetected, setFaceDetected] = useState(false)
-  const [countdown, setCountdown] = useState(5)
+  const [countdown, setCountdown] = useState(3)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
   const [facePhoto, setFacePhoto] = useState<string | null>(null)
@@ -33,10 +33,10 @@ const PengembalianMakanan = () => {
   // Food detection
   const [foodConditionOk, setFoodConditionOk] = useState(false)
   const [foodCondition, setFoodCondition] = useState<string>("")
-  const [foodCountdown, setFoodCountdown] = useState(5)
+  const [foodCountdown, setFoodCountdown] = useState(3)
   const [isFoodCountdownActive, setIsFoodCountdownActive] = useState(false)
   const [isPreparationActive, setIsPreparationActive] = useState(false)
-  const [preparationCountdown, setPreparationCountdown] = useState(5)
+  const [preparationCountdown, setPreparationCountdown] = useState(3)
 
   // RFID & Keterangan
   const [isScanning, setIsScanning] = useState(false)
@@ -69,6 +69,7 @@ const PengembalianMakanan = () => {
   const foodDetectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const foodCountdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const preparationIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const faceCameraIdRef = useRef<string>("") // Track kamera yang dipakai untuk face rego
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -198,7 +199,7 @@ const PengembalianMakanan = () => {
     enumerateCameras()
   }, [])
 
-  const switchCamera = () => {
+  const switchCamera = async () => {
     if (availableCameras.length <= 1) return;
     const currentIndex = availableCameras.findIndex(d => d.deviceId === selectedCameraId);
     const nextIndex = (currentIndex + 1) % availableCameras.length;
@@ -206,19 +207,27 @@ const PengembalianMakanan = () => {
     setSelectedCameraId(nextId);
     localStorage.setItem("preferred_camera_id", nextId);
 
-    // Restart camera if active
-    if (isCameraActive) {
-      stopCamera();
-      // useEffect will restart it
+    // startCamera sudah handle stop stream lama di dalamnya
+    const mode = stepRef.current === "camera-face" ? "user" : "environment"
+    await startCamera(mode, nextId)
+
+    // Restart food detection jika di step camera-food
+    if (stepRef.current === "camera-food") {
+      stopFoodDetection()
+      stopFoodCountdown()
+      setTimeout(() => {
+        startFoodDetection()
+      }, 500)
     }
   };
+
 
   const stopCountdown = useCallback(() => {
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current)
       countdownIntervalRef.current = null
     }
-    setCountdown(5)
+    setCountdown(3)
   }, [])
 
   const stopFaceDetection = useCallback(() => {
@@ -236,7 +245,7 @@ const PengembalianMakanan = () => {
       foodCountdownIntervalRef.current = null
     }
     setIsFoodCountdownActive(false)
-    setFoodCountdown(5)
+    setFoodCountdown(3)
   }, [])
 
   const stopFoodDetection = useCallback(() => {
@@ -254,7 +263,7 @@ const PengembalianMakanan = () => {
       preparationIntervalRef.current = null
     }
     setIsPreparationActive(false)
-    setPreparationCountdown(5)
+    setPreparationCountdown(3)
   }, [])
 
   const stopCamera = useCallback(() => {
@@ -281,22 +290,22 @@ const PengembalianMakanan = () => {
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0)
       const photoData = canvas.toDataURL("image/jpeg", 0.8)
-      if (step === "camera-face") {
+      if (stepRef.current === "camera-face") {
         setFacePhoto(photoData)
         stopCamera()
         // Start validation after stop camera to prevent state conflict
         setTimeout(() => validateFace(photoData), 100)
-      } else if (step === "camera-food") {
+      } else if (stepRef.current === "camera-food") {
         setFoodPhoto(photoData)
         stopCamera()
         setStep("keterangan")
       }
     }
-  }, [step, stopCamera])
+  }, [stopCamera])
 
   const startCountdown = useCallback(() => {
-    setCountdown(5)
-    let count = 5
+    setCountdown(3)
+    let count = 3
     countdownIntervalRef.current = setInterval(() => {
       count -= 1
       setCountdown(count)
@@ -309,7 +318,7 @@ const PengembalianMakanan = () => {
 
   const startFaceDetection = useCallback(() => {
     detectionIntervalRef.current = setInterval(() => {
-      if (!videoRef.current || !canvasRef.current || step !== "camera-face") return
+      if (!videoRef.current || !canvasRef.current || stepRef.current !== "camera-face") return
 
       const video = videoRef.current
       const canvas = canvasRef.current
@@ -340,12 +349,12 @@ const PengembalianMakanan = () => {
         stopCountdown()
       }
     }, 200)
-  }, [step, startCountdown, stopCountdown])
+  }, [startCountdown, stopCountdown])
 
   const startFoodCountdown = useCallback(() => {
     setIsFoodCountdownActive(true)
-    setFoodCountdown(5)
-    let count = 5
+    setFoodCountdown(3)
+    let count = 3
     foodCountdownIntervalRef.current = setInterval(() => {
       count -= 1
       setFoodCountdown(count)
@@ -358,7 +367,7 @@ const PengembalianMakanan = () => {
 
   const startFoodDetection = useCallback(() => {
     foodDetectionIntervalRef.current = setInterval(() => {
-      if (!videoRef.current || !canvasRef.current || step !== "camera-food") return
+      if (!videoRef.current || !canvasRef.current || stepRef.current !== "camera-food") return
 
       const video = videoRef.current
       const canvas = canvasRef.current
@@ -391,12 +400,12 @@ const PengembalianMakanan = () => {
         stopFoodCountdown()
       }
     }, 200)
-  }, [step, startFoodCountdown, stopFoodCountdown])
+  }, [startFoodCountdown, stopFoodCountdown])
 
   const startPreparationCountdown = useCallback(() => {
     setIsPreparationActive(true)
-    setPreparationCountdown(5)
-    let count = 5
+    setPreparationCountdown(3)
+    let count = 3
     preparationIntervalRef.current = setInterval(() => {
       count -= 1
       setPreparationCountdown(count)
@@ -408,45 +417,42 @@ const PengembalianMakanan = () => {
   }, [stopPreparationCountdown, startFoodDetection])
 
   const startCamera = async (facingMode: "user" | "environment" = "user", deviceId?: string) => {
-    try {
-      setIsCameraActive(true)
-      const constraints: MediaStreamConstraints = {
-        video: deviceId
-          ? {
-            deviceId: { exact: deviceId },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          }
-          : {
-            facingMode,
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-      }
+    // Stop existing stream first
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+    setIsCameraActive(true)
+    setCameraError(null)
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        streamRef.current = stream
+    const constraints: MediaStreamConstraints = {
+      video: deviceId
+        ? { deviceId: { exact: deviceId } }
+        : { facingMode: { ideal: facingMode } }
+    }
 
-        videoRef.current.onloadedmetadata = () => {
-          if (stepRef.current === "camera-face") {
-            startFaceDetection()
-          } else if (stepRef.current === "camera-food") {
-            startPreparationCountdown()
-          }
+    if (typeof constraints.video === 'object') {
+      (constraints.video as any).width = { ideal: 1280 };
+      (constraints.video as any).height = { ideal: 720 };
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia(constraints)
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream
+      streamRef.current = stream
+
+      videoRef.current.onloadedmetadata = () => {
+        if (stepRef.current === "camera-face") {
+          startFaceDetection()
         }
-
-        // Ensure play is called
-        videoRef.current.play().catch(e => console.error("Error playing video:", e));
       }
-    } catch (err: any) {
-      console.error("Error starting camera:", err)
-      setIsCameraActive(false)
-      setCameraError(err.message || "Gagal mengakses kamera")
+
+      videoRef.current.play().catch(e => console.warn("Video play error:", e))
     }
   }
+
 
   const validateFace = async (facePhotoData: string) => {
     setStep("processing-face")
@@ -705,21 +711,72 @@ const PengembalianMakanan = () => {
   }, [selectedSiswa])
 
   useEffect(() => {
-    if (step === "camera-face" && !isCameraActive && cameraReady) {
-      startCamera("user", selectedCameraId)
-    } else if (step === "camera-food" && !isCameraActive) {
-      if (selectedCameraId) {
-        startCamera("environment", selectedCameraId)
-      } else {
-        startCamera("environment")
+    let cancelled = false
+
+    const initCamera = async () => {
+      try {
+        if (step === "camera-face") {
+          if (cameraReady) {
+            const faceCamId = availableCameras.length > 0 ? availableCameras[0].deviceId : undefined
+            if (faceCamId) faceCameraIdRef.current = faceCamId
+            console.log("[CAMERA] Face step - starting with:", faceCamId ? "device " + faceCamId.slice(0, 8) : "default user")
+            await startCamera("user", faceCamId)
+          }
+        } else if (step === "camera-food") {
+          const otherCamera = availableCameras.find(cam => cam.deviceId !== faceCameraIdRef.current)
+          if (otherCamera) {
+            console.log("[CAMERA SWITCH] Trying other camera:", otherCamera.label)
+            setSelectedCameraId(otherCamera.deviceId)
+            try {
+              await startCamera("environment", otherCamera.deviceId)
+              console.log("[CAMERA SWITCH] Success!")
+            } catch (switchErr) {
+              console.warn("[CAMERA SWITCH] Other camera failed, falling back")
+              if (!cancelled) {
+                await startCamera("environment")
+              }
+            }
+          } else {
+            console.log("[CAMERA SWITCH] Only 1 camera, using same")
+            await startCamera("environment")
+          }
+        }
+      } catch (err: any) {
+        console.error("[CAMERA] Failed to start camera:", err)
+        setIsCameraActive(false)
+        setCameraError(err.message || "Gagal mengakses kamera")
       }
     }
 
-    return () => {
-      stopCamera()
-    }
-  }, [step, selectedCameraId, cameraReady])
+    initCamera()
 
+    return () => {
+      cancelled = true
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null
+      }
+      setIsCameraActive(false)
+      stopFaceDetection()
+    }
+  }, [step, cameraReady])
+
+
+
+  // Separate useEffect untuk preparation countdown
+  useEffect(() => {
+    if (step === "camera-food") {
+      startPreparationCountdown()
+    }
+    return () => {
+      stopPreparationCountdown()
+      stopFoodDetection()
+      stopFoodCountdown()
+    }
+  }, [step])
   useEffect(() => {
     if (step === "rfid-scan") {
       startRfidPolling()
@@ -829,16 +886,7 @@ const PengembalianMakanan = () => {
                   )}
                 </div>
 
-                <div className="absolute top-4 left-4 flex gap-2">
-                  {availableCameras.length > 1 && (
-                    <button onClick={switchCamera} className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all font-bold text-xs" title="Switch Camera">
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
-                  )}
-                  <button onClick={handleReset} className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all" title="Reset">
-                    <XCircle className="w-4 h-4" />
-                  </button>
-                </div>
+
 
                 {cameraError && (
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-600/80 backdrop-blur px-6 py-4 rounded-2xl text-white text-center shadow-xl border border-red-500/50">
@@ -1047,11 +1095,18 @@ const PengembalianMakanan = () => {
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedCameraId}
-                    onChange={(e) => {
-                      setSelectedCameraId(e.target.value)
-                      localStorage.setItem("preferred_camera_id", e.target.value)
-                      stopCamera()
-                      // useEffect restarts it
+                    onChange={async (e) => {
+                      const newCamId = e.target.value
+                      setSelectedCameraId(newCamId)
+                      localStorage.setItem("preferred_camera_id", newCamId)
+                      // startCamera handles stopping old stream
+                      await startCamera("environment", newCamId)
+                      // Restart food detection
+                      stopFoodDetection()
+                      stopFoodCountdown()
+                      setTimeout(() => {
+                        startFoodDetection()
+                      }, 500)
                     }}
                     className="px-3 py-1.5 border border-gray-600 bg-gray-800 text-white rounded-lg text-xs font-medium focus:ring-1 focus:ring-emerald-500 transition-all outline-none"
                   >
@@ -1098,7 +1153,7 @@ const PengembalianMakanan = () => {
               <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
                 {isPreparationActive ? "Mempersiapkan kamera..." : foodConditionOk ? "✓ Menangkap foto..." : "Arahkan kamera ke sisa makanan"}
               </div>
-              
+
               {!isPreparationActive && (
                 <button
                   onClick={capturePhoto}
@@ -1108,12 +1163,12 @@ const PengembalianMakanan = () => {
                 </button>
               )}
             </div>
-            
+
             {/* Top Right Controls */}
             <div className="absolute top-4 right-4 flex gap-2">
-              <button 
+              <button
                 onClick={handleReset}
-                className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all font-bold text-xs" 
+                className="p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-all font-bold text-xs"
                 title="Reset"
               >
                 <XCircle className="w-4 h-4" />

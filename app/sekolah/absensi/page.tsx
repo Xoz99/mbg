@@ -13,7 +13,7 @@ const AbsensiPenerima = () => {
   >("camera-face")
   const [faceDetected, setFaceDetected] = useState(false)
   const [facePosition, setFacePosition] = useState<string>("") // 'too-dark', 'too-bright'
-  const [countdown, setCountdown] = useState(5)
+  const [countdown, setCountdown] = useState(3)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
   const [facePhoto, setFacePhoto] = useState<string | null>(null)
@@ -27,7 +27,7 @@ const AbsensiPenerima = () => {
   const [sekolahId, setSekolahId] = useState("")
   const [keterangan, setKeterangan] = useState("")
   const [statusMakanan, setStatusMakanan] = useState<"habis" | "tidak_habis">("tidak_habis")
-  
+
   // State Refs to avoid stale closures in intervals
   const trayIdRef = useRef(trayId)
   const stepRef = useRef(step)
@@ -42,14 +42,16 @@ const AbsensiPenerima = () => {
   const [absensiData, setAbsensiData] = useState<Array<any>>([]) // Tracking siswa yang sudah absen
   const [isDuplicate, setIsDuplicate] = useState(false) // Flag untuk duplicate warning
   const [duplicateSiswaInfo, setDuplicateSiswaInfo] = useState<any>(null) // Info siswa yang sudah absen
+  const [rfidDetected, setRfidDetected] = useState(false) // Animasi RFID terdeteksi
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]) // List semua kamera yang tersedia
   const [selectedCameraId, setSelectedCameraId] = useState<string>("") // ID kamera yang dipilih
-  const [menuCountdown, setMenuCountdown] = useState(5) // Countdown untuk auto-capture foto makanan
+  const [menuCountdown, setMenuCountdown] = useState(3) // Countdown untuk auto-capture foto makanan
   const [isMenuCountdownActive, setIsMenuCountdownActive] = useState(false) // Flag untuk countdown aktif
   const [foodConditionOk, setFoodConditionOk] = useState(false) // Flag kondisi foto makanan OK
   const [foodCondition, setFoodCondition] = useState<string>("") // Status kondisi: 'too-dark', 'too-bright', 'ok'
-  const [preparationCountdown, setPreparationCountdown] = useState(10) // Countdown persiapan 10 detik
+  const [preparationCountdown, setPreparationCountdown] = useState(3) // Countdown persiapan 3 detik
   const [isPreparationActive, setIsPreparationActive] = useState(false) // Flag preparation aktif
+  const [resultCountdown, setResultCountdown] = useState(10) // Dynamic countdown for result step
 
   // ✅ Callback ketika unified cache ter-update dari page lain (instant sync!)
   const handleCacheUpdate = useCallback((cachedData: any) => {
@@ -71,6 +73,9 @@ const AbsensiPenerima = () => {
   const menuCountdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const foodDetectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const preparationIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const rfidTransitionRef = useRef<NodeJS.Timeout | null>(null)
+  const faceCameraIdRef = useRef<string>("") // Track kamera yang dipakai untuk face rego
+  const resultCountdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // ============================================
   // INITIALIZATION HOOKS
@@ -172,27 +177,60 @@ const AbsensiPenerima = () => {
   }, [])
 
   useEffect(() => {
-    if (step === "camera-face" && !isCameraActive && cameraReady) {
-      startCamera("user")
-    } else if (step === "camera-menu" && !isCameraActive) {
-      // Re-enumerate cameras saat masuk step camera-menu untuk ensure terdeteksi
-      enumerateCameras()
+    let cancelled = false
 
-      // Untuk foto makanan, gunakan selectedCameraId jika ada
-      if (selectedCameraId) {
-        startCamera("environment", selectedCameraId)
-      } else {
-        startCamera("environment")
+    const initCamera = async () => {
+      try {
+        if (step === "camera-face") {
+          if (cameraReady) {
+            const faceCamId = availableCameras.length > 0 ? availableCameras[0].deviceId : undefined
+            if (faceCamId) faceCameraIdRef.current = faceCamId
+            console.log("[CAMERA] Face step - starting with:", faceCamId ? "device " + faceCamId.slice(0, 8) : "default user")
+            await startCamera("user", faceCamId)
+          }
+        } else if (step === "camera-menu") {
+          const otherCamera = availableCameras.find(cam => cam.deviceId !== faceCameraIdRef.current)
+          if (otherCamera) {
+            console.log("[CAMERA SWITCH] Trying other camera:", otherCamera.label)
+            setSelectedCameraId(otherCamera.deviceId)
+            try {
+              await startCamera("environment", otherCamera.deviceId)
+              console.log("[CAMERA SWITCH] Success!")
+            } catch (switchErr) {
+              console.warn("[CAMERA SWITCH] Other camera failed, falling back")
+              if (!cancelled) {
+                await startCamera("environment")
+              }
+            }
+          } else {
+            console.log("[CAMERA SWITCH] Only 1 camera, using same")
+            await startCamera("environment")
+          }
+        }
+      } catch (err) {
+        console.error("[CAMERA] Failed to start camera:", err)
+        setIsCameraActive(false)
       }
     }
 
+    initCamera()
+
     return () => {
-      stopCamera()
+      cancelled = true
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null
+      }
+      setIsCameraActive(false)
       stopFaceDetection()
     }
-  }, [step, selectedCameraId, cameraReady])
+  }, [step, cameraReady])
 
-  // Separate effect untuk start preparation countdown hanya sekali saat masuk camera-menu
+
+  // Separate effect untuk preparation countdown + food detection
   useEffect(() => {
     if (step === "camera-menu") {
       startPreparationCountdown()
@@ -200,6 +238,8 @@ const AbsensiPenerima = () => {
 
     return () => {
       stopPreparationCountdown()
+      stopFoodDetection()
+      stopMenuCountdown()
     }
   }, [step])
 
@@ -302,43 +342,40 @@ const AbsensiPenerima = () => {
   }
 
   const startCamera = async (facingMode: "user" | "environment" = "user", deviceId?: string) => {
-    try {
-      setIsCameraActive(true)
+    // Stop existing stream first
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
 
-      // Jika ada deviceId spesifik, gunakan itu. Kalau tidak, gunakan facingMode
-      const constraints: MediaStreamConstraints = {
-        video: deviceId
-          ? {
-            deviceId: { exact: deviceId },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          }
-          : {
-            facingMode,
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-      }
+    setIsCameraActive(true)
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+    const constraints: MediaStreamConstraints = {
+      video: deviceId 
+        ? { deviceId: { exact: deviceId } } 
+        : { facingMode: { ideal: facingMode } }
+    }
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        streamRef.current = stream
+    if (typeof constraints.video === 'object') {
+      (constraints.video as any).width = { ideal: 1280 };
+      (constraints.video as any).height = { ideal: 720 };
+    }
 
-        videoRef.current.onloadedmetadata = () => {
-          if (step === "camera-face") {
-            startFaceDetection()
-          }
-          // For camera-menu, food detection will start after preparation countdown
+    const stream = await navigator.mediaDevices.getUserMedia(constraints)
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream
+      streamRef.current = stream
+
+      videoRef.current.onloadedmetadata = () => {
+        if (stepRef.current === "camera-face") {
+          startFaceDetection()
         }
       }
-    } catch (err) {
-      console.error("Error starting camera:", err)
-      alert("Gagal mengakses kamera")
-      setIsCameraActive(false)
+      videoRef.current.play().catch(e => console.warn("Video play error:", e))
     }
   }
+
 
   const stopCamera = (keepPreparation = false) => {
     stopFaceDetection()
@@ -359,7 +396,7 @@ const AbsensiPenerima = () => {
 
   const startFaceDetection = () => {
     detectionIntervalRef.current = setInterval(() => {
-      if (!videoRef.current || !canvasRef.current || step !== "camera-face") return
+      if (!videoRef.current || !canvasRef.current || stepRef.current !== "camera-face") return
 
       const video = videoRef.current
       const canvas = canvasRef.current
@@ -387,7 +424,12 @@ const AbsensiPenerima = () => {
       }
       const avgBrightness = totalBrightness / (imageData.data.length / 4)
 
-      if (avgBrightness > 80 && avgBrightness < 180) {
+      // Wider brightness range + hysteresis to prevent flip-flop
+      const isCurrentlyDetected = faceDetected
+      const detectThresholdLow = isCurrentlyDetected ? 40 : 50
+      const detectThresholdHigh = isCurrentlyDetected ? 220 : 200
+
+      if (avgBrightness > detectThresholdLow && avgBrightness < detectThresholdHigh) {
         setFaceDetected(true)
         setFacePosition("centered")
 
@@ -396,7 +438,7 @@ const AbsensiPenerima = () => {
         }
       } else {
         setFaceDetected(false)
-        setFacePosition(avgBrightness < 80 ? "too-dark" : "too-bright")
+        setFacePosition(avgBrightness < detectThresholdLow ? "too-dark" : "too-bright")
         stopCountdown()
       }
     }, 200)
@@ -413,8 +455,8 @@ const AbsensiPenerima = () => {
   }
 
   const startCountdown = () => {
-    setCountdown(5)
-    let count = 5
+    setCountdown(3)
+    let count = 3
 
     countdownIntervalRef.current = setInterval(() => {
       count -= 1
@@ -432,13 +474,13 @@ const AbsensiPenerima = () => {
       clearInterval(countdownIntervalRef.current)
       countdownIntervalRef.current = null
     }
-    setCountdown(5)
+    setCountdown(3)
   }
 
   const startMenuCountdown = () => {
     setIsMenuCountdownActive(true)
-    setMenuCountdown(5)
-    let count = 5
+    setMenuCountdown(3)
+    let count = 3
 
     menuCountdownIntervalRef.current = setInterval(() => {
       count -= 1
@@ -457,12 +499,37 @@ const AbsensiPenerima = () => {
       menuCountdownIntervalRef.current = null
     }
     setIsMenuCountdownActive(false)
-    setMenuCountdown(5)
+    setMenuCountdown(3)
+  }
+
+  const startResultCountdown = () => {
+    setResultCountdown(10)
+    let count = 10
+    if (resultCountdownIntervalRef.current) clearInterval(resultCountdownIntervalRef.current)
+    
+    resultCountdownIntervalRef.current = setInterval(() => {
+      count -= 1
+      setResultCountdown(count)
+      if (count <= 0) {
+        if (resultCountdownIntervalRef.current) {
+          clearInterval(resultCountdownIntervalRef.current)
+          resultCountdownIntervalRef.current = null
+        }
+      }
+    }, 1000)
+  }
+
+  const stopResultCountdown = () => {
+    if (resultCountdownIntervalRef.current) {
+      clearInterval(resultCountdownIntervalRef.current)
+      resultCountdownIntervalRef.current = null
+    }
+    setResultCountdown(10)
   }
 
   const startFoodDetection = () => {
     foodDetectionIntervalRef.current = setInterval(() => {
-      if (!videoRef.current || !canvasRef.current || step !== "camera-menu") return
+      if (!videoRef.current || !canvasRef.current || stepRef.current !== "camera-menu") return
 
       const video = videoRef.current
       const canvas = canvasRef.current
@@ -516,8 +583,8 @@ const AbsensiPenerima = () => {
 
   const startPreparationCountdown = () => {
     setIsPreparationActive(true)
-    setPreparationCountdown(10)
-    let count = 10
+    setPreparationCountdown(3)
+    let count = 3
 
     preparationIntervalRef.current = setInterval(() => {
       count -= 1
@@ -537,7 +604,7 @@ const AbsensiPenerima = () => {
       preparationIntervalRef.current = null
     }
     setIsPreparationActive(false)
-    setPreparationCountdown(10)
+    setPreparationCountdown(3)
   }
 
   const capturePhoto = () => {
@@ -552,11 +619,11 @@ const AbsensiPenerima = () => {
       ctx.drawImage(videoRef.current, 0, 0)
       const photoData = canvas.toDataURL("image/jpeg", 0.8)
 
-      if (step === "camera-face") {
+      if (stepRef.current === "camera-face") {
         setFacePhoto(photoData)
         stopCamera()
         validateFace(photoData)
-      } else if (step === "camera-menu") {
+      } else if (stepRef.current === "camera-menu") {
         setMenuPhoto(photoData)
         stopCamera()
         submitPengambilanMakanan(photoData)
@@ -734,10 +801,7 @@ const AbsensiPenerima = () => {
             if (trayIdFormatted === trayIdRef.current) return
 
             console.log("[WS] RFID detected:", trayIdFormatted)
-            setTrayId(trayIdFormatted)
-            toast.success(`Tray ${trayIdFormatted} terdeteksi!`)
-            stopRfidPolling()
-            setStep("confirm")
+            handleRfidDetected(trayIdFormatted)
           }
         } catch (err) {
           console.error("[WS] Parse error:", err)
@@ -790,10 +854,7 @@ const AbsensiPenerima = () => {
             if (trayIdFormatted === trayIdRef.current) return
 
             console.log("[Polling] RFID detected:", trayIdFormatted)
-            setTrayId(trayIdFormatted)
-            toast.success(`Tray ${trayIdFormatted} terdeteksi!`)
-            stopRfidPolling()
-            setStep("confirm")
+            handleRfidDetected(trayIdFormatted)
           }
         }
       } catch (err) {
@@ -816,6 +877,20 @@ const AbsensiPenerima = () => {
     }
     setIsScanning(false)
   }, [])
+
+  // Animasi transisi setelah RFID terdeteksi → langsung ke kamera makanan
+  const handleRfidDetected = useCallback((trayIdFormatted: string): void => {
+    setTrayId(trayIdFormatted)
+    setRfidDetected(true)
+    stopRfidPolling()
+    toast.success(`Tray ${trayIdFormatted} terdeteksi! Beralih ke kamera makanan...`)
+
+    // Auto-switch ke camera-menu setelah 1.5 detik
+    rfidTransitionRef.current = setTimeout(() => {
+      setRfidDetected(false)
+      setStep("camera-menu")
+    }, 1500)
+  }, [stopRfidPolling])
 
   useEffect(() => {
     if (step === "rfid-scan") {
@@ -872,7 +947,8 @@ const AbsensiPenerima = () => {
       })
       toast.success("Pengambilan makanan berhasil dicatat!")
       setStep("result")
-
+      startResultCountdown()
+      
       // Refresh absensi data setelah submit
       setTimeout(() => {
         fetchAbsensiToday()
@@ -880,7 +956,7 @@ const AbsensiPenerima = () => {
 
       setTimeout(() => {
         handleReset()
-      }, 5000)
+      }, 10000)
     } catch (err) {
       console.error("Error submitting:", err)
       const errMsg = err instanceof Error ? err.message : "Terjadi kesalahan"
@@ -890,10 +966,11 @@ const AbsensiPenerima = () => {
       })
       toast.error(`Gagal: ${errMsg}`)
       setStep("result")
+      startResultCountdown()
 
       setTimeout(() => {
         handleReset()
-      }, 5000)
+      }, 10000)
     }
   }
 
@@ -913,13 +990,16 @@ const AbsensiPenerima = () => {
     setSelectedSiswa(null)
     setTrayId("")
     setFacePhoto(null)
-    setPreparationCountdown(10)
+    setPreparationCountdown(5)
     setIsPreparationActive(false)
+    setRfidDetected(false)
+    if (rfidTransitionRef.current) clearTimeout(rfidTransitionRef.current)
     setStep("camera-face")
   }
 
   const handleReset = () => {
-    stopCamera()
+    stopRfidPolling()
+    stopResultCountdown()
     setFacePhoto(null)
     setMenuPhoto(null)
     setSelectedSiswa(null)
@@ -927,9 +1007,12 @@ const AbsensiPenerima = () => {
     setValidationResult(null)
     setIsDuplicate(false)
     setDuplicateSiswaInfo(null)
-    setCameraReady(false)
-    setPreparationCountdown(10)
+    setPreparationCountdown(5)
     setIsPreparationActive(false)
+    setRfidDetected(false)
+    if (rfidTransitionRef.current) clearTimeout(rfidTransitionRef.current)
+    // Keep cameraReady true so front camera auto-starts on reset
+    setCameraReady(true)
     setStep("camera-face")
   }
 
@@ -1065,9 +1148,9 @@ const AbsensiPenerima = () => {
                   <div className="bg-gray-900/90 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-medium">
                     {faceDetected ? "✓ Menangkap foto..." : "Posisikan wajah ke tengah"}
                   </div>
-                  
+
                   {!faceDetected && (
-                    <button 
+                    <button
                       onClick={(e) => { e.preventDefault(); capturePhoto(); }}
                       className="bg-white/20 hover:bg-white/30 backdrop-blur text-white px-4 py-2 rounded-lg text-xs font-bold transition-all border border-white/30 pointer-events-auto"
                     >
@@ -1083,21 +1166,76 @@ const AbsensiPenerima = () => {
 
       {/* STEP 2: PROCESSING FACE */}
       {step === "processing-face" && (
-        <div className="w-full bg-white rounded-xl border border-gray-100 p-12 text-center">
-          <div className="mb-6">
-            {facePhoto && (
-              <img
-                src={facePhoto || "/placeholder.svg"}
-                alt="Face"
-                className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 mx-auto"
-              />
-            )}
+        <div className="w-full bg-white rounded-xl border border-gray-100 overflow-hidden animate-fade-in">
+          {/* Alert Banner */}
+          <div className="bg-blue-50 border-b border-blue-100 px-5 py-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-blue-800">Harap Bersabar Ya! 🙏</p>
+                <p className="text-xs text-blue-600 mt-0.5">Sistem sedang mengenali wajahmu, tunggu sebentar...</p>
+              </div>
+            </div>
           </div>
-          <div className="flex justify-center mb-6">
-            <Loader className="w-8 h-8 text-[#1B263A] animate-spin" />
+
+          {/* Face Matching Animation */}
+          <div className="p-8 flex flex-col items-center">
+            {/* Scanning Face Photo */}
+            <div className="relative mb-6">
+              {/* Outer pulse rings */}
+              <div className="absolute inset-[-12px] rounded-full border-2 border-blue-300 face-pulse-ring"></div>
+              <div className="absolute inset-[-24px] rounded-full border border-blue-200 face-pulse-ring" style={{ animationDelay: "0.5s" }}></div>
+
+              {/* Face photo with scan overlay */}
+              <div className="relative w-28 h-28 rounded-full overflow-hidden border-3 border-blue-500">
+                {facePhoto && (
+                  <img
+                    src={facePhoto || "/placeholder.svg"}
+                    alt="Face"
+                    className="w-full h-full object-cover"
+                  />
+                )}
+                {/* Scan line effect */}
+                <div className="absolute left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-blue-400 to-transparent face-scan-line" style={{ boxShadow: "0 0 12px 2px rgba(59,130,246,0.5)" }}></div>
+              </div>
+            </div>
+
+            {/* Status Text */}
+            <h2 className="text-lg font-bold text-gray-900 mb-1">Mencocokkan Wajah</h2>
+            <div className="flex items-center gap-1 mb-4">
+              <span className="text-sm text-gray-500">Sedang memproses</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dot-1"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dot-2"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dot-3"></span>
+            </div>
+
+            {/* Progress Steps */}
+            <div className="w-full max-w-xs space-y-2">
+              <div className="flex items-center gap-3 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                <span className="text-gray-600">Foto wajah berhasil diambil</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <Loader className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" />
+                <span className="text-gray-800 font-medium">Mencocokkan dengan database...</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <div className="w-4 h-4 rounded-full border-2 border-gray-200 flex-shrink-0"></div>
+                <span className="text-gray-400">Verifikasi identitas siswa</span>
+              </div>
+            </div>
+
+            {/* RFID Warning */}
+            <div className="w-full max-w-xs mt-5 bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-amber-800">Jangan scan RFID dulu!</p>
+                <p className="text-xs text-amber-700 mt-0.5">Tunggu proses pengenalan wajah selesai sebelum menempelkan tray ke RFID scanner.</p>
+              </div>
+            </div>
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">Memproses Wajah...</h2>
-          <p className="text-gray-500 text-sm">Mohon tunggu sebentar</p>
         </div>
       )}
 
@@ -1261,30 +1399,51 @@ const AbsensiPenerima = () => {
             </div>
 
             {/* RFID Scan Section */}
-            <div className="text-center mb-6">
-              <div className="relative w-32 h-32 mx-auto mb-6 bg-white rounded-full flex flex-col items-center justify-center border-2 border-gray-100 shadow-xl shadow-gray-100/50">
-                {isScanning && (
-                  <div className="absolute inset-0 border border-[#1B263A] rounded-full animate-ping opacity-20"></div>
-                )}
-                <Nfc className="w-8 h-8 text-[#1B263A]" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-1">Tempelkan RFID Tray</h3>
-              <p className="text-gray-500 text-xs">Dekatkan tray ke pembaca RFID</p>
-
-              {isScanning && (
-                <div className="mt-4 flex justify-center items-center gap-2">
-                  <Loader className="w-4 h-4 text-[#1B263A] animate-spin" />
-                  <span className="text-sm text-[#1B263A] font-medium">Menunggu scan...</span>
+            {rfidDetected ? (
+              <div className="text-center mb-6">
+                <div className="relative w-32 h-32 mx-auto mb-6 rounded-full flex flex-col items-center justify-center bg-emerald-50 border-2 border-emerald-200 shadow-xl shadow-emerald-100/50">
+                  <div className="absolute inset-0 border-2 border-emerald-400 rounded-full animate-ping opacity-30"></div>
+                  <div className="absolute inset-2 border border-emerald-300 rounded-full animate-pulse opacity-50"></div>
+                  <CheckCircle className="w-10 h-10 text-emerald-500 animate-bounce" />
                 </div>
-              )}
-            </div>
+                <h3 className="text-lg font-bold text-emerald-700 mb-1">RFID Terdeteksi!</h3>
+                <p className="text-emerald-600 text-sm font-mono font-bold mb-3">{trayId}</p>
+                <div className="flex justify-center items-center gap-2">
+                  <Loader className="w-4 h-4 text-emerald-600 animate-spin" />
+                  <span className="text-sm text-emerald-600 font-medium">Memproses data...</span>
+                </div>
+                <div className="mt-4 mx-auto w-48 h-1.5 bg-emerald-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full animate-[loading_1.5s_ease-in-out]" style={{ animation: "loading 1.5s ease-in-out forwards" }}></div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="text-center mb-6">
+                  <div className="relative w-32 h-32 mx-auto mb-6 bg-white rounded-full flex flex-col items-center justify-center border-2 border-gray-100 shadow-xl shadow-gray-100/50">
+                    {isScanning && (
+                      <div className="absolute inset-0 border border-[#1B263A] rounded-full animate-ping opacity-20"></div>
+                    )}
+                    <Nfc className="w-8 h-8 text-[#1B263A]" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">Tempelkan RFID Tray</h3>
+                  <p className="text-gray-500 text-xs">Dekatkan tray ke pembaca RFID</p>
 
-            <button
-              onClick={() => setStep("input-tray")}
-              className="w-full text-center py-2 text-gray-500 hover:text-gray-900 transition-colors text-xs underline"
-            >
-              Input tray manual
-            </button>
+                  {isScanning && (
+                    <div className="mt-4 flex justify-center items-center gap-2">
+                      <Loader className="w-4 h-4 text-[#1B263A] animate-spin" />
+                      <span className="text-sm text-[#1B263A] font-medium">Menunggu scan...</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setStep("input-tray")}
+                  className="w-full text-center py-2 text-gray-500 hover:text-gray-900 transition-colors text-xs underline"
+                >
+                  Input tray manual
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1410,12 +1569,17 @@ const AbsensiPenerima = () => {
                 <>
                   <select
                     value={selectedCameraId}
-                    onChange={(e) => {
-                      setSelectedCameraId(e.target.value)
-                      stopCamera(true) // Keep preparation countdown running
+                    onChange={async (e) => {
+                      const newCamId = e.target.value
+                      setSelectedCameraId(newCamId)
+                      // startCamera sudah handle stop stream lama
+                      await startCamera("environment", newCamId)
+                      // Restart food detection
+                      stopFoodDetection()
+                      stopMenuCountdown()
                       setTimeout(() => {
-                        startCamera("environment", e.target.value)
-                      }, 100)
+                        startFoodDetection()
+                      }, 500)
                     }}
                     className="px-3 py-1.5 border border-gray-600 bg-gray-800 text-white rounded-lg text-xs font-medium focus:ring-1 focus:ring-emerald-500 focus:border-transparent transition-all outline-none"
                   >
@@ -1454,186 +1618,316 @@ const AbsensiPenerima = () => {
                 className={`w-96 h-64 border-2 rounded-xl transition-all duration-300 ${isPreparationActive
                   ? "border-blue-400 scale-100"
                   : foodConditionOk
-                ? "border-emerald-400 scale-100"
-              : "border-gray-500 opacity-50 scale-95"
-          }`}
-        >
-              {/* Preparation Countdown */}
-              {isPreparationActive && preparationCountdown > 0 && (
-                <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
-                  <div className="text-white text-9xl font-bold animate-pulse">{preparationCountdown}</div>
-                  <div className="text-white text-sm font-semibold bg-black/60 px-4 py-2 rounded-lg backdrop-blur">
-                    Persiapan Frame
-                  </div>
-                </div>
-              )}
-              {/* Capture Countdown */}
-              {!isPreparationActive && isMenuCountdownActive && menuCountdown > 0 && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-white text-9xl font-bold animate-pulse">{menuCountdown}</div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Status Badges */}
-          <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-            {isPreparationActive && (
-              <div className="bg-blue-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
-                <Camera className="w-3.5 h-3.5" />
-                Persiapan {preparationCountdown}s
-              </div>
-            )}
-
-            {!isPreparationActive && foodConditionOk && (
-              <div className="bg-emerald-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
-                <CheckCircle className="w-3.5 h-3.5" />
-                Kondisi Baik
-              </div>
-            )}
-
-            {!isPreparationActive && !foodConditionOk && foodCondition && (
-              <div className="bg-amber-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
-                {foodCondition === "too-dark" && "Terlalu gelap"}
-                {foodCondition === "too-bright" && "Terlalu terang"}
-              </div>
-            )}
-          </div>
-
-          {/* Bottom Controls */}
-          <div className="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-4 px-6">
-            <button 
-              onClick={(e) => { e.preventDefault(); capturePhoto(); }}
-              className="bg-[#1B263A] hover:bg-[#2A3749] text-white px-6 py-3 rounded-xl text-sm font-bold shadow-xl transition-all flex items-center gap-2 pointer-events-auto"
-            >
-              <Camera className="w-4 h-4" />
-              Ambil Foto Manual
-            </button>
-
-            {availableCameras.length > 1 && (
-              <button
-                onClick={() => {
-                  const currentIndex = availableCameras.findIndex((cam) => cam.deviceId === selectedCameraId)
-                  const nextIndex = (currentIndex + 1) % availableCameras.length
-                  const nextCamera = availableCameras[nextIndex]
-                  setSelectedCameraId(nextCamera.deviceId)
-                  stopCamera(true) // Keep preparation countdown running
-                  setTimeout(() => {
-                    startCamera("environment", nextCamera.deviceId)
-                  }, 100)
-                }}
-                className="bg-white hover:bg-gray-50 text-[#1B263A] px-4 py-3 rounded-xl text-xs font-bold transition-all border border-gray-200 shadow-xl pointer-events-auto flex items-center gap-2"
+                    ? "border-emerald-400 scale-100"
+                    : "border-gray-500 opacity-50 scale-95"
+                  }`}
               >
-                <RefreshCw className="w-4 h-4" />
-                Ganti Kamera
-              </button>
-            )}
-          </div>
-        </div>
-  </div>
-  )
-}
-
-{/* STEP 7: SUBMITTING */ }
-{
-  step === "submitting" && (
-    <div className="w-full bg-white rounded-xl border border-gray-100 p-12 text-center mx-auto">
-      <Loader className="w-8 h-8 text-[#1B263A] animate-spin mx-auto mb-4" />
-      <h2 className="text-lg font-bold text-gray-900 mb-1">Menyimpan Data...</h2>
-      <p className="text-gray-500 text-sm">Sistem sedang merekam absensi</p>
-    </div>
-  )
-}
-
-{/* STEP 8: RESULT */ }
-{
-  step === "result" && (
-    <div className="w-full mx-auto">
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div
-          className={`px-5 py-3 border-b ${validationResult?.success ? "bg-emerald-50 border-emerald-100" : "bg-red-50 border-red-100"}`}
-        >
-          <div className="flex items-center gap-2">
-            {validationResult?.success ? (
-              <>
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span className="text-sm font-semibold text-emerald-800">Berhasil Disimpan</span>
-              </>
-            ) : (
-              <>
-                <XCircle className="w-4 h-4 text-red-600" />
-                <span className="text-sm font-semibold text-red-800">Gagal Disimpan</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="p-4">
-          <div className="text-center mb-4">
-            {validationResult?.success ? (
-              <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
-            ) : (
-              <XCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
-            )}
-            <h2 className="text-xl font-bold text-gray-900 mb-1">
-              {validationResult?.success ? "Absen Berhasil!" : "Gagal!"}
-            </h2>
-            <p className="text-gray-500 text-sm">{validationResult?.message}</p>
-          </div>
-
-          {validationResult?.success && validationResult?.siswa && (
-            <div className="border border-gray-100 bg-gray-50 rounded-xl p-5 text-center mb-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-1">{validationResult.siswa.nama}</h3>
-              <p className="text-sm text-gray-500 mb-4">
-                {validationResult.siswa.kelas} • NIS {validationResult.siswa.nis}
-              </p>
-              <div className="inline-block bg-white border border-gray-200 px-4 py-2 rounded-lg font-mono font-bold text-[#1B263A] mb-4">
-                🍱 {trayId}
+                {/* Preparation Countdown */}
+                {isPreparationActive && preparationCountdown > 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
+                    <div className="text-white text-9xl font-bold animate-pulse">{preparationCountdown}</div>
+                    <div className="text-white text-sm font-semibold bg-black/60 px-4 py-2 rounded-lg backdrop-blur">
+                      Persiapan Frame
+                    </div>
+                  </div>
+                )}
+                {/* Capture Countdown */}
+                {!isPreparationActive && isMenuCountdownActive && menuCountdown > 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-white text-9xl font-bold animate-pulse">{menuCountdown}</div>
+                  </div>
+                )}
               </div>
-              {validationResult.siswa.alergi && validationResult.siswa.alergi.length > 0 && (
-                <div className="bg-red-50 rounded-lg p-3 text-left">
-                  <p className="text-xs text-red-700 font-bold mb-1">Alergi Terdaftar</p>
-                  <p className="text-sm text-red-800">{validationResult.siswa.alergi.join(", ")}</p>
+            </div>
+
+            {/* Status Badges */}
+            <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+              {isPreparationActive && (
+                <div className="bg-blue-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5" />
+                  Persiapan {preparationCountdown}s
+                </div>
+              )}
+
+              {!isPreparationActive && foodConditionOk && (
+                <div className="bg-emerald-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  Kondisi Baik
+                </div>
+              )}
+
+              {!isPreparationActive && !foodConditionOk && foodCondition && (
+                <div className="bg-amber-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                  {foodCondition === "too-dark" && "Terlalu gelap"}
+                  {foodCondition === "too-bright" && "Terlalu terang"}
                 </div>
               )}
             </div>
-          )}
 
-          {(facePhoto || menuPhoto) && (
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              {facePhoto && (
-                <div>
-                  <img
-                    src={facePhoto || "/placeholder.svg"}
-                    alt="Face"
-                    className="w-full aspect-square object-cover rounded-xl border border-gray-200 bg-gray-50"
-                  />
-                  <p className="text-xs text-center font-medium text-gray-500 mt-2">Wajah</p>
-                </div>
-              )}
-              {menuPhoto && (
-                <div>
-                  <img
-                    src={menuPhoto || "/placeholder.svg"}
-                    alt="Menu"
-                    className="w-full aspect-square object-cover rounded-xl border border-gray-200 bg-gray-50"
-                  />
-                  <p className="text-xs text-center font-medium text-gray-500 mt-2">Makanan</p>
-                </div>
+            {/* Bottom Controls */}
+            <div className="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-4 px-6">
+              <button
+                onClick={(e) => { e.preventDefault(); capturePhoto(); }}
+                className="bg-[#1B263A] hover:bg-[#2A3749] text-white px-6 py-3 rounded-xl text-sm font-bold shadow-xl transition-all flex items-center gap-2 pointer-events-auto"
+              >
+                <Camera className="w-4 h-4" />
+                Ambil Foto Manual
+              </button>
+
+              {availableCameras.length > 1 && (
+                <button
+                  onClick={async () => {
+                    const currentIndex = availableCameras.findIndex((cam) => cam.deviceId === selectedCameraId)
+                    const nextIndex = (currentIndex + 1) % availableCameras.length
+                    const nextCamera = availableCameras[nextIndex]
+                    setSelectedCameraId(nextCamera.deviceId)
+                    // startCamera sudah handle stop stream lama
+                    await startCamera("environment", nextCamera.deviceId)
+                    // Restart food detection
+                    stopFoodDetection()
+                    stopMenuCountdown()
+                    setTimeout(() => {
+                      startFoodDetection()
+                    }, 500)
+                  }}
+                  className="bg-white hover:bg-gray-50 text-[#1B263A] px-4 py-3 rounded-xl text-xs font-bold transition-all border border-gray-200 shadow-xl pointer-events-auto flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Ganti Kamera
+                </button>
               )}
             </div>
-          )}
-
-          <div className="text-center">
-            <p className="inline-block px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-              Kembali otomatis dalam 5 detik
-            </p>
           </div>
         </div>
-      </div>
-    </div>
-  )
-}
+      )
+      }
+
+      {/* STEP 7: SUBMITTING */}
+      {
+        step === "submitting" && (
+          <div className="w-full bg-white rounded-xl border border-gray-100 overflow-hidden mx-auto animate-fade-in">
+            {/* Header */}
+            <div className="bg-blue-50 border-b border-blue-100 px-5 py-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Zap className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-blue-800">AI Sedang Menganalisis</p>
+                  <p className="text-xs text-blue-600 mt-0.5">Mencocokkan data wajah, tray, dan foto makanan...</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-8">
+              {/* Photo comparison during analysis */}
+              <div className="flex items-center justify-center gap-4 mb-6">
+                {facePhoto && (
+                  <div className="text-center">
+                    <div className="relative">
+                      <img src={facePhoto} alt="Wajah" className="w-16 h-16 rounded-full object-cover border-2 border-emerald-400" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute -bottom-1 -right-1 bg-white rounded-full" />
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1.5 font-medium">Wajah</p>
+                  </div>
+                )}
+                <div className="flex flex-col items-center gap-1">
+                  <Loader className="w-5 h-5 text-blue-500 animate-spin" />
+                </div>
+                {menuPhoto && (
+                  <div className="text-center">
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-blue-400">
+                      <img src={menuPhoto} alt="Makanan" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-blue-500/10"></div>
+                      <div className="absolute left-0 right-0 h-[2px] bg-blue-400 face-scan-line" style={{ boxShadow: "0 0 8px 1px rgba(59,130,246,0.4)" }}></div>
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1.5 font-medium">Makanan</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Progress steps */}
+              <div className="max-w-xs mx-auto space-y-2">
+                <div className="flex items-center gap-3 text-sm">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                  <span className="text-gray-600">Wajah siswa terverifikasi</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                  <span className="text-gray-600">Tray {trayId} terhubung</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <Loader className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" />
+                  <span className="text-gray-800 font-medium">Menganalisis foto makanan...</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="w-4 h-4 rounded-full border-2 border-gray-200 flex-shrink-0"></div>
+                  <span className="text-gray-400">Menyimpan data absensi</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* STEP 8: RESULT */}
+      {
+        step === "result" && (
+          <div className="w-full mx-auto animate-fade-in">
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              {/* Header */}
+              <div
+                className={`px-5 py-3 border-b ${validationResult?.success ? "bg-emerald-50 border-emerald-100" : "bg-red-50 border-red-100"}`}
+              >
+                <div className="flex items-center gap-2">
+                  {validationResult?.success ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span className="text-sm font-semibold text-emerald-800">Berhasil Disimpan</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4 text-red-600" />
+                      <span className="text-sm font-semibold text-red-800">Gagal Disimpan</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4">
+                {/* Success/Fail icon */}
+                <div className="text-center mb-4">
+                  {validationResult?.success ? (
+                    <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
+                  ) : (
+                    <XCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
+                  )}
+                  <h2 className="text-xl font-bold text-gray-900 mb-1">
+                    {validationResult?.success ? "Absen Berhasil!" : "Gagal!"}
+                  </h2>
+                  <p className="text-gray-500 text-sm">{validationResult?.message}</p>
+                </div>
+
+                {/* AI Comparison Card */}
+                {validationResult?.success && (facePhoto || menuPhoto) && (
+                  <div className="border border-emerald-200 bg-emerald-50/50 rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Hasil Pencocokan AI</span>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-3">
+                      {/* Face photo */}
+                      {facePhoto && (
+                        <div className="text-center">
+                          <div className="relative">
+                            <img src={facePhoto} alt="Wajah" className="w-20 h-20 rounded-full object-cover border-2 border-emerald-400 bg-white" />
+                            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                              <CheckCircle className="w-3 h-3 text-white" />
+                            </div>
+                          </div>
+                          <p className="text-[10px] font-semibold text-gray-500 mt-1.5">Wajah</p>
+                        </div>
+                      )}
+
+                      {/* Match indicator */}
+                      <div className="flex flex-col items-center gap-0.5 px-2">
+                        <div className="flex items-center gap-1">
+                          <div className="w-6 h-[2px] bg-emerald-400"></div>
+                          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                          <div className="w-6 h-[2px] bg-emerald-400"></div>
+                        </div>
+                        <span className="text-[10px] font-bold text-emerald-600">COCOK</span>
+                      </div>
+
+                      {/* Menu photo */}
+                      {menuPhoto && (
+                        <div className="text-center">
+                          <div className="relative">
+                            <img src={menuPhoto} alt="Makanan" className="w-20 h-20 rounded-lg object-cover border-2 border-emerald-400 bg-white" />
+                            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                              <CheckCircle className="w-3 h-3 text-white" />
+                            </div>
+                          </div>
+                          <p className="text-[10px] font-semibold text-gray-500 mt-1.5">Makanan</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* AI confidence info */}
+                    <div className="mt-3 flex flex-col items-center gap-2">
+                       {validationResult?.data?.confidence && (
+                        <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-full uppercase tracking-tighter">
+                          Matching: {Math.round(validationResult.data.confidence * 100)}%
+                        </span>
+                      )}
+                      
+                      {validationResult?.data?.keteranganValidasi && (
+                        <div className="w-full mt-2 bg-white/50 border border-emerald-100 rounded-xl p-3 text-left shadow-sm">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest leading-none">AI ANALYSIS REPORT</p>
+                            {validationResult?.data?.isValidMakanan !== undefined && (
+                              <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${validationResult.data.isValidMakanan ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white animate-pulse'}`}>
+                                {validationResult.data.isValidMakanan ? 'VALID' : 'CAUTION'}
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-[11px] font-medium text-emerald-900 leading-relaxed italic">
+                            "{validationResult.data.keteranganValidasi}"
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Student info */}
+                {validationResult?.success && validationResult?.siswa && (
+                  <div className="border border-gray-100 bg-gray-50 rounded-xl p-5 text-center mb-4">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">{validationResult.siswa.nama}</h3>
+                    <p className="text-sm text-gray-500 mb-3">
+                      {validationResult.siswa.kelas} • NIS {validationResult.siswa.nis}
+                    </p>
+                    <div className="inline-block bg-white border border-gray-200 px-4 py-2 rounded-lg font-mono font-bold text-[#1B263A] mb-3">
+                      🍱 {trayId}
+                    </div>
+                    {validationResult.siswa.alergi && validationResult.siswa.alergi.length > 0 && (
+                      <div className="bg-red-50 rounded-lg p-3 text-left">
+                        <p className="text-xs text-red-700 font-bold mb-1">Alergi Terdaftar</p>
+                        <p className="text-sm text-red-800">{validationResult.siswa.alergi.join(", ")}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Failed state - show photos without AI card */}
+                {!validationResult?.success && (facePhoto || menuPhoto) && (
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    {facePhoto && (
+                      <div>
+                        <img src={facePhoto} alt="Face" className="w-full aspect-square object-cover rounded-xl border border-gray-200 bg-gray-50" />
+                        <p className="text-xs text-center font-medium text-gray-500 mt-2">Wajah</p>
+                      </div>
+                    )}
+                    {menuPhoto && (
+                      <div>
+                        <img src={menuPhoto} alt="Menu" className="w-full aspect-square object-cover rounded-xl border border-gray-200 bg-gray-50" />
+                        <p className="text-xs text-center font-medium text-gray-500 mt-2">Makanan</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="text-center">
+                  <p className="inline-block px-3 py-1 bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-wider rounded-full">
+                    Kembali otomatis dalam {resultCountdown}...
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
     </SekolahLayout>
   )
 }
