@@ -257,10 +257,10 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
                 // Filter untuk hari ini (tanggal sesuai hari ini di WIB)
                 const now = new Date()
                 const wibNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
-                const today = wibNow.getUTCFullYear() + '-' + 
-                              String(wibNow.getUTCMonth() + 1).padStart(2, '0') + '-' + 
-                              String(wibNow.getUTCDate()).padStart(2, '0')
-                
+                const today = wibNow.getUTCFullYear() + '-' +
+                  String(wibNow.getUTCMonth() + 1).padStart(2, '0') + '-' +
+                  String(wibNow.getUTCDate()).padStart(2, '0')
+
                 const todayRecords = absensiData.data.data.filter((record: any) => {
                   const recordDate = record.tanggal?.split('T')[0]
                   return recordDate === today
@@ -274,10 +274,10 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
                 // Direct array of records
                 const now = new Date()
                 const wibNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
-                const today = wibNow.getUTCFullYear() + '-' + 
-                              String(wibNow.getUTCMonth() + 1).padStart(2, '0') + '-' + 
-                              String(wibNow.getUTCDate()).padStart(2, '0')
-                
+                const today = wibNow.getUTCFullYear() + '-' +
+                  String(wibNow.getUTCMonth() + 1).padStart(2, '0') + '-' +
+                  String(wibNow.getUTCDate()).padStart(2, '0')
+
                 const todayRecord = absensiData.data.find((record: any) => {
                   const recordDate = record.tanggal?.split('T')[0]
                   return recordDate === today
@@ -311,13 +311,13 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
         const allAbsensi = absensiResults.flatMap((r: any) => r.data)
 
         let totalPickupToday = 0
-        
+
         // ✅ SYNC PICKUP DATA TO CLASSES
         // If a student picks up food, they are considered present today!
-        const todayStr = new Date(new Date().getTime() + 7 * 60 * 60 * 1000).getUTCFullYear() + '-' + 
-                         String(new Date(new Date().getTime() + 7 * 60 * 60 * 1000).getUTCMonth() + 1).padStart(2, '0') + '-' + 
-                         String(new Date(new Date().getTime() + 7 * 60 * 60 * 1000).getUTCDate()).padStart(2, '0')
-        
+        const todayStr = new Date(new Date().getTime() + 7 * 60 * 60 * 1000).getUTCFullYear() + '-' +
+          String(new Date(new Date().getTime() + 7 * 60 * 60 * 1000).getUTCMonth() + 1).padStart(2, '0') + '-' +
+          String(new Date(new Date().getTime() + 7 * 60 * 60 * 1000).getUTCDate()).padStart(2, '0')
+
         const pickupsUrl = `${API_BASE_URL}/api/pengambilan-makanan?tanggal=${todayStr}&limit=1000`
         try {
           const pickupsRes = await fetch(pickupsUrl, { headers })
@@ -438,9 +438,9 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
         // Initialize chart data for Monday-Friday
         const now = new Date()
         const wibNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
-        const todayString = wibNow.getUTCFullYear() + '-' + 
-                            String(wibNow.getUTCMonth() + 1).padStart(2, '0') + '-' + 
-                            String(wibNow.getUTCDate()).padStart(2, '0')
+        const todayString = wibNow.getUTCFullYear() + '-' +
+          String(wibNow.getUTCMonth() + 1).padStart(2, '0') + '-' +
+          String(wibNow.getUTCDate()).padStart(2, '0')
 
         for (let i = 0; i < 5; i++) {
           const dateForDay = new Date(mondayDate)
@@ -569,12 +569,12 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
       if (!response.ok) return null
 
       const data = await response.json()
-      
+
       const shipments = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
 
       if (shipments.length > 0) {
         // Cari status yang paling relevan (sedang diantar atau telah sampai)
-        const relevantPengiriman = shipments.find((p: any) => 
+        const relevantPengiriman = shipments.find((p: any) =>
           p.status === 'SEDANG_DIANTAR' || p.status === 'TELAH_SAMPAI' || p.status === 'MENUNGGU_PENGIRIMAN'
         ) || shipments[0]
 
@@ -709,7 +709,7 @@ export const useSekolahDataCache = (onCacheUpdate?: (data: SekolahCachedData) =>
       const data = await response.json()
       console.log(`[FETCH INVITATIONS] API Response for school ${schoolId}:`, data)
       const invitations = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
-      
+
       console.log(`[FETCH INVITATIONS] Normalised invitations for school ${schoolId}:`, invitations)
       console.timeEnd("fetchInvitations")
       return invitations

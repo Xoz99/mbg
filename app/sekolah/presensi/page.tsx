@@ -348,8 +348,29 @@ const Presensi = () => {
         }
 
         const siswaDataToFind = cachedData?.siswaData || []
-        const siswaFromList = siswaDataToFind.find((s: any) => String(s.id) === String(normalizedSiswa.id))
-        const siswaToUse = siswaFromList ? { ...normalizedSiswa, ...siswaFromList } : normalizedSiswa
+        const currentKelasId = String(selectedKelas?.id || "")
+
+        // Get siswa ids that actually belong to the selected kelas
+        const getKelasIdFromSiswa = (s: any) =>
+          String(s?.kelasId?.id || s?.kelasId?._id || s?.kelasId || s?.kelas?.id || s?.kelas?._id || "")
+
+        const siswaInSelectedKelas = siswaDataToFind.filter((s: any) => getKelasIdFromSiswa(s) === currentKelasId)
+        const siswaFromList = siswaInSelectedKelas.find((s: any) => String(s.id) === String(normalizedSiswa.id))
+
+        // If siswa isn't in the current kelas, reject immediately with a clear message
+        if (!siswaFromList) {
+          // Try to find which kelas this siswa actually belongs to (for a better message)
+          const siswaAnywhere = siswaDataToFind.find((s: any) => String(s.id) === String(normalizedSiswa.id))
+          const detectedKelasNama =
+            siswaAnywhere?.kelas ||
+            (typeof detectedSiswa.kelas === "object" ? detectedSiswa.kelas?.nama : detectedSiswa.kelas) ||
+            "kelas lain"
+          throw new Error(
+            `Siswa ${normalizedSiswa.nama || ""} terdaftar di ${detectedKelasNama}, bukan di ${selectedKelas?.nama || "kelas ini"}`
+          )
+        }
+
+        const siswaToUse = { ...normalizedSiswa, ...siswaFromList }
 
         setSelectedSiswa(siswaToUse)
         setStep("confirm")
@@ -380,7 +401,7 @@ const Presensi = () => {
         throw new Error("Token autentikasi tidak ditemukan")
       }
 
-      const url = `${API_BASE_URL}/api/kelas/${selectedKelas.id}/absensi/face-recognition`
+      const url = `${API_BASE_URL}/api/kelas/${selectedKelas.id}/absensi`
 
       // Get today's date in Indonesia timezone (UTC+7)
       const now = new Date();
@@ -390,9 +411,49 @@ const Presensi = () => {
       const day = String(indonesiaTime.getUTCDate()).padStart(2, '0');
       const todayString = `${year}-${month}-${day}`;
 
+      const siswaIdStr = String(selectedSiswa.id)
+
+      // Step 1: Fetch existing absensi for today to merge siswaHadir list
+      console.log("[PRESENSI] Fetching existing absensi from:", url)
+      const existingRes = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      let existingSiswaHadir: string[] = []
+      if (existingRes.ok) {
+        const existingJson = await existingRes.json()
+        const records = existingJson?.data?.absensi || existingJson?.data?.records || existingJson?.data || []
+        const recordsArr = Array.isArray(records) ? records : (Array.isArray(records?.items) ? records.items : [])
+        // Find today's record
+        const todayRecord = recordsArr.find((r: any) => {
+          const rDate = r.tanggal || r.date
+          if (!rDate) return false
+          const dStr = typeof rDate === "string" ? rDate.split("T")[0] : ""
+          return dStr === todayString
+        })
+        if (todayRecord) {
+          const hadirList = todayRecord.siswaHadir || todayRecord.siswa_hadir || []
+          existingSiswaHadir = (Array.isArray(hadirList) ? hadirList : [])
+            .map((s: any) => String(typeof s === "object" ? (s.id || s.siswaId || s._id) : s))
+            .filter((s: string) => s)
+        }
+      }
+
+      // Step 2: Check if siswa already presensi today
+      if (existingSiswaHadir.includes(siswaIdStr)) {
+        throw new Error("sudah melakukan absensi")
+      }
+
+      // Step 3: Merge and POST full siswaHadir list
+      const mergedSiswaHadir = [...existingSiswaHadir, siswaIdStr]
       const payload = {
-        siswaId: String(selectedSiswa.id),
         tanggal: todayString,
+        jumlahHadir: mergedSiswaHadir.length,
+        siswaHadir: mergedSiswaHadir,
       }
 
       console.log("[PRESENSI] Submitting to endpoint:", url)
@@ -407,11 +468,13 @@ const Presensi = () => {
         body: JSON.stringify(payload),
       })
 
-      const result = await response.json()
+      const responseText = await response.text()
+      let result: any = {}
+      try { result = JSON.parse(responseText) } catch { result = { message: responseText } }
       console.log("[PRESENSI] Response:", { status: response.status, result })
 
       if (!response.ok) {
-        const errorMsg = result.message || result.error || `HTTP ${response.status}`
+        const errorMsg = result.message || result.error || responseText || `HTTP ${response.status}`
         console.error("[PRESENSI] Error:", errorMsg)
         throw new Error(errorMsg)
       }
@@ -433,12 +496,15 @@ const Presensi = () => {
 
       // Check if it's a duplicate attendance error
       const isDuplicate = errorMessage.includes("sudah melakukan absensi")
+      const isNotInKelas = errorMessage.toLowerCase().includes("not registered") || errorMessage.toLowerCase().includes("tidak terdaftar")
 
       setValidationResult({
         success: false,
         message: isDuplicate
           ? "⚠️ Siswa sudah presensi hari ini. Coba scan siswa yang lain atau ubah tanggal untuk test."
-          : errorMessage,
+          : isNotInKelas
+            ? `Siswa ini tidak terdaftar di ${selectedKelas?.nama || "kelas ini"}. Pastikan siswa berada di kelas yang benar.`
+            : errorMessage,
       })
       setStep("result")
 
@@ -473,19 +539,58 @@ const Presensi = () => {
     <SekolahLayout currentPage="presensi">
       {/* LOADING MODAL - WHEN SELECTING KELAS */}
       {loadingSelectedKelas && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm mx-4">
-            <div className="flex flex-col items-center">
-              <div className="relative w-16 h-16 mb-6">
-                <div className="absolute inset-0 bg-blue-500 rounded-full animate-pulse opacity-20"></div>
-                <Loader className="w-full h-full animate-spin text-blue-600 relative" />
+        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <style jsx>{`
+            @keyframes slide-progress {
+              0% { transform: translateX(-100%); }
+              100% { transform: translateX(400%); }
+            }
+            @keyframes shimmer-line {
+              0% { background-position: -200% 0; }
+              100% { background-position: 200% 0; }
+            }
+            @keyframes spin-reverse {
+              from { transform: rotate(360deg); }
+              to { transform: rotate(0deg); }
+            }
+            .progress-slide { animation: slide-progress 1.6s ease-in-out infinite; }
+            .shimmer-bg {
+              background: linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 50%, #f3f4f6 100%);
+              background-size: 200% 100%;
+              animation: shimmer-line 1.8s ease-in-out infinite;
+            }
+            .spin-reverse { animation: spin-reverse 1.8s linear infinite; }
+          `}</style>
+          <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-sm w-full overflow-hidden">
+            {/* Top progress bar */}
+            <div className="h-1 w-full bg-gray-100 overflow-hidden relative">
+              <div className="absolute inset-y-0 w-1/4 bg-[#1B263A] rounded-full progress-slide"></div>
+            </div>
+
+            <div className="p-8">
+              {/* Orbital spinner */}
+              <div className="flex justify-center mb-6">
+                <div className="relative w-20 h-20">
+                  <div className="absolute inset-0 rounded-full bg-[#1B263A]/5"></div>
+                  <div className="absolute inset-0 border-[3px] border-transparent border-t-[#1B263A] border-r-[#1B263A] rounded-full animate-spin"></div>
+                  <div className="absolute inset-2 border-[3px] border-transparent border-b-[#1B263A]/40 border-l-[#1B263A]/40 rounded-full spin-reverse"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader className="w-6 h-6 text-[#1B263A]" />
+                  </div>
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">Mempersiapkan Kelas</h3>
-              <p className="text-sm text-gray-600 text-center mb-4">Memuat data siswa dan presensi hari ini...</p>
-              <div className="flex gap-1.5">
-                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
-                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+
+              {/* Labels */}
+              <div className="text-center mb-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-1.5">Mempersiapkan Kelas</h3>
+                <p className="text-sm text-gray-500">Memuat data siswa dan presensi hari ini</p>
+              </div>
+
+              {/* Skeleton shimmer lines */}
+              <div className="space-y-2.5">
+                <div className="h-2 shimmer-bg rounded-full w-full"></div>
+                <div className="h-2 shimmer-bg rounded-full w-5/6"></div>
+                <div className="h-2 shimmer-bg rounded-full w-2/3"></div>
               </div>
             </div>
           </div>
@@ -656,11 +761,10 @@ const Presensi = () => {
                     {/* Overlay Guide */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div
-                        className={`w-64 h-64 border-2 rounded-full transition-all duration-300 ${
-                          faceDetected
+                        className={`w-64 h-64 border-2 rounded-full transition-all duration-300 ${faceDetected
                             ? "border-emerald-400 scale-100"
                             : "border-gray-400 opacity-50 scale-95"
-                        }`}
+                          }`}
                       >
                         {faceDetected && countdown > 0 && (
                           <div className="absolute inset-0 flex items-center justify-center">

@@ -45,11 +45,11 @@ const AbsensiPenerima = () => {
   const [rfidDetected, setRfidDetected] = useState(false) // Animasi RFID terdeteksi
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]) // List semua kamera yang tersedia
   const [selectedCameraId, setSelectedCameraId] = useState<string>("") // ID kamera yang dipilih
-  const [menuCountdown, setMenuCountdown] = useState(3) // Countdown untuk auto-capture foto makanan
+  const [menuCountdown, setMenuCountdown] = useState(5) // Countdown untuk auto-capture foto makanan
   const [isMenuCountdownActive, setIsMenuCountdownActive] = useState(false) // Flag untuk countdown aktif
   const [foodConditionOk, setFoodConditionOk] = useState(false) // Flag kondisi foto makanan OK
   const [foodCondition, setFoodCondition] = useState<string>("") // Status kondisi: 'too-dark', 'too-bright', 'ok'
-  const [preparationCountdown, setPreparationCountdown] = useState(3) // Countdown persiapan 3 detik
+  const [preparationCountdown, setPreparationCountdown] = useState(5) // Countdown persiapan 5 detik
   const [isPreparationActive, setIsPreparationActive] = useState(false) // Flag preparation aktif
   const [resultCountdown, setResultCountdown] = useState(10) // Dynamic countdown for result step
 
@@ -479,8 +479,8 @@ const AbsensiPenerima = () => {
 
   const startMenuCountdown = () => {
     setIsMenuCountdownActive(true)
-    setMenuCountdown(3)
-    let count = 3
+    setMenuCountdown(5)
+    let count = 5
 
     menuCountdownIntervalRef.current = setInterval(() => {
       count -= 1
@@ -499,7 +499,7 @@ const AbsensiPenerima = () => {
       menuCountdownIntervalRef.current = null
     }
     setIsMenuCountdownActive(false)
-    setMenuCountdown(3)
+    setMenuCountdown(5)
   }
 
   const startResultCountdown = () => {
@@ -583,8 +583,8 @@ const AbsensiPenerima = () => {
 
   const startPreparationCountdown = () => {
     setIsPreparationActive(true)
-    setPreparationCountdown(3)
-    let count = 3
+    setPreparationCountdown(5)
+    let count = 5
 
     preparationIntervalRef.current = setInterval(() => {
       count -= 1
@@ -604,7 +604,7 @@ const AbsensiPenerima = () => {
       preparationIntervalRef.current = null
     }
     setIsPreparationActive(false)
-    setPreparationCountdown(3)
+    setPreparationCountdown(5)
   }
 
   const capturePhoto = () => {
@@ -1918,9 +1918,27 @@ const AbsensiPenerima = () => {
                   </div>
                 )}
 
-                <div className="text-center">
+                <div className="text-center space-y-3">
+                  {!validationResult?.success && (
+                    <button
+                      onClick={() => {
+                        stopResultCountdown()
+                        if (validationResult?.message?.toLowerCase().includes("wajah") || !menuPhoto) {
+                          setFacePhoto(null)
+                          setStep("camera-face")
+                        } else {
+                          setMenuPhoto(null)
+                          setStep("camera-menu")
+                        }
+                      }}
+                      className="w-full py-3 bg-[#1B263A] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-800 transition-colors"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Coba Lagi
+                    </button>
+                  )}
                   <p className="inline-block px-3 py-1 bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-wider rounded-full">
-                    Kembali otomatis dalam {resultCountdown}...
+                    {resultCountdown > 0 ? `Kembali otomatis dalam ${resultCountdown}...` : 'Sedang mereset...'}
                   </p>
                 </div>
               </div>

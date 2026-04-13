@@ -324,6 +324,9 @@ async function aggregateAbsensiForSekolah(sekolahId: string): Promise<AbsensiAgg
     const allKelasData = await Promise.all(absensiPromises)
     const validData = allKelasData.filter((d) => d !== null)
 
+    // ✅ Total siswa sekolah = sum dari semua kelas (bukan cuma kelas yang punya record absensi)
+    const totalSiswaSekolah = validData.reduce((sum, d) => sum + (d.totalSiswaKelas || 0), 0)
+
     // Aggregate ke map
     const allAbsensiByDate: { [dateKey: string]: AbsensiAggregated } = {}
 
@@ -336,13 +339,12 @@ async function aggregateAbsensiForSekolah(sekolahId: string): Promise<AbsensiAgg
           allAbsensiByDate[dateKey] = {
             tanggal: absensi.tanggal,
             jumlahHadirTotal: 0,
-            jumlahSiswaTotal: 0,
+            jumlahSiswaTotal: totalSiswaSekolah,
             breakdown: {},
           }
         }
 
         allAbsensiByDate[dateKey].jumlahHadirTotal += absensi.jumlahHadir
-        allAbsensiByDate[dateKey].jumlahSiswaTotal += totalSiswaKelas
         allAbsensiByDate[dateKey].breakdown[kelas.id] = {
           kelasNama: kelas.nama,
           jumlahHadir: absensi.jumlahHadir,
