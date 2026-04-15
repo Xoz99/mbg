@@ -351,8 +351,8 @@ const AbsensiPenerima = () => {
     setIsCameraActive(true)
 
     const constraints: MediaStreamConstraints = {
-      video: deviceId 
-        ? { deviceId: { exact: deviceId } } 
+      video: deviceId
+        ? { deviceId: { exact: deviceId } }
         : { facingMode: { ideal: facingMode } }
     }
 
@@ -503,10 +503,10 @@ const AbsensiPenerima = () => {
   }
 
   const startResultCountdown = () => {
-    setResultCountdown(10)
-    let count = 10
+    setResultCountdown(3)
+    let count = 3
     if (resultCountdownIntervalRef.current) clearInterval(resultCountdownIntervalRef.current)
-    
+
     resultCountdownIntervalRef.current = setInterval(() => {
       count -= 1
       setResultCountdown(count)
@@ -524,7 +524,7 @@ const AbsensiPenerima = () => {
       clearInterval(resultCountdownIntervalRef.current)
       resultCountdownIntervalRef.current = null
     }
-    setResultCountdown(10)
+    setResultCountdown(3)
   }
 
   const startFoodDetection = () => {
@@ -611,13 +611,20 @@ const AbsensiPenerima = () => {
     if (!videoRef.current) return
 
     const canvas = document.createElement("canvas")
-    canvas.width = videoRef.current.videoWidth
-    canvas.height = videoRef.current.videoHeight
+    const maxWidth = 800
+    const scale =  videoRef.current.videoWidth > maxWidth ? maxWidth / videoRef.current.videoWidth : 1
+    
+    canvas.width = videoRef.current.videoWidth * scale
+    canvas.height = videoRef.current.videoHeight * scale
+    
     const ctx = canvas.getContext("2d")
-
     if (ctx) {
+      if (scale < 1) {
+         ctx.scale(scale, scale)
+      }
       ctx.drawImage(videoRef.current, 0, 0)
-      const photoData = canvas.toDataURL("image/jpeg", 0.8)
+      
+      const photoData = canvas.toDataURL("image/jpeg", 0.6)
 
       if (stepRef.current === "camera-face") {
         setFacePhoto(photoData)
@@ -635,13 +642,20 @@ const AbsensiPenerima = () => {
     if (!videoRef.current) return
 
     const canvas = document.createElement("canvas")
-    canvas.width = videoRef.current.videoWidth
-    canvas.height = videoRef.current.videoHeight
+    const maxWidth = 800
+    const scale =  videoRef.current.videoWidth > maxWidth ? maxWidth / videoRef.current.videoWidth : 1
+    
+    canvas.width = videoRef.current.videoWidth * scale
+    canvas.height = videoRef.current.videoHeight * scale
+    
     const ctx = canvas.getContext("2d")
-
     if (ctx) {
+      if (scale < 1) {
+         ctx.scale(scale, scale)
+      }
       ctx.drawImage(videoRef.current, 0, 0)
-      const photoData = canvas.toDataURL("image/jpeg", 0.8)
+      
+      const photoData = canvas.toDataURL("image/jpeg", 0.6)
       setFacePhoto(photoData)
       stopCamera()
       validateFace(photoData)
@@ -948,7 +962,7 @@ const AbsensiPenerima = () => {
       toast.success("Pengambilan makanan berhasil dicatat!")
       setStep("result")
       startResultCountdown()
-      
+
       // Refresh absensi data setelah submit
       setTimeout(() => {
         fetchAbsensiToday()
@@ -956,7 +970,7 @@ const AbsensiPenerima = () => {
 
       setTimeout(() => {
         handleReset()
-      }, 10000)
+      }, 3000)
     } catch (err) {
       console.error("Error submitting:", err)
       const errMsg = err instanceof Error ? err.message : "Terjadi kesalahan"
@@ -970,7 +984,7 @@ const AbsensiPenerima = () => {
 
       setTimeout(() => {
         handleReset()
-      }, 10000)
+      }, 3000)
     }
   }
 
@@ -1856,12 +1870,12 @@ const AbsensiPenerima = () => {
 
                     {/* AI confidence info */}
                     <div className="mt-3 flex flex-col items-center gap-2">
-                       {validationResult?.data?.confidence && (
+                      {validationResult?.data?.confidence && (
                         <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-full uppercase tracking-tighter">
                           Matching: {Math.round(validationResult.data.confidence * 100)}%
                         </span>
                       )}
-                      
+
                       {validationResult?.data?.keteranganValidasi && (
                         <div className="w-full mt-2 bg-white/50 border border-emerald-100 rounded-xl p-3 text-left shadow-sm">
                           <div className="flex items-center justify-between mb-1.5">
@@ -1918,27 +1932,9 @@ const AbsensiPenerima = () => {
                   </div>
                 )}
 
-                <div className="text-center space-y-3">
-                  {!validationResult?.success && (
-                    <button
-                      onClick={() => {
-                        stopResultCountdown()
-                        if (validationResult?.message?.toLowerCase().includes("wajah") || !menuPhoto) {
-                          setFacePhoto(null)
-                          setStep("camera-face")
-                        } else {
-                          setMenuPhoto(null)
-                          setStep("camera-menu")
-                        }
-                      }}
-                      className="w-full py-3 bg-[#1B263A] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-800 transition-colors"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Coba Lagi
-                    </button>
-                  )}
+                <div className="text-center">
                   <p className="inline-block px-3 py-1 bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-wider rounded-full">
-                    {resultCountdown > 0 ? `Kembali otomatis dalam ${resultCountdown}...` : 'Sedang mereset...'}
+                    Kembali otomatis dalam {resultCountdown}...
                   </p>
                 </div>
               </div>

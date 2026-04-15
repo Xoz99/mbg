@@ -510,7 +510,7 @@ const Presensi = () => {
 
       setTimeout(() => {
         handleReset()
-      }, isDuplicate ? 5000 : 3000)
+      }, 3000)
     }
   }
 

@@ -284,12 +284,21 @@ const PengembalianMakanan = () => {
   const capturePhoto = useCallback(() => {
     if (!videoRef.current) return
     const canvas = document.createElement("canvas")
-    canvas.width = videoRef.current.videoWidth
-    canvas.height = videoRef.current.videoHeight
+    const maxWidth = 800
+    const scale =  videoRef.current.videoWidth > maxWidth ? maxWidth / videoRef.current.videoWidth : 1
+    
+    canvas.width = videoRef.current.videoWidth * scale
+    canvas.height = videoRef.current.videoHeight * scale
+    
     const ctx = canvas.getContext("2d")
     if (ctx) {
+      if (scale < 1) {
+         ctx.scale(scale, scale)
+      }
       ctx.drawImage(videoRef.current, 0, 0)
-      const photoData = canvas.toDataURL("image/jpeg", 0.8)
+      
+      const photoData = canvas.toDataURL("image/jpeg", 0.6) // Compress higher to reduce size
+      
       if (stepRef.current === "camera-face") {
         setFacePhoto(photoData)
         stopCamera()
@@ -477,32 +486,9 @@ const PengembalianMakanan = () => {
 
       const detectedSiswa = result.data?.siswa || result.siswa || result.data || result
 
-      // BACKUP: If backend didn't return pickupInfo, try to fetch it manually
-      if (detectedSiswa && !detectedSiswa.pickupInfo) {
-        try {
-          const todayStr = new Date().toISOString().split('T')[0]
-          const pickupResponse = await fetch(`${API_BASE_URL}/api/pengambilan-makanan?siswaId=${detectedSiswa.siswaId || detectedSiswa.id}&tanggal=${todayStr}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          })
+      // Backend sudah mengembalikan pickupInfo (jika ada).
+      // Jika null, biarkan saja agar Auto-Recovery backend bekerja, tidak perlu fetch redundan yang bikin lambat.
 
-          if (pickupResponse.ok) {
-            const pickupResult = await pickupResponse.json()
-            const pickups = pickupResult.data?.data || pickupResult.data || []
-            if (pickups.length > 0) {
-              // Use the latest pickup from today
-              detectedSiswa.pickupInfo = {
-                id: pickups[0].id,
-                idTray: pickups[0].idTray,
-                tanggalPengambilan: pickups[0].tanggalPengambilan
-              }
-            }
-          }
-        } catch (fetchErr) {
-          console.error("Failed to fetch backup pickup info:", fetchErr)
-        }
-      }
 
       if (detectedSiswa && (detectedSiswa.siswaId || detectedSiswa.id)) {
         let alergiArray: string[] = []
@@ -575,13 +561,13 @@ const PengembalianMakanan = () => {
       setValidationResult({ success: true, message: "Berhasil dicatat!", siswa: selectedSiswa })
       toast.success("Pengembalian makanan berhasil dicatat!")
       setStep("result")
-      setTimeout(handleReset, 5000)
+      setTimeout(handleReset, 3000)
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Terjadi kesalahan"
       setValidationResult({ success: false, message: errMsg })
       toast.error(`Gagal: ${errMsg}`)
       setStep("result")
-      setTimeout(handleReset, 5000)
+      setTimeout(handleReset, 3000)
     }
   }
 
@@ -986,13 +972,7 @@ const PengembalianMakanan = () => {
               )}
             </div>
 
-            {!selectedSiswa.pickupInfo ? (
-              <div className="text-center mb-4">
-                <button onClick={handleReset} className="w-full px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
-                  Coba Siswa Lain
-                </button>
-              </div>
-            ) : !showManualInput ? (
+            {!showManualInput ? (
               <>
                 {/* RFID Scan Section */}
                 <div className="text-center mb-6">
