@@ -401,7 +401,7 @@ const Presensi = () => {
         throw new Error("Token autentikasi tidak ditemukan")
       }
 
-      const url = `${API_BASE_URL}/api/kelas/${selectedKelas.id}/absensi`
+      const url = `${API_BASE_URL}/api/kelas/${selectedKelas.id}/absensi/face-recognition`
 
       // Get today's date in Indonesia timezone (UTC+7)
       const now = new Date();
@@ -411,49 +411,9 @@ const Presensi = () => {
       const day = String(indonesiaTime.getUTCDate()).padStart(2, '0');
       const todayString = `${year}-${month}-${day}`;
 
-      const siswaIdStr = String(selectedSiswa.id)
-
-      // Step 1: Fetch existing absensi for today to merge siswaHadir list
-      console.log("[PRESENSI] Fetching existing absensi from:", url)
-      const existingRes = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      let existingSiswaHadir: string[] = []
-      if (existingRes.ok) {
-        const existingJson = await existingRes.json()
-        const records = existingJson?.data?.absensi || existingJson?.data?.records || existingJson?.data || []
-        const recordsArr = Array.isArray(records) ? records : (Array.isArray(records?.items) ? records.items : [])
-        // Find today's record
-        const todayRecord = recordsArr.find((r: any) => {
-          const rDate = r.tanggal || r.date
-          if (!rDate) return false
-          const dStr = typeof rDate === "string" ? rDate.split("T")[0] : ""
-          return dStr === todayString
-        })
-        if (todayRecord) {
-          const hadirList = todayRecord.siswaHadir || todayRecord.siswa_hadir || []
-          existingSiswaHadir = (Array.isArray(hadirList) ? hadirList : [])
-            .map((s: any) => String(typeof s === "object" ? (s.id || s.siswaId || s._id) : s))
-            .filter((s: string) => s)
-        }
-      }
-
-      // Step 2: Check if siswa already presensi today
-      if (existingSiswaHadir.includes(siswaIdStr)) {
-        throw new Error("sudah melakukan absensi")
-      }
-
-      // Step 3: Merge and POST full siswaHadir list
-      const mergedSiswaHadir = [...existingSiswaHadir, siswaIdStr]
       const payload = {
+        siswaId: String(selectedSiswa.id),
         tanggal: todayString,
-        jumlahHadir: mergedSiswaHadir.length,
-        siswaHadir: mergedSiswaHadir,
       }
 
       console.log("[PRESENSI] Submitting to endpoint:", url)
@@ -856,10 +816,10 @@ const Presensi = () => {
 
                   <div className="flex justify-center items-center gap-8 md:gap-16">
                     <div className="relative group">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-blue-500 font-black mb-3 flex items-center justify-center gap-1.5 animate-pulse">
+                      <div className="text-[10px] uppercase tracking-[0.2em] text-blue-500 font-black mb-3 flex items-center justify-center gap-1.5 animate-pulse">
                         <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
                         BIOMETRIC TEMPLATE
-                      </p>
+                      </div>
                       <div className="relative">
                         {selectedSiswa.fotoUrl ? (
                           <img
@@ -883,10 +843,10 @@ const Presensi = () => {
                     </div>
 
                     <div className="relative group">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-500 font-black mb-3 flex items-center justify-center gap-1.5 animate-pulse">
+                      <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-500 font-black mb-3 flex items-center justify-center gap-1.5 animate-pulse">
                         <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
                         NEURAL SCAN RESULT
-                      </p>
+                      </div>
                       <div className="relative">
                         {facePhoto && (
                           <img
