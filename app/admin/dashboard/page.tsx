@@ -371,16 +371,25 @@ const AdminDashboard = () => {
       const reportRows: any[] = [];
       const masterStudentRows: any[] = [];
       const nutritionalSummary: any[] = [];
+      const studentBreakdownRows: any[] = []; // Per-student makan/tidak makan per hari
       const processedMenuIds = new Set<string>();
       const schoolsProcessedForAnnex = new Set<string>();
       const schoolTotalSiswaMap = new Map<string, number>();
       const schoolSiswaIdsMap = new Map<string, Set<string>>();
+      const schoolSiswaListMap = new Map<string, any[]>(); // schoolId -> full siswa list
+      const schoolNameMap = new Map<string, string>(); // schoolId -> nama sekolah
       const schoolAbsensiCache = new Map<string, Map<string, number>>(); // schoolId -> Map(dateKey -> totalHadir)
       const daySchoolDataCache = new Map<string, any>();
+      // Track pengambilan & pengembalian siswaIds per date per school
+      const dailyPickupSiswaBySchool = new Map<string, Map<string, Set<string>>>(); // dateKey -> schoolId -> Set<siswaId>
+      const dailyReturnSiswaBySchool = new Map<string, Map<string, Set<string>>>(); // dateKey -> schoolId -> Set<siswaId>
 
       // Manual date start to avoid TZ shift
       const startParts = startDate.split('-').map(Number);
       let currIterDate = dayjs(new Date(startParts[0], startParts[1] - 1, startParts[2]));
+
+      // Cache for tray return data per school
+      const schoolTrayReturnCache = new Map<string, any[]>();
 
       // 3. Loop through dates
       for (let i = 0; i <= diffDays; i++) {
@@ -388,8 +397,10 @@ const AdminDashboard = () => {
         const displayDate = currIterDate.locale('id').format('dddd, D MMMM YYYY');
         const schoolDayCache = new Map<string, any>();
 
-        // 3.0 Fetch ALL pengambilan-makanan for this date (fallback for presensi)
+        // 3.0 Fetch ALL pengambilan-makanan for this date
         let datePickupSiswaIds = new Set<string>();
+        let datePickupBySchool = new Map<string, number>();
+        const datePickupSiswaBySchool = new Map<string, Set<string>>();
         try {
           const pickupsRes = await fetch(`${API_BASE_URL}/api/pengambilan-makanan?tanggal=${dateKey}&limit=2000`, {
             headers: { Authorization: `Bearer ${authToken}` }
@@ -397,9 +408,38 @@ const AdminDashboard = () => {
           if (pickupsRes.ok) {
             const pickupsData = await pickupsRes.json();
             const pickupsList = Array.isArray(pickupsData.data?.data) ? pickupsData.data.data : (Array.isArray(pickupsData.data) ? pickupsData.data : []);
-            pickupsList.forEach((p: any) => { if (p.siswaId) datePickupSiswaIds.add(p.siswaId); });
+            pickupsList.forEach((p: any) => {
+              if (p.siswaId) datePickupSiswaIds.add(p.siswaId);
+              if (p.sekolahId) {
+                datePickupBySchool.set(p.sekolahId, (datePickupBySchool.get(p.sekolahId) || 0) + 1);
+                if (!datePickupSiswaBySchool.has(p.sekolahId)) datePickupSiswaBySchool.set(p.sekolahId, new Set());
+                if (p.siswaId) datePickupSiswaBySchool.get(p.sekolahId)!.add(p.siswaId);
+              }
+            });
           }
         } catch (e) { }
+        dailyPickupSiswaBySchool.set(dateKey, datePickupSiswaBySchool);
+
+        // 3.0b Fetch ALL pengembalian-makanan for this date
+        let dateReturnBySchool = new Map<string, number>();
+        const dateReturnSiswaBySchool = new Map<string, Set<string>>();
+        try {
+          const returnsRes = await fetch(`${API_BASE_URL}/api/pengembalian-makanan?tanggal=${dateKey}&limit=2000`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+          });
+          if (returnsRes.ok) {
+            const returnsData = await returnsRes.json();
+            const returnsList = Array.isArray(returnsData.data?.data) ? returnsData.data.data : (Array.isArray(returnsData.data) ? returnsData.data : []);
+            returnsList.forEach((r: any) => {
+              if (r.sekolahId) {
+                dateReturnBySchool.set(r.sekolahId, (dateReturnBySchool.get(r.sekolahId) || 0) + 1);
+                if (!dateReturnSiswaBySchool.has(r.sekolahId)) dateReturnSiswaBySchool.set(r.sekolahId, new Set());
+                if (r.siswaId) dateReturnSiswaBySchool.get(r.sekolahId)!.add(r.siswaId);
+              }
+            });
+          }
+        } catch (e) { }
+        dailyReturnSiswaBySchool.set(dateKey, dateReturnSiswaBySchool);
 
         const dayMenusPromises = relevantPlannings.map(async (p: any) => {
           try {
@@ -552,6 +592,10 @@ const AdminDashboard = () => {
                     sListOriginal.forEach((s: any) => { if (s.id) siswaIds.add(s.id); });
                     schoolSiswaIdsMap.set(schoolId, siswaIds);
 
+                    // Store full siswa list and school name for breakdown page
+                    schoolSiswaListMap.set(schoolId, sListOriginal);
+                    schoolNameMap.set(schoolId, sekolahName);
+
                     // Sort by Kelas then Name
                     const sList = [...sListOriginal].sort((a, b) => {
                       const kA = a.kelas?.nama || "";
@@ -612,8 +656,58 @@ const AdminDashboard = () => {
                 }
               }
 
+              // 3e. Fetch tray return data for this school (cached per school)
+              let trayReturnData: any[] = [];
+              if (schoolId && !schoolTrayReturnCache.has(schoolId)) {
+                try {
+                  const trRes = await fetch(`${API_BASE_URL}/api/tray-return/sekolah/${schoolId}`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                  });
+                  if (trRes.ok) {
+                    const trData = await trRes.json();
+                    const trList = Array.isArray(trData.data?.data) ? trData.data.data : (Array.isArray(trData.data) ? trData.data : []);
+                    schoolTrayReturnCache.set(schoolId, trList);
+                  } else {
+                    schoolTrayReturnCache.set(schoolId, []);
+                  }
+                } catch (e) { schoolTrayReturnCache.set(schoolId, []); }
+              }
+              trayReturnData = schoolTrayReturnCache.get(schoolId) || [];
+
+              // Find tray return matching this date
+              const normalizeToWIBDate = (ds: string): string => {
+                if (!ds) return '';
+                if (ds.includes('T')) {
+                  const ud = new Date(ds);
+                  if (isNaN(ud.getTime())) return ds.split('T')[0];
+                  const ld = new Date(ud.getTime() + 7 * 60 * 60 * 1000);
+                  return `${ld.getUTCFullYear()}-${String(ld.getUTCMonth() + 1).padStart(2, '0')}-${String(ld.getUTCDate()).padStart(2, '0')}`;
+                }
+                return ds;
+              };
+              const dateTrayReturns = trayReturnData.filter((tr: any) => {
+                const trDate = normalizeToWIBDate(String(tr.waktuSubmit || tr.createdAt || ''));
+                return trDate === dateKey;
+              });
+
+              // 3f. 4-step tray tracking
+              const pgMatch = currentDayData.pgMatch;
+              // Dapur → Driver: jumlahTray saat driver scan QR
+              const trayDapurDriver = pgMatch?.waktuScanDriver ? (pgMatch.jumlahTray || 0) : 0;
+              // Driver → Sekolah: jumlahTray saat sampai sekolah
+              const trayDriverSekolah = pgMatch?.waktuSampai ? (pgMatch.jumlahTray || 0) : 0;
+              // Sekolah → Driver: jumlahTrayDiterimaDriver dari tray return
+              const traySekolahDriver = dateTrayReturns.reduce((sum: number, tr: any) => sum + (tr.jumlahTrayDiterimaDriver || tr.jumlahTray || 0), 0);
+              // Driver → Dapur: jumlahTrayDiterimaDapur dari tray return
+              const trayDriverDapur = dateTrayReturns.reduce((sum: number, tr: any) => sum + (tr.jumlahTrayDiterimaDapur || 0), 0);
+
+              // 3g. Pengambilan & pengembalian counts from pre-fetched data
+              const presensiPengambilan = datePickupBySchool.get(schoolId) || 0;
+              const presensiPengembalian = dateReturnBySchool.get(schoolId) || 0;
+              const sisaMakanan = presensiPengambilan - presensiPengembalian;
+
               const totalSiswa = schoolTotalSiswaMap.get(schoolId) || scuolaStats?.totalSiswa || scuolaStats?.jumlahSiswa || 0;
-              return { ...m, ...currentDayData, presensi, totalSiswa, sekolahName, checkpoints };
+              return { ...m, ...currentDayData, presensi, totalSiswa, sekolahName, checkpoints, trayDapurDriver, trayDriverSekolah, traySekolahDriver, trayDriverDapur, presensiPengambilan, presensiPengembalian, sisaMakanan };
             }));
           } catch (e) { return []; }
         });
@@ -641,12 +735,70 @@ const AdminDashboard = () => {
             m.pgMatch ? formatTime(m.pgMatch.waktuScanDriver) : "-",
             m.pgMatch ? formatTime(m.pgMatch.waktuSampai) : "-",
             cpX(["SCHOOL_TO_DRIVER_RETURN"]), cpX(["DRIVER_TO_KITCHEN"]), cpX(["WASHING_COMPLETE"]),
-            m.targetTray || 0, 0, m.totalSiswa || "-", m.presensi || 0
+            m.trayDapurDriver || 0, m.trayDriverSekolah || 0, m.traySekolahDriver || 0, m.trayDriverDapur || 0,
+            m.totalSiswa || "-", m.presensi || 0,
+            m.presensiPengambilan || 0, m.presensiPengembalian || 0, m.sisaMakanan >= 0 ? m.sisaMakanan : 0
           ]);
         });
 
         currIterDate = currIterDate.add(1, 'day');
         setReportProgress(Math.round(15 + ((i + 1) / (diffDays + 1)) * 80));
+      }
+
+      // Build student breakdown rows + daily chart data
+      const dailyChartData: { date: string, shortDate: string, makan: number, tidakMakan: number, kembali: number, total: number }[] = [];
+      const breakdownStartParts = startDate.split('-').map(Number);
+      let breakdownDate = dayjs(new Date(breakdownStartParts[0], breakdownStartParts[1] - 1, breakdownStartParts[2]));
+      for (let i = 0; i <= diffDays; i++) {
+        const dKey = breakdownDate.format('YYYY-MM-DD');
+        const dDisplay = breakdownDate.locale('id').format('dddd, D MMMM YYYY');
+        const dShort = breakdownDate.format('DD/MM');
+        const pickupMap = dailyPickupSiswaBySchool.get(dKey) || new Map();
+        const returnMap = dailyReturnSiswaBySchool.get(dKey) || new Map();
+
+        let dayMakan = 0, dayTidakMakan = 0, dayKembali = 0, dayTotal = 0;
+
+        schoolSiswaListMap.forEach((siswaList, schoolId) => {
+          const schName = schoolNameMap.get(schoolId) || '-';
+          const pickupSet = pickupMap.get(schoolId) || new Set();
+          const returnSet = returnMap.get(schoolId) || new Set();
+
+          // Sort by kelas then nama
+          const sorted = [...siswaList].sort((a, b) => {
+            const kA = a.kelas?.nama || '';
+            const kB = b.kelas?.nama || '';
+            if (kA !== kB) return kA.localeCompare(kB);
+            return (a.nama || '').localeCompare(b.nama || '');
+          });
+
+          sorted.forEach((s: any) => {
+            const sudahAmbil = pickupSet.has(s.id);
+            const sudahKembali = returnSet.has(s.id);
+            let statusMakan = 'TIDAK MAKAN';
+            if (sudahAmbil && sudahKembali) { statusMakan = 'SUDAH MAKAN & KEMBALI'; dayMakan++; dayKembali++; }
+            else if (sudahAmbil) { statusMakan = 'SUDAH MAKAN'; dayMakan++; }
+            else { dayTidakMakan++; }
+            dayTotal++;
+
+            studentBreakdownRows.push([
+              studentBreakdownRows.length + 1,
+              dDisplay,
+              schName,
+              s.kelas?.nama || '-',
+              s.nama || '-',
+              s.nis || '-',
+              sudahAmbil ? 'YA' : 'TIDAK',
+              sudahKembali ? 'YA' : 'TIDAK',
+              statusMakan
+            ]);
+          });
+        });
+
+        if (dayTotal > 0) {
+          dailyChartData.push({ date: dKey, shortDate: dShort, makan: dayMakan, tidakMakan: dayTidakMakan, kembali: dayKembali, total: dayTotal });
+        }
+
+        breakdownDate = breakdownDate.add(1, 'day');
       }
 
       setReportProgress(100);
@@ -667,11 +819,14 @@ const AdminDashboard = () => {
         head: [[
           'No.', 'Hari dan Tanggal', 'Sekolah', 'Menu', 'Jam mulai masak', 'Jam selesai masak',
           'Jam selesai kemas', 'Jam diantar', 'Jam sampai sekolah', 'Jam ambil ompreng', 'Jam sampai SPPG',
-          'Jam selesai pencucian', 'Jml Tray', 'Tray Basi', 'Total Siswa', 'Jml Presensi'
+          'Jam selesai pencucian',
+          'Tray Dapur→Driver', 'Tray Driver→Sekolah', 'Tray Sekolah→Driver', 'Tray Driver→Dapur',
+          'Total Siswa', 'Jml Presensi',
+          'Presensi Pengambilan', 'Presensi Pengembalian', 'Sisa Makanan'
         ]],
         body: reportRows, startY: 40, theme: 'grid',
-        headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontSize: 7, halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0] },
-        bodyStyles: { fontSize: 7, halign: 'center', textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0] },
+        headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontSize: 6, halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0] },
+        bodyStyles: { fontSize: 6, halign: 'center', textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0] },
         margin: { top: 40 }, styles: { font: "helvetica", cellPadding: 2 }
       });
 
@@ -707,6 +862,230 @@ const AdminDashboard = () => {
           headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontSize: 8, halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0] },
           bodyStyles: { fontSize: 8, halign: 'center', textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0] },
           margin: { top: 25 }
+        });
+      }
+
+      // PAGE 4: GRAFIK ANALISIS HARIAN
+      if (dailyChartData.length > 0) {
+        doc.addPage('a3', 'landscape');
+        const pageW = doc.internal.pageSize.width;
+        const pageH = doc.internal.pageSize.height;
+
+        // Header
+        doc.setFillColor(27, 38, 58);
+        doc.rect(0, 0, pageW, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(18); doc.setFont("helvetica", "bold");
+        doc.text("GRAFIK ANALISIS PENGAMBILAN MAKANAN HARIAN", pageW / 2, 18, { align: 'center' });
+        doc.setFontSize(12); doc.text(`Periode: ${startDate} s/d ${endDate}`, pageW / 2, 30, { align: 'center' });
+
+        // Draw bar chart using canvas
+        const canvas = document.createElement('canvas');
+        const chartW = 1200;
+        const chartH = 500;
+        canvas.width = chartW;
+        canvas.height = chartH;
+        const ctx = canvas.getContext('2d')!;
+
+        // Background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, chartW, chartH);
+
+        const marginLeft = 80;
+        const marginRight = 40;
+        const marginTop = 40;
+        const marginBottom = 80;
+        const plotW = chartW - marginLeft - marginRight;
+        const plotH = chartH - marginTop - marginBottom;
+        const barCount = dailyChartData.length;
+        const groupWidth = plotW / barCount;
+        const barWidth = Math.min(groupWidth * 0.35, 50);
+        const maxVal = Math.max(...dailyChartData.map(d => d.total), 1);
+
+        // Y-axis gridlines
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.lineWidth = 1;
+        const yTicks = 5;
+        for (let t = 0; t <= yTicks; t++) {
+          const y = marginTop + plotH - (t / yTicks) * plotH;
+          ctx.beginPath(); ctx.moveTo(marginLeft, y); ctx.lineTo(marginLeft + plotW, y); ctx.stroke();
+          ctx.fillStyle = '#6b7280'; ctx.font = '14px sans-serif'; ctx.textAlign = 'right';
+          ctx.fillText(String(Math.round((t / yTicks) * maxVal)), marginLeft - 10, y + 5);
+        }
+
+        // Bars
+        dailyChartData.forEach((d, idx) => {
+          const groupX = marginLeft + idx * groupWidth + groupWidth / 2;
+
+          // Bar: Makan (green)
+          const makanH = (d.makan / maxVal) * plotH;
+          ctx.fillStyle = '#22c55e';
+          ctx.fillRect(groupX - barWidth - 2, marginTop + plotH - makanH, barWidth, makanH);
+
+          // Bar: Tidak Makan (red)
+          const tidakH = (d.tidakMakan / maxVal) * plotH;
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(groupX + 2, marginTop + plotH - tidakH, barWidth, tidakH);
+
+          // Value labels on bars
+          ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+          if (d.makan > 0) {
+            ctx.fillStyle = '#166534';
+            ctx.fillText(String(d.makan), groupX - barWidth / 2 - 2, marginTop + plotH - makanH - 5);
+          }
+          if (d.tidakMakan > 0) {
+            ctx.fillStyle = '#991b1b';
+            ctx.fillText(String(d.tidakMakan), groupX + barWidth / 2 + 2, marginTop + plotH - tidakH - 5);
+          }
+
+          // X-axis label
+          ctx.fillStyle = '#374151'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText(d.shortDate, groupX, marginTop + plotH + 20);
+        });
+
+        // Axis lines
+        ctx.strokeStyle = '#374151'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(marginLeft, marginTop); ctx.lineTo(marginLeft, marginTop + plotH); ctx.lineTo(marginLeft + plotW, marginTop + plotH); ctx.stroke();
+
+        // Y-axis title
+        ctx.save(); ctx.translate(20, marginTop + plotH / 2); ctx.rotate(-Math.PI / 2);
+        ctx.fillStyle = '#374151'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('Jumlah Siswa', 0, 0); ctx.restore();
+
+        // Legend
+        const legendY = marginTop + plotH + 45;
+        ctx.fillStyle = '#22c55e'; ctx.fillRect(marginLeft, legendY, 16, 16);
+        ctx.fillStyle = '#374151'; ctx.font = '14px sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText('Makan', marginLeft + 22, legendY + 13);
+        ctx.fillStyle = '#ef4444'; ctx.fillRect(marginLeft + 100, legendY, 16, 16);
+        ctx.fillStyle = '#374151'; ctx.fillText('Tidak Makan', marginLeft + 122, legendY + 13);
+
+        // Add chart to PDF
+        const chartImg = canvas.toDataURL('image/png');
+        const pdfChartW = pageW - 40;
+        const pdfChartH = (chartH / chartW) * pdfChartW;
+        const maxChartH = 130;
+        doc.addImage(chartImg, 'PNG', 20, 45, pdfChartW, Math.min(pdfChartH, maxChartH));
+
+        // ── Analisis Teks ──
+        const analisisY = 45 + Math.min(pdfChartH, maxChartH) + 10;
+        doc.setTextColor(27, 38, 58);
+        doc.setFontSize(14); doc.setFont("helvetica", "bold");
+        doc.text("ANALISIS", 20, analisisY);
+
+        const totalAllMakan = dailyChartData.reduce((s, d) => s + d.makan, 0);
+        const totalAllTidak = dailyChartData.reduce((s, d) => s + d.tidakMakan, 0);
+        const totalAllKembali = dailyChartData.reduce((s, d) => s + d.kembali, 0);
+        const totalAllSiswa = dailyChartData.reduce((s, d) => s + d.total, 0);
+        const avgMakan = dailyChartData.length > 0 ? Math.round(totalAllMakan / dailyChartData.length) : 0;
+        const avgPersen = totalAllSiswa > 0 ? ((totalAllMakan / totalAllSiswa) * 100).toFixed(1) : '0';
+        const bestDay = [...dailyChartData].sort((a, b) => (b.makan / b.total) - (a.makan / a.total))[0];
+        const worstDay = [...dailyChartData].sort((a, b) => (a.makan / a.total) - (b.makan / b.total))[0];
+        const avgKembaliPersen = totalAllMakan > 0 ? ((totalAllKembali / totalAllMakan) * 100).toFixed(1) : '0';
+
+        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(55, 65, 81);
+        const lines = [
+          `• Rata-rata siswa makan per hari: ${avgMakan} siswa (${avgPersen}% dari total)`,
+          `• Total pengambilan makanan: ${totalAllMakan} | Total tidak makan: ${totalAllTidak}`,
+          `• Tingkat pengembalian tray: ${avgKembaliPersen}% dari yang mengambil makanan`,
+          `• Hari dengan partisipasi tertinggi: ${bestDay.shortDate} (${bestDay.makan}/${bestDay.total} = ${((bestDay.makan/bestDay.total)*100).toFixed(1)}%)`,
+          `• Hari dengan partisipasi terendah: ${worstDay.shortDate} (${worstDay.makan}/${worstDay.total} = ${((worstDay.makan/worstDay.total)*100).toFixed(1)}%)`,
+        ];
+
+        // Trend analysis
+        if (dailyChartData.length >= 3) {
+          const firstHalf = dailyChartData.slice(0, Math.floor(dailyChartData.length / 2));
+          const secondHalf = dailyChartData.slice(Math.floor(dailyChartData.length / 2));
+          const firstAvg = firstHalf.reduce((s, d) => s + d.makan / d.total, 0) / firstHalf.length;
+          const secondAvg = secondHalf.reduce((s, d) => s + d.makan / d.total, 0) / secondHalf.length;
+          const diff = ((secondAvg - firstAvg) * 100).toFixed(1);
+          if (secondAvg > firstAvg) {
+            lines.push(`• Tren: Partisipasi MENINGKAT +${diff}% di paruh kedua periode`);
+          } else if (secondAvg < firstAvg) {
+            lines.push(`• Tren: Partisipasi MENURUN ${diff}% di paruh kedua periode`);
+          } else {
+            lines.push(`• Tren: Partisipasi STABIL sepanjang periode`);
+          }
+        }
+
+        lines.forEach((line, idx) => {
+          doc.text(line, 20, analisisY + 12 + idx * 12);
+        });
+
+        // ── Pie chart (total keseluruhan) ──
+        const pieCanvas = document.createElement('canvas');
+        pieCanvas.width = 400; pieCanvas.height = 400;
+        const pctx = pieCanvas.getContext('2d')!;
+        pctx.fillStyle = '#ffffff'; pctx.fillRect(0, 0, 400, 400);
+
+        const cx = 200, cy = 180, radius = 130;
+        const makanAngle = (totalAllMakan / totalAllSiswa) * Math.PI * 2;
+
+        // Makan slice
+        pctx.beginPath(); pctx.moveTo(cx, cy); pctx.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + makanAngle); pctx.closePath();
+        pctx.fillStyle = '#22c55e'; pctx.fill(); pctx.strokeStyle = '#ffffff'; pctx.lineWidth = 2; pctx.stroke();
+
+        // Tidak makan slice
+        pctx.beginPath(); pctx.moveTo(cx, cy); pctx.arc(cx, cy, radius, -Math.PI / 2 + makanAngle, -Math.PI / 2 + Math.PI * 2); pctx.closePath();
+        pctx.fillStyle = '#ef4444'; pctx.fill(); pctx.strokeStyle = '#ffffff'; pctx.lineWidth = 2; pctx.stroke();
+
+        // Center text
+        pctx.fillStyle = '#111827'; pctx.font = 'bold 28px sans-serif'; pctx.textAlign = 'center';
+        pctx.fillText(`${avgPersen}%`, cx, cy - 5);
+        pctx.font = '14px sans-serif'; pctx.fillStyle = '#6b7280';
+        pctx.fillText('Makan', cx, cy + 18);
+
+        // Pie legend
+        pctx.fillStyle = '#22c55e'; pctx.fillRect(100, 340, 14, 14);
+        pctx.fillStyle = '#374151'; pctx.font = '13px sans-serif'; pctx.textAlign = 'left';
+        pctx.fillText(`Makan (${totalAllMakan})`, 120, 353);
+        pctx.fillStyle = '#ef4444'; pctx.fillRect(230, 340, 14, 14);
+        pctx.fillStyle = '#374151'; pctx.fillText(`Tidak Makan (${totalAllTidak})`, 250, 353);
+
+        const pieImg = pieCanvas.toDataURL('image/png');
+        doc.addImage(pieImg, 'PNG', pageW - 150, analisisY - 5, 120, 120);
+      }
+
+      // PAGE 5: BREAKDOWN PER SISWA (MAKAN / TIDAK MAKAN)
+      if (studentBreakdownRows.length > 0) {
+        doc.addPage('a3', 'landscape');
+        doc.setFillColor(27, 38, 58);
+        doc.rect(0, 0, doc.internal.pageSize.width, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(18); doc.setFont("helvetica", "bold");
+        doc.text("LAMPIRAN: BREAKDOWN PENGAMBILAN & PENGEMBALIAN MAKANAN PER SISWA", doc.internal.pageSize.width / 2, 18, { align: 'center' });
+        doc.setFontSize(12); doc.text(`Periode: ${startDate} s/d ${endDate}`, doc.internal.pageSize.width / 2, 30, { align: 'center' });
+
+        autoTable(doc, {
+          head: [['No.', 'Tanggal', 'Sekolah', 'Kelas', 'Nama Siswa', 'NIS', 'Ambil Makanan', 'Kembalikan Tray', 'Status']],
+          body: studentBreakdownRows, startY: 40, theme: 'grid',
+          headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontSize: 7, halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0] },
+          bodyStyles: { fontSize: 7, halign: 'center', textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0] },
+          margin: { top: 40 },
+          didParseCell: (data: any) => {
+            // Color code status column
+            if (data.section === 'body' && data.column.index === 8) {
+              const val = String(data.cell.raw);
+              if (val === 'TIDAK MAKAN') {
+                data.cell.styles.textColor = [220, 38, 38]; // red
+                data.cell.styles.fontStyle = 'bold';
+              } else if (val === 'SUDAH MAKAN & KEMBALI') {
+                data.cell.styles.textColor = [22, 163, 74]; // green
+                data.cell.styles.fontStyle = 'bold';
+              } else if (val === 'SUDAH MAKAN') {
+                data.cell.styles.textColor = [245, 158, 11]; // amber
+                data.cell.styles.fontStyle = 'bold';
+              }
+            }
+            // Color code YA/TIDAK columns
+            if (data.section === 'body' && (data.column.index === 6 || data.column.index === 7)) {
+              if (String(data.cell.raw) === 'YA') {
+                data.cell.styles.textColor = [22, 163, 74];
+              } else {
+                data.cell.styles.textColor = [220, 38, 38];
+              }
+            }
+          }
         });
       }
 
