@@ -26,6 +26,9 @@ import {
   Upload,
   ChevronDown,
   Save,
+  UtensilsCrossed,
+  RotateCcw,
+  CheckCircle,
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
@@ -200,6 +203,97 @@ const DataSiswa = () => {
   }, [siswaData])
   const [submitting, setSubmitting] = useState(false)
 
+  // Tracking pengambilan & pengembalian hari ini
+  const [todayPickups, setTodayPickups] = useState<Set<string>>(new Set())
+  const [todayReturns, setTodayReturns] = useState<Set<string>>(new Set())
+  const [loadingTracking, setLoadingTracking] = useState(false)
+  const [overridingId, setOverridingId] = useState<string | null>(null)
+  const [filterMakan, setFilterMakan] = useState("semua") // semua | sudah_ambil | belum_ambil | sudah_kembali | belum_kembali
+
+  const fetchTodayTracking = useCallback(async () => {
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    if (!token) return
+
+    setLoadingTracking(true)
+    try {
+      const today = new Date().toISOString().split("T")[0]
+      const [pickupsRes, returnsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/pengambilan-makanan?tanggal=${today}&limit=2000`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/api/pengembalian-makanan?tanggal=${today}&limit=2000`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ])
+
+      if (pickupsRes.ok) {
+        const pickupsData = await pickupsRes.json()
+        const list = Array.isArray(pickupsData.data?.data) ? pickupsData.data.data : Array.isArray(pickupsData.data) ? pickupsData.data : []
+        setTodayPickups(new Set(list.map((p: any) => p.siswaId).filter(Boolean)))
+      }
+
+      if (returnsRes.ok) {
+        const returnsData = await returnsRes.json()
+        const list = Array.isArray(returnsData.data?.data) ? returnsData.data.data : Array.isArray(returnsData.data) ? returnsData.data : []
+        setTodayReturns(new Set(list.map((r: any) => r.siswaId).filter(Boolean)))
+      }
+    } catch (e) {
+      console.error("[SISWA] Error fetching today tracking:", e)
+    } finally {
+      setLoadingTracking(false)
+    }
+  }, [])
+
+  const handleManualPickup = async (siswaId: string) => {
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    if (!token) return
+
+    setOverridingId(siswaId)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/pengambilan-makanan/manual-override`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ siswaId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || "Gagal")
+      setTodayPickups((prev) => new Set([...prev, siswaId]))
+      alert("Berhasil tandai pengambilan makanan")
+    } catch (err: any) {
+      alert(err.message || "Gagal menandai pengambilan")
+    } finally {
+      setOverridingId(null)
+    }
+  }
+
+  const handleManualReturn = async (siswaId: string) => {
+    const token = localStorage.getItem("authToken") || localStorage.getItem("mbg_token")
+    if (!token) return
+
+    setOverridingId(siswaId)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/pengembalian-makanan/manual-override`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ siswaId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || "Gagal")
+      setTodayReturns((prev) => new Set([...prev, siswaId]))
+      alert("Berhasil tandai pengembalian tray")
+    } catch (err: any) {
+      alert(err.message || "Gagal menandai pengembalian")
+    } finally {
+      setOverridingId(null)
+    }
+  }
+
   const [searchTerm, setSearchTerm] = useState("")
   const [filterKelas, setFilterKelas] = useState("semua")
   const [filterStatus, setFilterStatus] = useState("semua")
@@ -339,6 +433,12 @@ const DataSiswa = () => {
     window.addEventListener("storage", handleStorageChange)
     return () => window.removeEventListener("storage", handleStorageChange)
   }, [credentialsReady])
+
+  // EFFECT 4: Fetch today's pengambilan & pengembalian tracking
+  useEffect(() => {
+    if (!credentialsReady) return
+    fetchTodayTracking()
+  }, [credentialsReady, fetchTodayTracking])
 
   const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -783,9 +883,15 @@ const DataSiswa = () => {
       const matchKelas = filterKelas === "semua" || siswa.kelas === filterKelas
       const matchStatus = filterStatus === "semua" || siswa.statusGizi === filterStatus
 
-      return matchSearch && matchKelas && matchStatus
+      let matchMakan = true
+      if (filterMakan === "sudah_ambil") matchMakan = todayPickups.has(siswa.id)
+      else if (filterMakan === "belum_ambil") matchMakan = !todayPickups.has(siswa.id)
+      else if (filterMakan === "sudah_kembali") matchMakan = todayReturns.has(siswa.id)
+      else if (filterMakan === "belum_kembali") matchMakan = todayPickups.has(siswa.id) && !todayReturns.has(siswa.id)
+
+      return matchSearch && matchKelas && matchStatus && matchMakan
     })
-  }, [siswaData, searchTerm, filterKelas, filterStatus])
+  }, [siswaData, searchTerm, filterKelas, filterStatus, filterMakan, todayPickups, todayReturns])
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage)
   const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
@@ -795,11 +901,12 @@ const DataSiswa = () => {
     const normal = siswaData.filter((s) => s.statusGizi === "NORMAL").length
     const giziKurang = siswaData.filter((s) => s.statusGizi === "GIZI_KURANG").length
     const giziBuruk = siswaData.filter((s) => s.statusGizi === "GIZI_BURUK").length
-    // Untuk saat ini, Risiko Stunting kita petakan ke Gizi Buruk (Status Gizi paling rendah)
     const stunted = giziBuruk
+    const sudahAmbil = siswaData.filter((s) => todayPickups.has(s.id)).length
+    const sudahKembali = siswaData.filter((s) => todayReturns.has(s.id)).length
 
-    return { total, normal, giziKurang, giziBuruk, stunted }
-  }, [siswaData])
+    return { total, normal, giziKurang, giziBuruk, stunted, sudahAmbil, sudahKembali }
+  }, [siswaData, todayPickups, todayReturns])
 
   const handleOpenDetailModal = (siswa: any) => {
     setSelectedSiswa(siswa)
@@ -941,12 +1048,43 @@ const DataSiswa = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-6 gap-y-1 border border-gray-100 rounded-xl p-5 bg-white mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 border border-gray-100 rounded-xl p-5 bg-white mb-4">
         <StatCard title="Total Siswa" value={stats.total} subtitle="Siswa terdaftar" color="text-[#1B263A]" icon={User} />
         <StatCard title="Gizi Normal" value={stats.normal} subtitle={`${stats.total > 0 ? Math.round((stats.normal / stats.total) * 100) : 0}% dari total`} color="text-emerald-600" icon={TrendingUp} />
         <StatCard title="Gizi Kurang" value={stats.giziKurang} subtitle="Perlu perhatian" color="text-amber-600" icon={AlertTriangle} />
         <StatCard title="Gizi Buruk" value={stats.giziBuruk} subtitle="Prioritas tinggi" color="text-red-600" icon={AlertCircle} />
-        <StatCard title="Risiko Stunting" value={stats.stunted} subtitle="Perlu intervensi" color="text-orange-600" icon={AlertTriangle} />
+      </div>
+
+      {/* Tracking Hari Ini */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+          <UtensilsCrossed className="w-5 h-5 text-blue-600 flex-shrink-0" />
+          <div>
+            <p className="text-lg font-bold text-blue-900">{stats.sudahAmbil}<span className="text-xs font-medium text-blue-500">/{stats.total}</span></p>
+            <p className="text-[10px] font-bold text-blue-600 uppercase">Sudah Ambil</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+          <AlertCircle className="w-5 h-5 text-gray-500 flex-shrink-0" />
+          <div>
+            <p className="text-lg font-bold text-gray-900">{stats.total - stats.sudahAmbil}</p>
+            <p className="text-[10px] font-bold text-gray-500 uppercase">Belum Ambil</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+          <RotateCcw className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+          <div>
+            <p className="text-lg font-bold text-emerald-900">{stats.sudahKembali}<span className="text-xs font-medium text-emerald-500">/{stats.sudahAmbil}</span></p>
+            <p className="text-[10px] font-bold text-emerald-600 uppercase">Tray Kembali</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl">
+          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+          <div>
+            <p className="text-lg font-bold text-amber-900">{stats.sudahAmbil - stats.sudahKembali}</p>
+            <p className="text-[10px] font-bold text-amber-600 uppercase">Tray Belum Kembali</p>
+          </div>
+        </div>
       </div>
 
       {stats.stunted > 0 && (
@@ -997,17 +1135,18 @@ const DataSiswa = () => {
           </div>
           <div>
             <select
-              value={filterStatus}
+              value={filterMakan}
               onChange={(e) => {
-                setFilterStatus(e.target.value)
+                setFilterMakan(e.target.value)
                 setCurrentPage(1)
               }}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
             >
-              <option value="semua">Semua Status</option>
-              <option value="NORMAL">Normal</option>
-              <option value="OBESITAS">Obesitas</option>
-              <option value="GIZI_BURUK">Gizi Buruk</option>
+              <option value="semua">Semua Status Makan</option>
+              <option value="sudah_ambil">Sudah Ambil</option>
+              <option value="belum_ambil">Belum Ambil</option>
+              <option value="sudah_kembali">Sudah Kembali</option>
+              <option value="belum_kembali">Belum Kembali Tray</option>
             </select>
           </div>
         </div>
@@ -1022,11 +1161,10 @@ const DataSiswa = () => {
                 <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">NIS</th>
                 <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Nama</th>
                 <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Kelas</th>
-                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">L/P</th>
-                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Umur</th>
-                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">TB</th>
-                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">BB</th>
-                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">TB/BB</th>
+                <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status Gizi</th>
+                <th className="text-center py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Ambil Tray</th>
+                <th className="text-center py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Kembali Tray</th>
                 <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
               </tr>
             </thead>
@@ -1036,6 +1174,10 @@ const DataSiswa = () => {
                 if (fotoSrc && !fotoSrc.startsWith("data:") && !fotoSrc.startsWith("http")) {
                   fotoSrc = `${API_BASE_URL}${fotoSrc}`
                 }
+
+                const hasPickup = todayPickups.has(siswa.id)
+                const hasReturn = todayReturns.has(siswa.id)
+                const isOverriding = overridingId === siswa.id
 
                 return (
                   <tr key={siswa.id} className="hover:bg-gray-50/50 transition-colors">
@@ -1055,18 +1197,51 @@ const DataSiswa = () => {
                     <td className="py-3 px-4 text-sm text-gray-900 font-medium">{siswa.nis}</td>
                     <td className="py-3 px-4 text-sm text-gray-900">{siswa.nama}</td>
                     <td className="py-3 px-4 text-sm text-gray-600">{siswa.kelas}</td>
-                    <td className="py-3 px-4 text-sm text-gray-600">
-                      {siswa.jenisKelamin === "LAKI_LAKI" ? "L" : "P"}
+                    <td className="py-3 px-4 text-xs text-gray-600">
+                      {siswa.tinggiBadan}cm / {siswa.beratBadan}kg
                     </td>
-                    <td className="py-3 px-4 text-sm text-gray-600">{siswa.umur} th</td>
-                    <td className="py-3 px-4 text-sm text-gray-600">{siswa.tinggiBadan} cm</td>
-                    <td className="py-3 px-4 text-sm text-gray-600">{siswa.beratBadan} kg</td>
                     <td className="py-3 px-4">
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(siswa.statusGizi)}`}
                       >
                         {displayStatusText(siswa.statusGizi)}
                       </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {hasPickup ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
+                          <CheckCircle className="w-3 h-3" /> Sudah
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleManualPickup(siswa.id)}
+                          disabled={isOverriding}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                          title="Konfirmasi sudah ambil makanan"
+                        >
+                          {isOverriding ? <Loader2 className="w-3 h-3 animate-spin" /> : <UtensilsCrossed className="w-3 h-3" />}
+                          Belum
+                        </button>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {hasReturn ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
+                          <CheckCircle className="w-3 h-3" /> Sudah
+                        </span>
+                      ) : hasPickup ? (
+                        <button
+                          onClick={() => handleManualReturn(siswa.id)}
+                          disabled={isOverriding}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                          title="Konfirmasi sudah kembalikan tray"
+                        >
+                          {isOverriding ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                          Belum
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">-</span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1">

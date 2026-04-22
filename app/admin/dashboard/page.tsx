@@ -359,12 +359,19 @@ const AdminDashboard = () => {
       const schoolStatsMap = new Map();
       schoolStats.forEach((s: any) => schoolStatsMap.get(s.id) ? null : schoolStatsMap.set(s.id, s));
 
-      const planningsRes = await fetch(`${API_BASE_URL}/api/menu-planning?limit=500&page=1`, {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-      const planningsData = await planningsRes.json();
-      const allPlannings = Array.isArray(planningsData.data?.data) ? planningsData.data.data : (Array.isArray(planningsData.data) ? planningsData.data : []);
-      const relevantPlannings = allPlannings.filter((p: any) => kitchenIds.includes(p.dapurId) || kitchenIds.includes(p.dapur?.id));
+      // Fetch plannings PER DAPUR to avoid pagination cutoff when multiple dapurs selected
+      const planningsPerDapur = await Promise.all(
+        kitchenIds.map(async (dapurId: string) => {
+          try {
+            const res = await fetch(`${API_BASE_URL}/api/menu-planning?dapurId=${dapurId}&limit=500&page=1`, {
+              headers: { Authorization: `Bearer ${authToken}` }
+            });
+            const data = await res.json();
+            return Array.isArray(data.data?.data) ? data.data.data : (Array.isArray(data.data) ? data.data : []);
+          } catch (e) { return []; }
+        })
+      );
+      const relevantPlannings = planningsPerDapur.flat();
 
       setReportProgress(15);
 
@@ -382,7 +389,8 @@ const AdminDashboard = () => {
       const daySchoolDataCache = new Map<string, any>();
       // Track pengambilan & pengembalian siswaIds per date per school
       const dailyPickupSiswaBySchool = new Map<string, Map<string, Set<string>>>(); // dateKey -> schoolId -> Set<siswaId>
-      const dailyReturnSiswaBySchool = new Map<string, Map<string, Set<string>>>(); // dateKey -> schoolId -> Set<siswaId>
+      const dailyReturnSiswaBySchool = new Map<string, Map<string, Map<string, { status: string | null, keterangan: string | null }>>>(); // dateKey -> schoolId -> siswaId -> returnInfo
+      const datesWithMenu = new Set<string>(); // dateKeys yang punya menu terjadwal
 
       // Manual date start to avoid TZ shift
       const startParts = startDate.split('-').map(Number);
@@ -422,7 +430,7 @@ const AdminDashboard = () => {
 
         // 3.0b Fetch ALL pengembalian-makanan for this date
         let dateReturnBySchool = new Map<string, number>();
-        const dateReturnSiswaBySchool = new Map<string, Set<string>>();
+        const dateReturnSiswaBySchool = new Map<string, Map<string, { status: string | null, keterangan: string | null }>>();
         try {
           const returnsRes = await fetch(`${API_BASE_URL}/api/pengembalian-makanan?tanggal=${dateKey}&limit=2000`, {
             headers: { Authorization: `Bearer ${authToken}` }
@@ -433,8 +441,13 @@ const AdminDashboard = () => {
             returnsList.forEach((r: any) => {
               if (r.sekolahId) {
                 dateReturnBySchool.set(r.sekolahId, (dateReturnBySchool.get(r.sekolahId) || 0) + 1);
-                if (!dateReturnSiswaBySchool.has(r.sekolahId)) dateReturnSiswaBySchool.set(r.sekolahId, new Set());
-                if (r.siswaId) dateReturnSiswaBySchool.get(r.sekolahId)!.add(r.siswaId);
+                if (!dateReturnSiswaBySchool.has(r.sekolahId)) dateReturnSiswaBySchool.set(r.sekolahId, new Map());
+                if (r.siswaId) {
+                  dateReturnSiswaBySchool.get(r.sekolahId)!.set(r.siswaId, {
+                    status: r.status || null,
+                    keterangan: r.keterangan || null,
+                  });
+                }
               }
             });
           }
@@ -715,6 +728,8 @@ const AdminDashboard = () => {
         const dayMenusRaw = (await Promise.all(dayMenusPromises)).flat();
         const dayMenus = dayMenusRaw.filter(m => m !== null);
 
+        if (dayMenus.length > 0) datesWithMenu.add(dateKey);
+
         dayMenus.forEach((m: any) => {
           const cpX = (types: string[]) => {
             const found = (m.checkpoints || []).find((c: any) =>
@@ -751,6 +766,13 @@ const AdminDashboard = () => {
       let breakdownDate = dayjs(new Date(breakdownStartParts[0], breakdownStartParts[1] - 1, breakdownStartParts[2]));
       for (let i = 0; i <= diffDays; i++) {
         const dKey = breakdownDate.format('YYYY-MM-DD');
+
+        // Skip tanggal yang gak ada menu — gak perlu ada di chart maupun breakdown per-siswa
+        if (!datesWithMenu.has(dKey)) {
+          breakdownDate = breakdownDate.add(1, 'day');
+          continue;
+        }
+
         const dDisplay = breakdownDate.locale('id').format('dddd, D MMMM YYYY');
         const dShort = breakdownDate.format('DD/MM');
         const pickupMap = dailyPickupSiswaBySchool.get(dKey) || new Map();
@@ -761,7 +783,8 @@ const AdminDashboard = () => {
         schoolSiswaListMap.forEach((siswaList, schoolId) => {
           const schName = schoolNameMap.get(schoolId) || '-';
           const pickupSet = pickupMap.get(schoolId) || new Set();
-          const returnSet = returnMap.get(schoolId) || new Set();
+          const returnInfoMap: Map<string, { status: string | null, keterangan: string | null }> =
+            returnMap.get(schoolId) || new Map();
 
           // Sort by kelas then nama
           const sorted = [...siswaList].sort((a, b) => {
@@ -773,12 +796,23 @@ const AdminDashboard = () => {
 
           sorted.forEach((s: any) => {
             const sudahAmbil = pickupSet.has(s.id);
-            const sudahKembali = returnSet.has(s.id);
+            const returnInfo = returnInfoMap.get(s.id);
+            const sudahKembali = !!returnInfo;
             let statusMakan = 'TIDAK MAKAN';
             if (sudahAmbil && sudahKembali) { statusMakan = 'SUDAH MAKAN & KEMBALI'; dayMakan++; dayKembali++; }
             else if (sudahAmbil) { statusMakan = 'SUDAH MAKAN'; dayMakan++; }
             else { dayTidakMakan++; }
             dayTotal++;
+
+            // Status makanan dari tabel pengembalian_makanan
+            let statusMakanan = '-';
+            if (sudahKembali) {
+              if (returnInfo?.status === 'HABIS') statusMakanan = 'HABIS';
+              else if (returnInfo?.status === 'TIDAK_HABIS') statusMakanan = 'TIDAK HABIS';
+              else statusMakanan = 'HABIS'; // default kalau kolom kosong (row lama sebelum migrasi)
+            }
+
+            const keterangan = returnInfo?.keterangan?.trim() || '-';
 
             studentBreakdownRows.push([
               studentBreakdownRows.length + 1,
@@ -789,6 +823,8 @@ const AdminDashboard = () => {
               s.nis || '-',
               sudahAmbil ? 'YA' : 'TIDAK',
               sudahKembali ? 'YA' : 'TIDAK',
+              statusMakanan,
+              keterangan,
               statusMakan
             ]);
           });
@@ -1057,14 +1093,17 @@ const AdminDashboard = () => {
         doc.setFontSize(12); doc.text(`Periode: ${startDate} s/d ${endDate}`, doc.internal.pageSize.width / 2, 30, { align: 'center' });
 
         autoTable(doc, {
-          head: [['No.', 'Tanggal', 'Sekolah', 'Kelas', 'Nama Siswa', 'NIS', 'Ambil Makanan', 'Kembalikan Tray', 'Status']],
+          head: [['No.', 'Tanggal', 'Sekolah', 'Kelas', 'Nama Siswa', 'NIS', 'Ambil Makanan', 'Kembalikan Tray', 'Status Makanan', 'Keterangan', 'Status']],
           body: studentBreakdownRows, startY: 40, theme: 'grid',
           headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontSize: 7, halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0] },
           bodyStyles: { fontSize: 7, halign: 'center', textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0] },
           margin: { top: 40 },
+          columnStyles: {
+            9: { halign: 'left', cellWidth: 'auto' }, // Keterangan align kiri biar enak dibaca
+          },
           didParseCell: (data: any) => {
-            // Color code status column
-            if (data.section === 'body' && data.column.index === 8) {
+            // Color code overall status column (index 10)
+            if (data.section === 'body' && data.column.index === 10) {
               const val = String(data.cell.raw);
               if (val === 'TIDAK MAKAN') {
                 data.cell.styles.textColor = [220, 38, 38]; // red
@@ -1075,6 +1114,19 @@ const AdminDashboard = () => {
               } else if (val === 'SUDAH MAKAN') {
                 data.cell.styles.textColor = [245, 158, 11]; // amber
                 data.cell.styles.fontStyle = 'bold';
+              }
+            }
+            // Color code Status Makanan column (index 8)
+            if (data.section === 'body' && data.column.index === 8) {
+              const val = String(data.cell.raw);
+              if (val === 'HABIS') {
+                data.cell.styles.textColor = [22, 163, 74]; // green
+                data.cell.styles.fontStyle = 'bold';
+              } else if (val === 'TIDAK HABIS') {
+                data.cell.styles.textColor = [245, 158, 11]; // amber
+                data.cell.styles.fontStyle = 'bold';
+              } else {
+                data.cell.styles.textColor = [156, 163, 175]; // gray for "-"
               }
             }
             // Color code YA/TIDAK columns

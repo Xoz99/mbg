@@ -285,20 +285,20 @@ const PengembalianMakanan = () => {
     if (!videoRef.current) return
     const canvas = document.createElement("canvas")
     const maxWidth = 800
-    const scale =  videoRef.current.videoWidth > maxWidth ? maxWidth / videoRef.current.videoWidth : 1
-    
+    const scale = videoRef.current.videoWidth > maxWidth ? maxWidth / videoRef.current.videoWidth : 1
+
     canvas.width = videoRef.current.videoWidth * scale
     canvas.height = videoRef.current.videoHeight * scale
-    
+
     const ctx = canvas.getContext("2d")
     if (ctx) {
       if (scale < 1) {
-         ctx.scale(scale, scale)
+        ctx.scale(scale, scale)
       }
       ctx.drawImage(videoRef.current, 0, 0)
-      
+
       const photoData = canvas.toDataURL("image/jpeg", 0.6) // Compress higher to reduce size
-      
+
       if (stepRef.current === "camera-face") {
         setFacePhoto(photoData)
         stopCamera()
