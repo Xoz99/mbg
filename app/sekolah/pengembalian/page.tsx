@@ -297,6 +297,39 @@ const PengembalianMakanan = () => {
       }
       ctx.drawImage(videoRef.current, 0, 0)
 
+      // Watermark timestamp untuk foto tray pengembalian (bukti audit sisa makanan)
+      if (stepRef.current === "camera-food") {
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+
+        const now = new Date()
+        const pad = (n: number) => String(n).padStart(2, "0")
+        const timestamp = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} WIB`
+        const siswaLine = selectedSiswa ? `${selectedSiswa.nama}${selectedSiswa.nis ? ` · NIS ${selectedSiswa.nis}` : ""}` : ""
+        const trayLine = trayId ? `Tray: ${trayId}` : ""
+        const lines = ["PENGEMBALIAN", timestamp, siswaLine, trayLine].filter(Boolean) as string[]
+
+        const fontSize = Math.max(14, Math.floor(canvas.width / 36))
+        ctx.font = `bold ${fontSize}px Arial, sans-serif`
+        ctx.textBaseline = "top"
+
+        const padding = Math.floor(fontSize * 0.6)
+        const lineHeight = Math.floor(fontSize * 1.25)
+        const maxTextWidth = Math.max(...lines.map((l) => ctx.measureText(l).width))
+        const boxWidth = maxTextWidth + padding * 2
+        const boxHeight = lineHeight * lines.length + padding
+        const margin = Math.floor(fontSize * 0.5)
+        const boxX = canvas.width - boxWidth - margin
+        const boxY = canvas.height - boxHeight - margin
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.55)"
+        ctx.fillRect(boxX, boxY, boxWidth, boxHeight)
+
+        ctx.fillStyle = "#ffffff"
+        lines.forEach((line, i) => {
+          ctx.fillText(line, boxX + padding, boxY + padding / 2 + i * lineHeight)
+        })
+      }
+
       const photoData = canvas.toDataURL("image/jpeg", 0.6) // Compress higher to reduce size
 
       if (stepRef.current === "camera-face") {
@@ -310,7 +343,7 @@ const PengembalianMakanan = () => {
         setStep("keterangan")
       }
     }
-  }, [stopCamera])
+  }, [stopCamera, selectedSiswa, trayId])
 
   const startCountdown = useCallback(() => {
     setCountdown(3)
